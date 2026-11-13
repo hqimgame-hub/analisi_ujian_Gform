@@ -11,6 +11,7 @@ import { LoginPage } from './pages/LoginPage';
 import { GuruAppPage } from './pages/GuruAppPage';
 import { WaliKelasAppPage } from './pages/WaliKelasAppPage';
 import { AdminAppPage } from './pages/AdminAppPage';
+import { PublicExamMonitoringPage } from './pages/PublicExamMonitoringPage';
 import { authService } from './services/auth';
 import { dbService } from './services/database';
 import { User } from './types/database';
@@ -64,7 +65,7 @@ function AppContent() {
     if (clean === '' || clean === '/' || clean === '/index.html' || clean === '/login') {
       return '/login';
     }
-    if (clean === '/hasil' || clean === '/guru' || clean === '/admin' || clean === '/wali-kelas') {
+    if (clean === '/hasil' || clean === '/guru' || clean === '/admin' || clean === '/wali-kelas' || clean === '/rekap') {
       return clean;
     }
     return '/login';
@@ -163,6 +164,12 @@ function AppContent() {
         {activeRoute === '/hasil' && (
           <ErrorBoundary>
             <StudentPortalPage />
+          </ErrorBoundary>
+        )}
+
+        {activeRoute === '/rekap' && (
+          <ErrorBoundary>
+            <PublicExamMonitoringPage onNavigate={navigateTo} />
           </ErrorBoundary>
         )}
 

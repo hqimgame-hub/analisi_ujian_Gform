@@ -3,8 +3,10 @@ import {
   TeacherSubject, Material, Competency, Tryout, TryoutSubject, Question,
   TryoutQuestion, GoogleForm, Response, Answer, Score, QuestionAnalysis,
   Explanation, Report, AuditLog, TryoutStatus, ScoringConfig, Role, SchoolProfile,
-  ExamPackage, ExamPackageSubject
+  ExamPackage, ExamPackageSubject, LiveMonitoringConfig, MonitoringSubjectItem,
+  StudentMonitoringItem, LiveMonitoringPayload
 } from '../types/database';
+import { resolveTryoutGroup } from '../utils/tryoutGroupUtils';
 import {
   INITIAL_ACADEMIC_YEARS, INITIAL_USERS, INITIAL_TEACHERS, INITIAL_CLASSES,
   INITIAL_SUBJECTS, INITIAL_TEACHER_SUBJECTS, INITIAL_MATERIALS,
@@ -37,6 +39,7 @@ const SCHOOL_PROFILE_CACHE_KEY = 'wikan_school_profile_cache_v1';
 const DELETED_TRYOUTS_KEY = 'school_tryout_deleted_ids_v1';
 const DELETED_SUBJECTS_KEY = 'school_tryout_deleted_subjects_v1';
 const DELETED_EXPLANATIONS_KEY = 'school_tryout_deleted_explanations_v1';
+const LIVE_MONITORING_CACHE_KEY = 'wikan_live_monitoring_cache_v1';
 
 export interface DatabaseState {
   users: User[];
@@ -63,6 +66,7 @@ export interface DatabaseState {
   reports: Report[];
   auditLogs: AuditLog[];
   schoolProfile?: SchoolProfile;
+  liveMonitoringConfig?: LiveMonitoringConfig;
 }
 
 export class DatabaseService {
@@ -1585,6 +1589,31 @@ export class DatabaseService {
     }
   }
 
+  private loadCachedLiveMonitoringConfig(): LiveMonitoringConfig | undefined {
+    if (typeof window === 'undefined' || !window.localStorage) return undefined;
+    try {
+      const raw = localStorage.getItem(LIVE_MONITORING_CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && typeof parsed.isEnabled === 'boolean') {
+          return parsed as LiveMonitoringConfig;
+        }
+      }
+    } catch (e) {
+      console.warn('[DB] Failed to load cached live monitoring config:', e);
+    }
+    return undefined;
+  }
+
+  private saveCachedLiveMonitoringConfig(config: LiveMonitoringConfig): void {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+      localStorage.setItem(LIVE_MONITORING_CACHE_KEY, JSON.stringify(config));
+    } catch (e) {
+      console.warn('[DB] Failed to save live monitoring cache:', e);
+    }
+  }
+
   public applySchoolProfile(cloudProfile: SchoolProfile): boolean {
     const current = this.state?.schoolProfile || this.loadCachedSchoolProfile() || this.getSchoolProfile();
     const hasDiff =
@@ -1835,6 +1864,272 @@ export class DatabaseService {
       );
     }
     return updated;
+  }
+
+  public getLiveMonitoringConfig(): LiveMonitoringConfig {
+    if (this.state.liveMonitoringConfig) {
+      return this.state.liveMonitoringConfig;
+    }
+    const cached = this.loadCachedLiveMonitoringConfig();
+    if (cached) {
+      this.state.liveMonitoringConfig = cached;
+      return cached;
+    }
+    const defaultPackage = this.state.examPackages?.[0];
+    const defaultConfig: LiveMonitoringConfig = {
+      isEnabled: false,
+      targetType: defaultPackage ? 'EXAM_PACKAGE' : 'TRYOUT_STAGE',
+      targetId: defaultPackage ? defaultPackage.id : 'TO 1',
+      hideScores: true,
+      lastUpdated: new Date().toISOString()
+    };
+    this.state.liveMonitoringConfig = defaultConfig;
+    return defaultConfig;
+  }
+
+  public updateLiveMonitoringConfig(config: Partial<LiveMonitoringConfig>, currentUser?: any): LiveMonitoringConfig {
+    if (currentUser) {
+      this.assertAdmin(currentUser, 'UPDATE_LIVE_MONITORING_CONFIG');
+    }
+    const current = this.getLiveMonitoringConfig();
+    const updated: LiveMonitoringConfig = {
+      ...current,
+      ...config,
+      lastUpdated: new Date().toISOString()
+    };
+    this.state.liveMonitoringConfig = updated;
+    this.saveCachedLiveMonitoringConfig(updated);
+    this.persistState();
+    this.notifyListeners();
+    if (currentUser) {
+      this.logAudit(
+        currentUser,
+        'UPDATE_LIVE_MONITORING_CONFIG',
+        'SYSTEM',
+        `Admin mengubah status live monitoring (${updated.isEnabled ? 'AKTIF' : 'NONAKTIF'}, target: ${updated.targetId})`
+      );
+    }
+    return updated;
+  }
+
+  public getLiveMonitoringData(selectedSubjectId?: string): LiveMonitoringPayload {
+    const config = this.getLiveMonitoringConfig();
+    const allTryouts = this.state.tryouts || [];
+    const allPackages = this.state.examPackages || [];
+    const allClasses = this.state.classes || [];
+    const allStudents = (this.state.students || []).filter(s => !s.isAnswerKeyAccount);
+    const allScores = this.state.scores || [];
+    const allResponses = this.state.responses || [];
+
+    let title = 'Live Monitoring Asesmen';
+    let subTitle = `Tahun Ajaran ${this.getSchoolProfile().academicYear}`;
+    let assessmentType = 'TRYOUT';
+    let targetClassIds: string[] = [];
+    let targetGrades: string[] = [];
+
+    const subjectItemsMap = new Map<string, {
+      subject: Subject;
+      tryoutIds: string[];
+      passingGrade: number;
+    }>();
+
+    if (config.targetType === 'EXAM_PACKAGE') {
+      const pkg = allPackages.find(p => p.id === config.targetId) || allPackages[0];
+      if (pkg) {
+        title = pkg.title;
+        assessmentType = pkg.assessmentType || 'TRYOUT';
+        subTitle = `Paket ${assessmentType} · TP ${this.getSchoolProfile().academicYear}`;
+        targetClassIds = pkg.targetClassIds || [];
+        targetGrades = pkg.targetGrades || [];
+
+        (pkg.subjects || []).forEach(ps => {
+          const sub = this.state.subjects.find(s => s.id === ps.subjectId);
+          if (sub) {
+            const matchingTryouts = allTryouts.filter(t =>
+              (t.packageId === pkg.id && (t.subjectId === sub.id || !t.subjectId)) ||
+              (t.packageId === pkg.id && t.title.toLowerCase().includes(sub.name.toLowerCase()))
+            );
+            const tryoutIds = matchingTryouts.map(t => t.id);
+            if (tryoutIds.length === 0) {
+              const anyPkgTryout = allTryouts.find(t => t.packageId === pkg.id);
+              if (anyPkgTryout) tryoutIds.push(anyPkgTryout.id);
+            }
+            subjectItemsMap.set(sub.id, {
+              subject: sub,
+              tryoutIds,
+              passingGrade: ps.passingGrade || sub.passingGrade || 75
+            });
+          }
+        });
+      }
+    } else {
+      const stageLabel = config.targetId || 'TO 1';
+      title = `Try Out Siklus ${stageLabel}`;
+      assessmentType = 'TRYOUT';
+      subTitle = `Siklus ${stageLabel} · TP ${this.getSchoolProfile().academicYear}`;
+
+      const matchingTryouts = allTryouts.filter(t => {
+        const grp = resolveTryoutGroup(t, allTryouts, allPackages);
+        return grp === stageLabel;
+      });
+
+      matchingTryouts.forEach(t => {
+        let sub = t.subjectId ? this.state.subjects.find(s => s.id === t.subjectId) : undefined;
+        if (!sub) {
+          sub = this.state.subjects.find(s => t.title.toLowerCase().includes(s.name.toLowerCase()));
+        }
+        if (sub) {
+          const existing = subjectItemsMap.get(sub.id);
+          if (existing) {
+            if (!existing.tryoutIds.includes(t.id)) existing.tryoutIds.push(t.id);
+          } else {
+            subjectItemsMap.set(sub.id, {
+              subject: sub,
+              tryoutIds: [t.id],
+              passingGrade: t.scoringConfig?.passingGrade || sub.passingGrade || 75
+            });
+          }
+        }
+      });
+    }
+
+    if (subjectItemsMap.size === 0 && this.state.subjects.length > 0) {
+      this.state.subjects.slice(0, 4).forEach(sub => {
+        subjectItemsMap.set(sub.id, {
+          subject: sub,
+          tryoutIds: [],
+          passingGrade: sub.passingGrade || 75
+        });
+      });
+    }
+
+    let filteredClasses = allClasses;
+    if (targetClassIds.length > 0) {
+      filteredClasses = allClasses.filter(c => targetClassIds.includes(c.id));
+    } else if (targetGrades.length > 0) {
+      filteredClasses = allClasses.filter(c => targetGrades.includes(c.gradeLevel));
+    }
+    const filteredClassIds = new Set(filteredClasses.map(c => c.id));
+
+    let eligibleStudents = allStudents;
+    if (filteredClassIds.size > 0 && targetClassIds.length > 0) {
+      eligibleStudents = allStudents.filter(s => filteredClassIds.has(s.classId));
+    }
+
+    const subjectList: MonitoringSubjectItem[] = [];
+    subjectItemsMap.forEach(({ subject, tryoutIds, passingGrade }, subId) => {
+      let submittedCount = 0;
+      if (tryoutIds.length > 0) {
+        const submittedStudentIds = new Set<string>();
+        allScores.forEach(sc => {
+          if (tryoutIds.includes(sc.tryoutId)) submittedStudentIds.add(sc.studentId);
+        });
+        allResponses.forEach(r => {
+          if (tryoutIds.includes(r.tryoutId)) submittedStudentIds.add(r.studentId);
+        });
+        submittedCount = eligibleStudents.filter(st => submittedStudentIds.has(st.id)).length;
+      }
+
+      subjectList.push({
+        id: subId,
+        name: subject.name,
+        code: subject.code,
+        passingGrade,
+        totalStudents: eligibleStudents.length,
+        submittedCount
+      });
+    });
+
+    const activeSubjectId = (selectedSubjectId && subjectItemsMap.has(selectedSubjectId))
+      ? selectedSubjectId
+      : (subjectList[0]?.id || '');
+    const activeSubjectInfo = activeSubjectId ? subjectItemsMap.get(activeSubjectId) : undefined;
+    const activeSubjectItem = subjectList.find(s => s.id === activeSubjectId);
+
+    const activeTryoutIds = activeSubjectInfo?.tryoutIds || [];
+    const activePassingGrade = activeSubjectInfo?.passingGrade || 75;
+
+    const studentScoreMap = new Map<string, Score>();
+    const studentResponseMap = new Map<string, Response>();
+
+    if (activeTryoutIds.length > 0) {
+      allScores.forEach(sc => {
+        if (activeTryoutIds.includes(sc.tryoutId)) {
+          studentScoreMap.set(sc.studentId, sc);
+        }
+      });
+      allResponses.forEach(r => {
+        if (activeTryoutIds.includes(r.tryoutId)) {
+          studentResponseMap.set(r.studentId, r);
+        }
+      });
+    }
+
+    const studentRows: StudentMonitoringItem[] = eligibleStudents.map(student => {
+      const cls = allClasses.find(c => c.id === student.classId);
+      const scoreObj = studentScoreMap.get(student.id);
+      const respObj = studentResponseMap.get(student.id);
+      const isSubmitted = !!scoreObj || !!respObj;
+
+      let scoreVal: number | undefined = undefined;
+      if (scoreObj) {
+        scoreVal = typeof scoreObj.calculatedScore === 'number'
+          ? scoreObj.calculatedScore
+          : (typeof scoreObj.googleFormScore === 'number' ? scoreObj.googleFormScore : scoreObj.subjectScores?.[activeSubjectId]);
+      } else if (respObj && typeof respObj.rawScoreGForm === 'number') {
+        scoreVal = respObj.rawScoreGForm;
+      }
+
+      return {
+        studentId: student.id,
+        nisn: student.nisn,
+        name: student.name,
+        gender: student.gender,
+        classId: student.classId,
+        className: cls?.name || 'Kelas -',
+        gradeLevel: cls?.gradeLevel || '',
+        isSubmitted,
+        submittedAt: respObj?.submittedAt || scoreObj?.createdAt,
+        score: scoreVal,
+        passingGrade: activePassingGrade
+      };
+    });
+
+    const submittedRows = studentRows.filter(s => s.isSubmitted);
+    const submittedCount = submittedRows.length;
+    const unsubmittedCount = studentRows.length - submittedCount;
+    const scoresArray = submittedRows
+      .map(s => s.score)
+      .filter((sc): sc is number => typeof sc === 'number' && !isNaN(sc));
+
+    const totalScoresSum = scoresArray.reduce((acc, curr) => acc + curr, 0);
+    const averageScore = scoresArray.length > 0 ? Math.round((totalScoresSum / scoresArray.length) * 10) / 10 : 0;
+    const highestScore = scoresArray.length > 0 ? Math.max(...scoresArray) : 0;
+    const lowestScore = scoresArray.length > 0 ? Math.min(...scoresArray) : 0;
+
+    const gradeLevels = Array.from(new Set(filteredClasses.map(c => c.gradeLevel))).filter(Boolean).sort();
+
+    return {
+      config,
+      title,
+      subTitle,
+      targetType: config.targetType,
+      assessmentType,
+      subjects: subjectList,
+      activeSubject: activeSubjectItem,
+      students: studentRows,
+      classes: filteredClasses,
+      gradeLevels,
+      summary: {
+        totalStudents: studentRows.length,
+        submittedCount,
+        unsubmittedCount,
+        averageScore,
+        highestScore,
+        lowestScore
+      },
+      lastSyncedAt: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    };
   }
 
   // SECURITY: Require Admin Authorization Helper

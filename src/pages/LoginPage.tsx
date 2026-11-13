@@ -23,10 +23,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   isStaffModalOpen: externalStaffModalOpen,
   setIsStaffModalOpen: externalSetIsStaffModalOpen,
 }) => {
-    const [schoolProfile, setSchoolProfile] = useState(() => dbService.getSchoolProfile());
+  const [schoolProfile, setSchoolProfile] = useState(() => dbService.getSchoolProfile());
+  const [monitoringConfig, setMonitoringConfig] = useState(() => dbService.getLiveMonitoringConfig());
   useEffect(() => {
     return dbService.subscribe(() => {
       setSchoolProfile(dbService.getSchoolProfile());
+      setMonitoringConfig(dbService.getLiveMonitoringConfig());
     });
   }, []);
   const [internalStaffModalOpen, setInternalStaffModalOpen] = useState(!!returnTo);
@@ -194,6 +196,47 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               <span>Verifikasi &amp; Buka Hasil Siswa</span>
             </button>
           </form>
+
+          {/* Tombol Akses Cepat Live Rekap Ujian (Hanya Muncul Jika Diaktifkan Admin) */}
+          {monitoringConfig.isEnabled && (
+            <div className="pt-2">
+              <div className="relative flex py-2 items-center">
+                <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+                <span className="flex-shrink mx-3 text-[10px] font-bold uppercase tracking-wider text-rose-500 dark:text-rose-400 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping inline-block" />
+                  Live Asesmen
+                </span>
+                <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (onNavigate) onNavigate('/rekap');
+                  else window.location.href = '/rekap';
+                }}
+                className="w-full py-2.5 px-4 bg-gradient-to-r from-rose-500/10 via-rose-500/5 to-indigo-500/10 hover:from-rose-500/20 hover:to-indigo-500/20 border border-rose-300 dark:border-rose-800/80 rounded-2xl transition-all cursor-pointer group flex items-center justify-between shadow-xs"
+              >
+                <div className="flex items-center gap-2.5 text-left">
+                  <span className="relative flex h-3 w-3 shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+                  </span>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900 dark:text-slate-100 group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">
+                      Pantau Live Rekap Ujian
+                    </p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                      Cek kehadiran &amp; progres siswa real-time
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-rose-600 dark:text-rose-400 group-hover:translate-x-0.5 transition-transform">
+                  Buka ➔
+                </span>
+              </button>
+            </div>
+          )}
 
 
         </div>

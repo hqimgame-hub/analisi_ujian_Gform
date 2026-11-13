@@ -463,3 +463,59 @@ export interface SchoolProfile {
   logoUrl?: string;
 }
 
+export interface LiveMonitoringConfig {
+  isEnabled: boolean;
+  targetType: 'EXAM_PACKAGE' | 'TRYOUT_STAGE';
+  targetId: string; // packageId or groupKey ('TO 1', 'TO 2', etc.)
+  hideScores: boolean;
+  lastUpdated?: string;
+}
+
+export interface MonitoringSubjectItem {
+  id: string;
+  name: string;
+  code: string;
+  tryoutId?: string;
+  passingGrade?: number;
+  totalStudents: number;
+  submittedCount: number;
+}
+
+export interface StudentMonitoringItem {
+  studentId: string;
+  nisn: string;
+  name: string;
+  gender: 'L' | 'P';
+  classId: string;
+  className: string;
+  gradeLevel: string;
+  isSubmitted: boolean;
+  submittedAt?: string;
+  score?: number;
+  passingGrade?: number;
+}
+
+export interface LiveMonitoringPayload {
+  config: LiveMonitoringConfig;
+  title: string;
+  subTitle: string;
+  targetType: 'EXAM_PACKAGE' | 'TRYOUT_STAGE';
+  assessmentType: string;
+  subjects: MonitoringSubjectItem[];
+  activeSubject?: MonitoringSubjectItem;
+  students: StudentMonitoringItem[];
+  classes: ClassRoom[];
+  gradeLevels: string[];
+  summary: {
+    totalStudents: number;
+    submittedCount: number;
+    unsubmittedCount: number;
+    averageScore: number;
+    highestScore: number;
+    lowestScore: number;
+  };
+  lastSyncedAt: string;
+}
+
+
+

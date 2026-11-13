@@ -5,13 +5,15 @@ import {
   AlertCircle, ShieldAlert, Search, Trash2, Edit3,
   Layers, ChevronLeft, ChevronRight, Check, AlertTriangle,
   FileSpreadsheet, Sparkles, Download, Upload, UserPlus,
-  Award, FileText, ArrowRight, FolderKanban, ChevronDown, ChevronUp, Cloud, Key
+  Award, FileText, ArrowRight, FolderKanban, ChevronDown, ChevronUp, Cloud, Key,
+  Radio, EyeOff, ExternalLink
 } from 'lucide-react';
 import { dbService } from '../services/database';
 import {
   User, Teacher, Student, ClassRoom, AcademicYear, Subject,
-  AuditLog, Role, ExamPackage
+  AuditLog, Role, ExamPackage, LiveMonitoringConfig
 } from '../types/database';
+import { getDynamicTryoutStageOptions } from '../utils/tryoutGroupUtils';
 import { ExamPackagesSection } from '../components/admin/ExamPackagesSection';
 import * as XLSX from 'xlsx';
 
@@ -75,6 +77,7 @@ export const AdminAppPage: React.FC<AdminAppPageProps> = ({ currentUser, onNavig
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [examPackages, setExamPackages] = useState<ExamPackage[]>(() => dbService.getExamPackages());
+  const [monitoringConfig, setMonitoringConfig] = useState<LiveMonitoringConfig>(() => dbService.getLiveMonitoringConfig());
 
   // Modals State
   const [modalType, setModalType] = useState<
@@ -265,6 +268,7 @@ export const AdminAppPage: React.FC<AdminAppPageProps> = ({ currentUser, onNavig
     setSchoolPrincipalNip(sp.principalNip);
     setSchoolAcademicYear(sp.academicYear);
     setSchoolLogoUrl(sp.logoUrl || '');
+    setMonitoringConfig(dbService.getLiveMonitoringConfig());
   };
 
   useEffect(() => {
@@ -2313,6 +2317,224 @@ export const AdminAppPage: React.FC<AdminAppPageProps> = ({ currentUser, onNavig
                     <span>{cloudSyncResult.message}</span>
                   </div>
                 )}
+              </div>
+
+              {/* ========================================================= */}
+              {/* KARTU PENGATURAN: LIVE MONITORING & REKAP NILAI PUBLIK (/rekap) */}
+              {/* ========================================================= */}
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 shadow-xs">
+                      <Radio className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                          Portal Live Rekap &amp; Monitoring Ujian Publik
+                        </h3>
+                        <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold">
+                          /rekap
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Memungkinkan pengawas ruangan, guru, dan siswa mengecek kelengkapan ujian secara real-time dari halaman login tanpa perlu autentikasi staf.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Status Badge */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {monitoringConfig.isEnabled ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-full text-xs font-bold">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        Portal Publik Aktif
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-full text-xs font-medium">
+                        Portal Nonaktif
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Saklar 1: Toggle Aktifkan Portal */}
+                <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                      Akses Halaman Publik Tanpa Login
+                    </h4>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      Bila diaktifkan, tombol <strong>"🔴 Pantau Live Ujian"</strong> akan muncul di halaman Login portal siswa.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={monitoringConfig.isEnabled}
+                      onChange={e => {
+                        const updated = dbService.updateLiveMonitoringConfig({ isEnabled: e.target.checked }, currentUser);
+                        setMonitoringConfig(updated);
+                        triggerToast(e.target.checked ? 'Portal Live Rekap (/rekap) AKTIF!' : 'Portal Live Rekap dinonaktifkan.');
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
+                  </label>
+                </div>
+
+                {/* Target Asesmen yang Dipantau */}
+                <div className="space-y-3">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Pilih Target Asesmen / Sesi yang Dipantau Hari Ini:
+                  </label>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Mode 1: Paket SAT / SAS */}
+                    <div
+                      onClick={() => {
+                        const defaultPkg = examPackages[0]?.id || '';
+                        const updated = dbService.updateLiveMonitoringConfig({
+                          targetType: 'EXAM_PACKAGE',
+                          targetId: defaultPkg
+                        }, currentUser);
+                        setMonitoringConfig(updated);
+                      }}
+                      className={`p-3.5 rounded-xl border cursor-pointer transition-all ${monitoringConfig.targetType === 'EXAM_PACKAGE' ? 'bg-indigo-50/70 dark:bg-indigo-950/40 border-indigo-500 ring-2 ring-indigo-500/20' : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-slate-300'}`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                          <FolderKanban className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                          Paket Ujian (SAT / SAS)
+                        </span>
+                        {monitoringConfig.targetType === 'EXAM_PACKAGE' && (
+                          <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mb-2.5">
+                        Memantau wadah paket semesteran terpadu yang membawahi banyak mata pelajaran sekaligus.
+                      </p>
+
+                      {monitoringConfig.targetType === 'EXAM_PACKAGE' && (
+                        <div onClick={e => e.stopPropagation()}>
+                          <select
+                            value={monitoringConfig.targetId}
+                            onChange={e => {
+                              const updated = dbService.updateLiveMonitoringConfig({ targetId: e.target.value }, currentUser);
+                              setMonitoringConfig(updated);
+                              triggerToast('Target paket ujian diperbarui.');
+                            }}
+                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-900 dark:text-slate-100"
+                          >
+                            {examPackages.length === 0 ? (
+                              <option value="">(Belum ada Paket Ujian dibuat)</option>
+                            ) : (
+                              examPackages.map(pkg => (
+                                <option key={pkg.id} value={pkg.id}>
+                                  {pkg.title} ({pkg.assessmentType}) — {pkg.subjects?.length || 0} Mapel
+                                </option>
+                              ))
+                            )}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Mode 2: Siklus Try Out (TO 1, TO 2, TO 3) */}
+                    <div
+                      onClick={() => {
+                        const updated = dbService.updateLiveMonitoringConfig({
+                          targetType: 'TRYOUT_STAGE',
+                          targetId: 'TO 1'
+                        }, currentUser);
+                        setMonitoringConfig(updated);
+                      }}
+                      className={`p-3.5 rounded-xl border cursor-pointer transition-all ${monitoringConfig.targetType === 'TRYOUT_STAGE' ? 'bg-indigo-50/70 dark:bg-indigo-950/40 border-indigo-500 ring-2 ring-indigo-500/20' : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-slate-300'}`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                          <Layers className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                          Siklus Try Out (TO)
+                        </span>
+                        {monitoringConfig.targetType === 'TRYOUT_STAGE' && (
+                          <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mb-2.5">
+                        Memantau pelaksanaan Try Out berkala per siklus (TO 1, TO 2, TO 3, dst.) lintas guru mapel.
+                      </p>
+
+                      {monitoringConfig.targetType === 'TRYOUT_STAGE' && (
+                        <div onClick={e => e.stopPropagation()}>
+                          <select
+                            value={monitoringConfig.targetId}
+                            onChange={e => {
+                              const updated = dbService.updateLiveMonitoringConfig({ targetId: e.target.value }, currentUser);
+                              setMonitoringConfig(updated);
+                              triggerToast(`Target siklus Try Out diatur ke ${e.target.value}`);
+                            }}
+                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-900 dark:text-slate-100"
+                          >
+                            {getDynamicTryoutStageOptions(dbService.getTryouts(), examPackages).map(opt => (
+                              <option key={opt} value={opt}>
+                                Siklus {opt} (Semua Mapel)
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Saklar 2: Sensor Nilai Siswa */}
+                <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <EyeOff className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                        Mode Sensor Nilai Siswa (Sembunyikan Angka Nilai)
+                      </h4>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      {monitoringConfig.hideScores
+                        ? '✅ AKTIF: Hanya menampilkan status pengerjaan (Sudah Selesai / Belum Mengerjakan). Angka nilai dirahasiakan.'
+                        : '⚠️ TERBUKA: Angka nilai siswa (0–100) dapat dilihat oleh siapa saja di halaman publik.'}
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={monitoringConfig.hideScores}
+                      onChange={e => {
+                        const updated = dbService.updateLiveMonitoringConfig({ hideScores: e.target.checked }, currentUser);
+                        setMonitoringConfig(updated);
+                        triggerToast(e.target.checked ? 'Mode sensor nilai DIAKTIFKAN (Hanya status)' : 'Mode sensor nilai DINONAKTIFKAN (Nilai terbuka)');
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-amber-600"></div>
+                  </label>
+                </div>
+
+                {/* Direct Link Preview */}
+                <div className="flex items-center justify-between pt-2 text-xs">
+                  <span className="text-slate-500 dark:text-slate-400">
+                    Tautan publik:{' '}
+                    <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">
+                      /rekap
+                    </span>
+                  </span>
+                  <a
+                    href="/rekap"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-semibold rounded-lg transition-colors cursor-pointer"
+                  >
+                    <span>Buka Halaman Rekap</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
               </div>
 
               <div className="bg-rose-50 dark:bg-rose-950/40 p-6 rounded-2xl border border-rose-200 dark:border-rose-900 space-y-4">

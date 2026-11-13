@@ -38,6 +38,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isPageWaliKelas = currentPath === '/wali-kelas';
   const isPageGuru = currentPath === '/guru';
   const isPageStudent = currentPath === '/hasil';
+  const isPageMonitoring = currentPath === '/rekap';
   const isPageLogin = currentPath === '/login' || currentPath === '/';
 
   let brandBgClass = 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20';
@@ -60,6 +61,10 @@ export const Navbar: React.FC<NavbarProps> = ({
     brandBgClass = 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20';
     badgeLabel = 'Portal Siswa';
     badgeColorClass = 'text-indigo-700 bg-indigo-50 border-indigo-200 dark:text-indigo-300 dark:bg-indigo-950/80 dark:border-indigo-800';
+  } else if (isPageMonitoring) {
+    brandBgClass = 'bg-rose-600 text-white shadow-md shadow-rose-600/20';
+    badgeLabel = 'Live Monitoring';
+    badgeColorClass = 'text-rose-700 bg-rose-50 border-rose-200 dark:text-rose-300 dark:bg-rose-950/80 dark:border-rose-800';
   } else if (isPageLogin) {
     brandBgClass = 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20';
     badgeLabel = 'Halaman Login';
