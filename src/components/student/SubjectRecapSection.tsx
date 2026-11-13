@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   BookOpen, BarChart3, Layers, Search, Download, CheckCircle2, XCircle,
-  ArrowUpRight, ArrowDownRight, LayoutGrid, Table, Video, Sparkles
+  ArrowUpRight, ArrowDownRight, LayoutGrid, Table, Video, Sparkles, ArrowLeftRight
 } from 'lucide-react';
 import { Subject, Student } from '../../types/database';
 
@@ -147,7 +147,10 @@ export const SubjectRecapSection: React.FC<SubjectRecapSectionProps> = ({
           {/* Petunjuk Geser di Layar HP */}
           <div className="flex sm:hidden items-center justify-between text-[11px] font-medium text-teal-700 dark:text-teal-300 bg-teal-50/80 dark:bg-teal-950/50 border border-teal-200/70 dark:border-teal-800/70 px-3 py-1.5 rounded-xl">
             <span>Geser grafik ke samping untuk melihat detail tiap TO</span>
-            <span className="font-mono font-bold">↔ Geser</span>
+            <span className="font-mono font-bold flex items-center gap-1">
+              <ArrowLeftRight className="w-3 h-3 text-teal-600 dark:text-teal-400" />
+              <span>Geser</span>
+            </span>
           </div>
 
           <div className="relative w-full mobile-chart-scroll bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-3 sm:p-4 shadow-2xs">

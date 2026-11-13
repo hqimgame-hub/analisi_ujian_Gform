@@ -4,7 +4,7 @@ import {
   AlertTriangle, BookOpen, ExternalLink, Youtube, Sparkles, Lock, ShieldCheck,
   TrendingUp, ArrowRight, ShieldAlert, CheckCircle2, RotateCcw, Eye, ChevronDown, ChevronUp,
   Filter, Layers, ArrowUpRight, ArrowDownRight, BarChart3, Play, Video, Copy, Check, Share2,
-  LayoutGrid, LogOut, UserCheck, Trophy, Medal
+  LayoutGrid, LogOut, UserCheck, Trophy, Medal, Package, ClipboardList, ArrowLeftRight
 } from 'lucide-react';
 import { ResourceCard } from '../components/ResourceCard';
 import { dbService } from '../services/database';
@@ -967,18 +967,19 @@ export const StudentPortalPage: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-2.5">
                   {/* Dropdown 1: Wadah Ujian */}
                   <div className="flex items-center gap-1.5">
-                    <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                      Wadah:
+                    <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap flex items-center gap-1">
+                      <Package className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
+                      <span>Wadah:</span>
                     </label>
                     <select
                       value={selectedPackageId}
                       onChange={e => setSelectedPackageId(e.target.value)}
                       className="px-3 py-2 bg-indigo-50 dark:bg-indigo-950/70 border border-indigo-200 dark:border-indigo-800 rounded-xl text-xs font-bold text-indigo-700 dark:text-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer max-w-[210px] truncate"
                     >
-                      <option value="ALL">📦 Semua Wadah / Mandiri</option>
+                      <option value="ALL">Semua Wadah / Mandiri</option>
                       {studentPackages.map(pkg => (
                         <option key={pkg.id} value={pkg.id}>
-                          📦 {pkg.assessmentType === 'SAS' ? '[SAS] ' : pkg.assessmentType === 'SAT' ? '[SAT] ' : '[TO] '}
+                          {pkg.assessmentType === 'SAS' ? '[SAS] ' : pkg.assessmentType === 'SAT' ? '[SAT] ' : '[TO] '}
                           {pkg.title}
                         </option>
                       ))}
@@ -987,8 +988,9 @@ export const StudentPortalPage: React.FC = () => {
 
                   {/* Dropdown 2: Pelaksanaan Try Out / Cakupan Mapel */}
                   <div className="flex items-center gap-1.5">
-                    <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                      {isSumatifPackage ? 'Lingkup:' : 'Ujian:'}
+                    <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap flex items-center gap-1">
+                      <ClipboardList className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                      <span>{isSumatifPackage ? 'Lingkup:' : 'Ujian:'}</span>
                     </label>
                     {isSumatifPackage ? (
                       <div className="px-3 py-2 bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
@@ -1005,7 +1007,7 @@ export const StudentPortalPage: React.FC = () => {
                           const isExt = Boolean(t.isExternal || t.source === 'EXTERNAL');
                           return (
                             <option key={t.id} value={t.id}>
-                              [{getFriendlyTryoutStageLabel(t, displayTryouts)}] {t.title} {isExt ? '🏷️ (Eksternal)' : '🏫 (Internal)'}
+                              [{getFriendlyTryoutStageLabel(t, displayTryouts)}] {t.title} {isExt ? '(Eksternal)' : '(Internal)'}
                             </option>
                           );
                         })}
@@ -1490,7 +1492,10 @@ export const StudentPortalPage: React.FC = () => {
                         {/* Petunjuk Geser di Layar HP */}
                         <div className="flex sm:hidden items-center justify-between text-[11px] font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-50/80 dark:bg-indigo-950/50 border border-indigo-200/70 dark:border-indigo-800/70 px-3 py-1.5 rounded-xl">
                           <span>Geser grafik ke samping untuk melihat detail tiap TO</span>
-                          <span className="font-mono font-bold">↔ Geser</span>
+                          <span className="font-mono font-bold flex items-center gap-1">
+                            <ArrowLeftRight className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
+                            <span>Geser</span>
+                          </span>
                         </div>
 
                         <div className="relative w-full mobile-chart-scroll bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-3 sm:p-4 shadow-2xs">
