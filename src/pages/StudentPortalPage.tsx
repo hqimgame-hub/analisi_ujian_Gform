@@ -30,6 +30,7 @@ export const StudentPortalPage: React.FC = () => {
   const [birthDateInput, setBirthDateInput] = useState('');
   const [nisnInput, setNisnInput] = useState('');
   const [selectedTryoutId, setSelectedTryoutId] = useState('');
+  const [selectedPackageId, setSelectedPackageId] = useState<string>('ALL');
 
   // Verified Session & Data State
   const [verifiedStudent, setVerifiedStudent] = useState<Student | null>(null);
@@ -445,13 +446,59 @@ export const StudentPortalPage: React.FC = () => {
   const studentClassObj = verifiedStudent ? allClasses.find(c => c.id === verifiedStudent.classId) : null;
   const studentClassName = studentClassObj?.name || 'Kelas Siswa';
 
+  // Daftar seluruh Wadah Ujian yang menargetkan kelas/jenjang siswa ini
+  const studentPackages = useMemo(() => {
+    if (!verifiedStudent) return [];
+    const cls = allClasses.find(c => c.id === verifiedStudent.classId);
+    const pkgs = dbService.getExamPackagesForStudent(verifiedStudent.classId, cls?.gradeLevel);
+    // Tambahkan wadah dari tryout yang memiliki nilai siswa meskipun tidak terdaftar otomatis
+    const packageIdsWithScore = new Set(
+      allScores
+        .filter(s => s.studentId === verifiedStudent.id)
+        .map(s => {
+          const t = allTryouts.find(tr => tr.id === s.tryoutId);
+          return t?.packageId;
+        })
+        .filter(Boolean) as string[]
+    );
+    packageIdsWithScore.forEach(pkgId => {
+      if (!pkgs.some(p => p.id === pkgId)) {
+        const found = dbService.getExamPackageById(pkgId);
+        if (found) pkgs.push(found);
+      }
+    });
+    return pkgs;
+  }, [verifiedStudent, allClasses, allScores, allTryouts]);
+
+  // Tryouts yang disaring berdasarkan wadah yang sedang dipilih
+  const displayTryouts = useMemo(() => {
+    if (selectedPackageId === 'ALL') {
+      return tryouts;
+    }
+    const filtered = tryouts.filter(t => t.packageId === selectedPackageId);
+    return filtered.length > 0 ? filtered : tryouts;
+  }, [tryouts, selectedPackageId]);
+
+  // Sinkronisasi otomatis selectedTryoutId saat memilih wadah
+  useEffect(() => {
+    if (selectedPackageId !== 'ALL') {
+      const inPkg = tryouts.filter(t => t.packageId === selectedPackageId);
+      if (inPkg.length > 0 && !inPkg.some(t => t.id === selectedTryoutId)) {
+        setSelectedTryoutId(inPkg[0].id);
+      }
+    }
+  }, [selectedPackageId, tryouts]);
+
   // Deteksi Mode Wadah: Try Out vs SAS vs SAT (Container-Driven Modality)
   const activePackage = useMemo(() => {
+    if (selectedPackageId !== 'ALL') {
+      return studentPackages.find(p => p.id === selectedPackageId);
+    }
     if (activeTryout?.packageId) {
       return dbService.getExamPackageById(activeTryout.packageId);
     }
-    return undefined;
-  }, [activeTryout]);
+    return studentPackages[0];
+  }, [selectedPackageId, studentPackages, activeTryout]);
 
   const isSumatifPackage = activePackage?.assessmentType === 'SAS' || activePackage?.assessmentType === 'SAT';
 
@@ -887,6 +934,88 @@ export const StudentPortalPage: React.FC = () => {
               </div>
             </div>
 
+            {/* 1.5 PERSISTENT GLOBAL FILTER BAR (WADAH & PELAKSANAAN / MAPEL) */}
+            {tryouts.length > 0 && (
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                    <Filter className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                        Filter Konteks Ujian &amp; Wadah
+                      </h3>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                        activePackage?.assessmentType === 'SAS'
+                          ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                          : activePackage?.assessmentType === 'SAT'
+                          ? 'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300'
+                          : 'bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300'
+                      }`}>
+                        {activePackage?.assessmentType === 'SAS' ? 'Mode SAS' : activePackage?.assessmentType === 'SAT' ? 'Mode SAT' : 'Mode Try Out'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      {isSumatifPackage
+                        ? `Menampilkan data ${activePackage?.title} — Evaluasi semesteran seluruh mata pelajaran`
+                        : `Wadah aktif: ${activePackage?.title || 'Try Out Mandiri'} — Pilih tahapan pelaksanaan di samping`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {/* Dropdown 1: Wadah Ujian */}
+                  <div className="flex items-center gap-1.5">
+                    <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                      Wadah:
+                    </label>
+                    <select
+                      value={selectedPackageId}
+                      onChange={e => setSelectedPackageId(e.target.value)}
+                      className="px-3 py-2 bg-indigo-50 dark:bg-indigo-950/70 border border-indigo-200 dark:border-indigo-800 rounded-xl text-xs font-bold text-indigo-700 dark:text-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer max-w-[210px] truncate"
+                    >
+                      <option value="ALL">📦 Semua Wadah / Mandiri</option>
+                      {studentPackages.map(pkg => (
+                        <option key={pkg.id} value={pkg.id}>
+                          📦 {pkg.assessmentType === 'SAS' ? '[SAS] ' : pkg.assessmentType === 'SAT' ? '[SAT] ' : '[TO] '}
+                          {pkg.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Dropdown 2: Pelaksanaan Try Out / Cakupan Mapel */}
+                  <div className="flex items-center gap-1.5">
+                    <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                      {isSumatifPackage ? 'Lingkup:' : 'Ujian:'}
+                    </label>
+                    {isSumatifPackage ? (
+                      <div className="px-3 py-2 bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Kompilasi Seluruh Mapel ({activePackage?.subjects?.length || 0} Mapel)</span>
+                      </div>
+                    ) : (
+                      <select
+                        value={selectedTryoutId}
+                        onChange={e => setSelectedTryoutId(e.target.value)}
+                        className="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer max-w-[240px] truncate"
+                      >
+                        {displayTryouts.map(t => {
+                          const isExt = Boolean(t.isExternal || t.source === 'EXTERNAL');
+                          return (
+                            <option key={t.id} value={t.id}>
+                              [{getFriendlyTryoutStageLabel(t, displayTryouts)}] {t.title} {isExt ? '🏷️ (Eksternal)' : '🏫 (Internal)'}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* 2. 4-SEGMENT NAVIGATION BAR */}
             <div className="bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs grid grid-cols-2 lg:grid-cols-4 gap-1.5 transition-colors">
               <button
@@ -974,23 +1103,23 @@ export const StudentPortalPage: React.FC = () => {
             {/* TAB 1: RAPOR & SKOR TRY OUT TERPILIH */}
             {portalTab === 'REPORT' && activeScore && tryouts.length > 0 && (
               <div className="space-y-6 animate-fade-in">
-                {/* Tryout Selector Bar */}
-                <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold">
-                    <span>Paket Try Out yang Sedang Dilihat:</span>
+                {/* Active Exam Context Banner */}
+                <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">Ujian yang Ditampilkan:</span>
+                    <span className="font-bold font-mono text-indigo-600 dark:text-indigo-400">
+                      {isSumatifPackage
+                        ? `${activePackage?.title} (${activePackage?.code})`
+                        : `${getFriendlyTryoutStageLabel(activeTryout, displayTryouts)} — ${activeTryout?.title} (${activeTryout?.code})`}
+                    </span>
+                    {activeTryout?.isExternal && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                        Try Out Eksternal
+                      </span>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={selectedTryoutId}
-                      onChange={e => setSelectedTryoutId(e.target.value)}
-                      className="px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-                    >
-                      {tryouts.map(t => (
-                        <option key={t.id} value={t.id}>
-                          [{getFriendlyTryoutStageLabel(t, tryouts)}] {t.title}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="text-[11px] text-slate-400">
+                    *Gunakan menu filter di atas untuk beralih wadah atau tahapan ujian
                   </div>
                 </div>
 
@@ -1182,7 +1311,7 @@ export const StudentPortalPage: React.FC = () => {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-4">
                     <div>
                       <h3 className="font-bold text-slate-900 dark:text-slate-100 text-base">
-                        Capaian Nilai Per Mata Pelajaran ({activeTryout ? getFriendlyTryoutStageLabel(activeTryout, tryouts) : 'Try Out'})
+                        Capaian Nilai Per Mata Pelajaran ({activeTryout ? getFriendlyTryoutStageLabel(activeTryout, displayTryouts) : 'Try Out'})
                       </h3>
                       <p className="text-xs text-slate-500 mt-0.5">
                         Rincian skor perolehan dan ketuntasan KKM siswa untuk masing-masing bidang studi pada try out ini.
@@ -1252,7 +1381,7 @@ export const StudentPortalPage: React.FC = () => {
                         {academicPredicate.label}
                       </div>
                       <span className="text-[11px] text-slate-500 mt-1 block">
-                        Evaluasi paket {activeTryout ? getFriendlyTryoutStageLabel(activeTryout, tryouts) : 'Try Out'}
+                        Evaluasi paket {activeTryout ? getFriendlyTryoutStageLabel(activeTryout, displayTryouts) : 'Try Out'}
                       </span>
                     </div>
                     <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-2xl font-mono border ${academicPredicate.badge}`}>
@@ -1524,8 +1653,8 @@ export const StudentPortalPage: React.FC = () => {
                     setSelectedVideoUrl(url);
                     setSelectedVideoTitle(title);
                   }}
-                  activeTryoutCode={activeTryout ? `${getFriendlyTryoutStageLabel(activeTryout, tryouts)} (${activeTryout.title})` : 'Try Out'}
-                  tryouts={tryouts}
+                  activeTryoutCode={activeTryout ? `${getFriendlyTryoutStageLabel(activeTryout, displayTryouts)} (${activeTryout.title})` : 'Try Out'}
+                  tryouts={displayTryouts}
                   selectedTryoutId={selectedTryoutId}
                   onSelectTryout={id => setSelectedTryoutId(id)}
                 />
@@ -1544,13 +1673,27 @@ export const StudentPortalPage: React.FC = () => {
                         : `Belum ada butir soal yang dipublikasikan untuk paket ujian ${activeTryout?.title || ''}. Silakan hubungi guru mata pelajaran terkait.`}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setPortalTab('REPORT')}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition cursor-pointer"
-                  >
-                    Kembali ke Rapor Siswa
-                  </button>
+                  <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setPortalTab('REPORT')}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+                    >
+                      Lihat Nilai di Tab Rapor
+                    </button>
+                    {displayTryouts.find(t => !t.isExternal && t.id !== selectedTryoutId) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const internalTo = displayTryouts.find(t => !t.isExternal);
+                          if (internalTo) setSelectedTryoutId(internalTo.id);
+                        }}
+                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition cursor-pointer"
+                      >
+                        Beralih ke TO Internal Berbutir Soal
+                      </button>
+                    )}
+                  </div>
                 </div>
               )
             )}
@@ -1663,7 +1806,7 @@ export const StudentPortalPage: React.FC = () => {
                           </h3>
                           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                             Tautan dokumen PDF dan video pembahasan YouTube resmi untuk evaluasi mandiri paket{' '}
-                            <strong className="text-indigo-600 dark:text-indigo-400 font-mono font-bold">{activeTryout ? getFriendlyTryoutStageLabel(activeTryout, tryouts) : 'Try Out'}</strong>.
+                            <strong className="text-indigo-600 dark:text-indigo-400 font-mono font-bold">{activeTryout ? getFriendlyTryoutStageLabel(activeTryout, displayTryouts) : 'Try Out'}</strong>.
                           </p>
                         </div>
                       </div>
@@ -1677,9 +1820,9 @@ export const StudentPortalPage: React.FC = () => {
                             onChange={e => setSelectedTryoutId(e.target.value)}
                             className="bg-transparent text-xs font-bold font-mono text-indigo-600 dark:text-indigo-400 focus:outline-none cursor-pointer"
                           >
-                            {tryouts.map(t => (
+                            {displayTryouts.map(t => (
                               <option key={t.id} value={t.id} className="text-slate-900 dark:text-slate-100">
-                                [{getFriendlyTryoutStageLabel(t, tryouts)}] {t.title}
+                                [{getFriendlyTryoutStageLabel(t, displayTryouts)}] {t.title}
                               </option>
                             ))}
                           </select>
