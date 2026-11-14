@@ -770,7 +770,7 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
   // Phase 9: Analytics Engine UI States
   const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
   const [toAnalyticsSubTab, setToAnalyticsSubTab] = useState<'PROGRESS' | 'ITEM_ANALYSIS' | 'REPORTS'>('PROGRESS');
-  const [analyticsSubTab, setAnalyticsSubTab] = useState<'OVERALL' | 'CLASS' | 'STUDENT' | 'PSYCHOMETRICS' | 'SUMATIF_EVALUATION'>('OVERALL');
+  const [analyticsSubTab, setAnalyticsSubTab] = useState<'OVERALL' | 'CLASS' | 'STUDENT' | 'PSYCHOMETRICS'>('OVERALL');
   const [selectedSumatifPackageId, setSelectedSumatifPackageId] = useState<string>('');
   const [analyticsYearFilter, setAnalyticsYearFilter] = useState('ALL');
   const [analyticsGradeFilter, setAnalyticsGradeFilter] = useState('ALL');
@@ -3888,22 +3888,6 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                       >
                         Analisis Butir Soal
                       </button>
-                      {teacherSumatifPackages.length > 0 && (
-                        <button
-                          onClick={() => setAnalyticsSubTab('SUMATIF_EVALUATION')}
-                          className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                            analyticsSubTab === 'SUMATIF_EVALUATION'
-                              ? 'bg-emerald-600 text-white shadow-sm font-bold'
-                              : 'text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/50'
-                          }`}
-                        >
-                          <Award className="w-3.5 h-3.5" />
-                          <span>Audit SAS / SAT</span>
-                          <span className="text-[10px] font-mono px-1 rounded-sm bg-emerald-800 text-emerald-100 font-bold">
-                            {teacherSumatifPackages.length}
-                          </span>
-                        </button>
-                      )}
                     </div>
                   </div>
 
@@ -5535,51 +5519,6 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                           </tbody>
                         </table>
                       </div>
-                    </div>
-                  )}
-
-                  {/* SUB-TAB 5: SUMATIF SAS / SAT EVALUATION */}
-                  {analyticsSubTab === 'SUMATIF_EVALUATION' && (
-                    <div className="space-y-4">
-                      {/* Selector Wadah SAS/SAT */}
-                      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                              {activeSumatifPackage?.assessmentType === 'SAT' ? 'Sumatif Akhir Tahun' : 'Sumatif Akhir Semester'}
-                            </span>
-                            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                              {activeSumatifPackage?.title || 'Wadah SAS / SAT'}
-                            </h3>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            Audit psikometri butir soal semesteran dan distribusi nilai ketuntasan KKTP untuk Mapel {activeSubjectObj?.name}.
-                          </p>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <label className="text-xs font-semibold text-slate-500">Pilih Wadah:</label>
-                          <select
-                            value={activeSumatifPackage?.id || ''}
-                            onChange={e => setSelectedSumatifPackageId(e.target.value)}
-                            className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer"
-                          >
-                            {teacherSumatifPackages.map(pkg => (
-                              <option key={pkg.id} value={pkg.id}>
-                                [{pkg.assessmentType}] {pkg.title}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      {teacherSumatifData ? (
-                        <GuruSumatifView analytics={teacherSumatifData} />
-                      ) : (
-                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center text-slate-400 text-xs">
-                          Belum ada data nilai atau soal untuk mata pelajaran ini di wadah yang dipilih.
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
@@ -8918,6 +8857,11 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                   questions={questions}
                   answers={dbService.getAnswers()}
                   subjects={subjects}
+                  materials={materials}
+                  competencies={competencies}
+                  tryouts={tryouts}
+                  dbService={dbService}
+                  currentUser={currentUser}
                   onShowToast={(msg) => triggerToast(msg)}
                 />
               )}

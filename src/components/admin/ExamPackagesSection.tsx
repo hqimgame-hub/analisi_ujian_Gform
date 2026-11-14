@@ -450,14 +450,23 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
 
                 {/* Tryout Composition Badges */}
                 <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-teal-50 dark:bg-teal-950/80 text-teal-700 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/60 flex items-center gap-1">
-                    <Layers className="w-3 h-3" />
-                    <span>{internalCount} TO Internal</span>
-                  </span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60 flex items-center gap-1">
-                    <FileSpreadsheet className="w-3 h-3" />
-                    <span>{externalCount} TO Eksternal</span>
-                  </span>
+                  {(pkg.assessmentType === 'SAS' || pkg.assessmentType === 'SAT') ? (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60 flex items-center gap-1">
+                      <FileSpreadsheet className="w-3 h-3" />
+                      <span>{attachedTryouts.length} Mapel Terjadwal (Google Form)</span>
+                    </span>
+                  ) : (
+                    <>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-teal-50 dark:bg-teal-950/80 text-teal-700 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/60 flex items-center gap-1">
+                        <Layers className="w-3 h-3" />
+                        <span>{internalCount} TO Internal</span>
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60 flex items-center gap-1">
+                        <FileSpreadsheet className="w-3 h-3" />
+                        <span>{externalCount} TO Eksternal</span>
+                      </span>
+                    </>
+                  )}
                 </div>
                 {pkg.description && (
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 mb-3">
@@ -560,6 +569,7 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
         const pkgTryouts = (dbService.getTryouts() || []).filter(t => t.packageId === selectedPackage.id);
         const internalTos = pkgTryouts.filter(t => !t.isExternal);
         const externalTos = pkgTryouts.filter(t => t.isExternal);
+        const isSelectedSatSas = selectedPackage.assessmentType === 'SAS' || selectedPackage.assessmentType === 'SAT';
 
         return (
         <div className="bg-white dark:bg-slate-900 border-2 border-indigo-500/40 rounded-3xl p-6 shadow-lg space-y-6 animate-in fade-in duration-200">
@@ -574,7 +584,9 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
                 </h3>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Rekapitulasi seluruh Try Out (Internal &amp; Eksternal) dan status link spreadsheet tiap mata pelajaran.
+                {isSelectedSatSas
+                  ? `Rekapitulasi jadwal asesmen ${selectedPackage.assessmentType} (Google Form) dan status link spreadsheet tiap mata pelajaran.`
+                  : 'Rekapitulasi seluruh Try Out (Internal & Eksternal) dan status link spreadsheet tiap mata pelajaran.'}
               </p>
             </div>
 
@@ -586,22 +598,32 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
             </button>
           </div>
 
-          {/* ── SECTION A: DAFTAR TRY OUT TERDAFTAR DI WADAH INI ── */}
+          {/* ── SECTION A: DAFTAR TRY OUT / ASESMEN TERDAFTAR DI WADAH INI ── */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Layers className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                  Try Out Terdaftar di Wadah Ini ({pkgTryouts.length} Paket TO)
+                  {isSelectedSatSas
+                    ? `Jadwal Ujian Terdaftar di Wadah Ini (${pkgTryouts.length} Mapel)`
+                    : `Try Out Terdaftar di Wadah Ini (${pkgTryouts.length} Paket TO)`}
                 </h4>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950 px-2.5 py-0.5 rounded-lg border border-teal-200/60 dark:border-teal-800/60">
-                  {internalTos.length} Internal
-                </span>
-                <span className="text-[11px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950 px-2.5 py-0.5 rounded-lg border border-purple-200/60 dark:border-purple-800/60">
-                  {externalTos.length} Eksternal
-                </span>
+                {isSelectedSatSas ? (
+                  <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950 px-2.5 py-0.5 rounded-lg border border-emerald-200/60 dark:border-emerald-800/60">
+                    {pkgTryouts.length} Google Form
+                  </span>
+                ) : (
+                  <>
+                    <span className="text-[11px] font-bold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950 px-2.5 py-0.5 rounded-lg border border-teal-200/60 dark:border-teal-800/60">
+                      {internalTos.length} Internal
+                    </span>
+                    <span className="text-[11px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950 px-2.5 py-0.5 rounded-lg border border-purple-200/60 dark:border-purple-800/60">
+                      {externalTos.length} Eksternal
+                    </span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -624,19 +646,21 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
                           <div className="flex items-center gap-1.5">
                             <span
                               className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                isExt
+                                isSelectedSatSas
+                                  ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                                  : isExt
                                   ? 'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-800'
                                   : 'bg-teal-100 dark:bg-teal-950 text-teal-700 dark:text-teal-300 border-teal-300 dark:border-teal-800'
                               }`}
                             >
-                              {isExt ? 'TO Eksternal' : 'TO Internal'}
+                              {isSelectedSatSas ? 'Google Form' : isExt ? 'TO Eksternal' : 'TO Internal'}
                             </span>
                             <button
                               type="button"
                               onClick={() => {
-                                if (window.confirm(`Hapus jadwal Try Out '${toItem.title}' (${toItem.code}) beserta seluruh nilainya dari sistem?`)) {
+                                if (window.confirm(`Hapus jadwal ${isSelectedSatSas ? 'Ujian' : 'Try Out'} '${toItem.title}' (${toItem.code}) beserta seluruh nilainya dari sistem?`)) {
                                   dbService.deleteTryout(toItem.id, currentUser);
-                                  onShowToast(`Try Out '${toItem.title}' (${toItem.code}) berhasil dihapus dari semua perangkat.`);
+                                  onShowToast(`Jadwal '${toItem.title}' (${toItem.code}) berhasil dihapus dari semua perangkat.`);
                                   refreshData();
                                 }
                               }}
@@ -657,7 +681,7 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
                         </div>
                       </div>
 
-                      {isExt && toItem.externalSubjects && toItem.externalSubjects.length > 0 && (
+                      {isExt && !isSelectedSatSas && toItem.externalSubjects && toItem.externalSubjects.length > 0 && (
                         <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800 text-[10px] text-slate-500">
                           <span className="font-medium text-slate-600 dark:text-slate-400">Mapel: </span>
                           <span className="line-clamp-1">{toItem.externalSubjects.join(', ')}</span>
@@ -669,7 +693,9 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
               </div>
             ) : (
               <div className="p-4 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-center text-xs text-slate-500">
-                Belum ada Try Out yang dimasukkan ke wadah ini. Guru dapat memilih wadah ini saat membuat TO Internal maupun TO Eksternal.
+                {isSelectedSatSas
+                  ? `Belum ada jadwal asesmen ${selectedPackage.assessmentType} yang dimasukkan ke wadah ini. Guru dapat menghubungkan Google Form ke wadah ini pada menu Asesmen Sumatif.`
+                  : 'Belum ada Try Out yang dimasukkan ke wadah ini. Guru dapat memilih wadah ini saat membuat TO Internal maupun TO Eksternal.'}
               </div>
             )}
           </div>
@@ -704,7 +730,7 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
                       (t.externalSubjects && subj && t.externalSubjects.includes(subj.name))
                     )
                   );
-                  const isSyncedViaExternal = Boolean(!hasSheet && extToForSubj);
+                  const isSyncedViaExternal = Boolean(!hasSheet && extToForSubj && !isSelectedSatSas);
 
                   return (
                     <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">

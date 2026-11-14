@@ -2,13 +2,16 @@ import React, { useState, useMemo } from 'react';
 import {
   Award, BarChart3, CheckCircle2, AlertTriangle, FileSpreadsheet,
   Download, Filter, Search, School, BookOpen, Users, HelpCircle,
-  TrendingUp, CheckSquare, Sparkles, ChevronRight
+  TrendingUp, CheckSquare, Sparkles, ChevronRight, Info
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell
 } from 'recharts';
-import { ExamPackage, ClassRoom, Subject, Student, Score, Question, Answer } from '../../types/database';
+import { ExamPackage, ClassRoom, Subject, Student, Score, Question, Answer, Material, Competency, Tryout, User } from '../../types/database';
 import { SumatifAnalyticsService, TeacherSumatifAnalytics } from '../../services/sumatifAnalytics';
+import { AnalyticsService, QuestionAnalysisResult } from '../../services/analytics';
+import { ExportService } from '../../services/export';
+import { DatabaseService } from '../../services/database';
 
 interface GuruSumatifAnalyticsSectionProps {
   packages: ExamPackage[];
@@ -21,6 +24,11 @@ interface GuruSumatifAnalyticsSectionProps {
   questions: Question[];
   answers: Answer[];
   subjects: Subject[];
+  materials?: Material[];
+  competencies?: Competency[];
+  tryouts?: Tryout[];
+  dbService?: DatabaseService;
+  currentUser?: User;
   onShowToast: (msg: string) => void;
 }
 
@@ -35,11 +43,17 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
   questions,
   answers,
   subjects,
+  materials = [],
+  competencies = [],
+  tryouts = [],
+  dbService,
+  currentUser,
   onShowToast,
 }) => {
   // Sub-tabs navigation inside Sumatif Analytics
   const [subTab, setSubTab] = useState<'KKTP_SUMMARY' | 'PSYCHOMETRICS' | 'REKAP_RAPOR'>('KKTP_SUMMARY');
   const [classFilter, setClassFilter] = useState('ALL');
+  const [psychometricsClassFilter, setPsychometricsClassFilter] = useState('ALL');
   const [searchStudent, setSearchStudent] = useState('');
   const [kktpStatusFilter, setKktpStatusFilter] = useState<'ALL' | 'TUNTAS' | 'REMEDIAL'>('ALL');
 
@@ -155,6 +169,191 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
     link.click();
     URL.revokeObjectURL(url);
     onShowToast(`File CSV nilai ${activeSubject?.name || 'Mapel'} berhasil diunduh.`);
+  };
+
+  // ── KALKULASI ANALISIS BUTIR SOAL MURNI & PSIKOMETRI (SEPERTI TRY OUT) ──
+  const matchedSumatifTryout = useMemo(() => {
+    if (!activePackage || !activeSubject) return null;
+    return tryouts.find(t => t.packageId === activePackage.id && t.subjectId === activeSubject.id) || null;
+  }, [tryouts, activePackage, activeSubject]);
+
+  const relevantSubjectQuestions = useMemo(() => {
+    if (!activeSubject) return [];
+    if (matchedSumatifTryout && dbService) {
+      const qFromTryout = dbService.getQuestionsForTryout(matchedSumatifTryout.id, activeSubject.id);
+      if (qFromTryout.length > 0) return qFromTryout;
+    }
+    return questions
+      .filter(q => q.subjectId === activeSubject.id)
+      .sort((a, b) => (a.questionNumber || 0) - (b.questionNumber || 0));
+  }, [questions, activeSubject, matchedSumatifTryout, dbService]);
+
+  const targetClassStudentsForPsychometrics = useMemo(() => {
+    let list = students;
+    if (activePackage?.targetClassIds && activePackage.targetClassIds.length > 0) {
+      list = list.filter(s => activePackage.targetClassIds!.includes(s.classId));
+    }
+    if (psychometricsClassFilter !== 'ALL') {
+      list = list.filter(s => s.classId === psychometricsClassFilter);
+    }
+    return list;
+  }, [students, activePackage, psychometricsClassFilter]);
+
+  const targetStudentIdSet = useMemo(
+    () => new Set(targetClassStudentsForPsychometrics.map(s => s.id)),
+    [targetClassStudentsForPsychometrics]
+  );
+
+  const questionAnalysisResults: QuestionAnalysisResult[] = useMemo(() => {
+    if (!activeSubject) return [];
+
+    // Prioritas 1: Jika tryout ID terhubung di database dan dbService tersedia, gunakan getQuestionAnalysis
+    if (matchedSumatifTryout && dbService) {
+      const dbCalc = dbService.getQuestionAnalysis(
+        matchedSumatifTryout.id,
+        activeSubject.id,
+        psychometricsClassFilter === 'ALL' ? undefined : psychometricsClassFilter,
+        currentUser
+      );
+      if (dbCalc && dbCalc.length > 0) return dbCalc;
+    }
+
+    // Prioritas 2: Hitung langsung dengan calculateQuestionItemAnalysis dari AnalyticsService
+    if (relevantSubjectQuestions.length > 0) {
+      const qIds = new Set(relevantSubjectQuestions.map(q => q.id));
+      const filteredAns = answers.filter(a => qIds.has(a.questionId) && targetStudentIdSet.has(a.studentId));
+      const filteredScores = scores.filter(s => targetStudentIdSet.has(s.studentId));
+
+      if (filteredAns.length > 0) {
+        const directCalc = AnalyticsService.calculateQuestionItemAnalysis(
+          relevantSubjectQuestions,
+          filteredAns,
+          filteredScores,
+          materials,
+          competencies
+        );
+        if (directCalc && directCalc.length > 0) return directCalc;
+      }
+    }
+
+    // Prioritas 3: Standarisasi dari analytics.questionStats (SumatifAnalyticsService)
+    if (analytics && analytics.questionStats.length > 0) {
+      return analytics.questionStats.map((qs, idx) => {
+        const qNum = qs.questionNumber || idx + 1;
+        const matchingQ = relevantSubjectQuestions.find(q => (q.questionNumber || idx + 1) === qNum);
+        const correctKey = matchingQ?.correctAnswer || 'A';
+        const totalResp = qs.totalResponses || 1;
+        const pVal = qs.facilityValue;
+        const dVal = qs.discriminationIndex ?? 0;
+        const isReview = qs.isReviewRecommended;
+
+        const wrongTotal = Math.max(0, qs.wrongCount);
+        const optKeys = ['A', 'B', 'C', 'D', 'E'];
+        const otherKeys = optKeys.filter(k => k !== correctKey.toUpperCase());
+        const perDist = otherKeys.length > 0 ? Math.floor(wrongTotal / otherKeys.length) : 0;
+        const remainder = otherKeys.length > 0 ? wrongTotal % otherKeys.length : 0;
+
+        const distStats: Record<string, any> = {};
+        distStats[correctKey.toUpperCase()] = {
+          count: qs.correctCount,
+          percentage: Math.round((qs.correctCount / totalResp) * 100),
+          isMisleading: false,
+        };
+        otherKeys.forEach((k, kIdx) => {
+          const count = perDist + (kIdx === 0 ? remainder : 0);
+          distStats[k] = {
+            count,
+            percentage: Math.round((count / totalResp) * 100),
+            isMisleading: count > qs.correctCount,
+          };
+        });
+
+        const qId = matchingQ?.id || `q-sum-${qNum}`;
+        const tryoutId = matchedSumatifTryout?.id || activePackage?.id || `pkg-${activePackage?.id}`;
+        const distCounts: Record<string, number> = {};
+        distCounts[correctKey.toUpperCase()] = qs.correctCount;
+        otherKeys.forEach((k, kIdx) => {
+          distCounts[k] = perDist + (kIdx === 0 ? remainder : 0);
+        });
+
+        const diffCategory: 'MUDAH' | 'SEDANG' | 'SULIT' = pVal > 0.70 ? 'MUDAH' : pVal >= 0.30 ? 'SEDANG' : 'SULIT';
+        const discCategory: 'SANGAT_BAIK' | 'BAIK' | 'CUKUP' | 'BURUK' = dVal >= 0.40 ? 'SANGAT_BAIK' : dVal >= 0.30 ? 'BAIK' : dVal >= 0.20 ? 'CUKUP' : 'BURUK';
+
+        return {
+          id: `qa-${qId}`,
+          tryoutId,
+          questionId: qId,
+          questionNumber: qNum,
+          uniqueCode: matchingQ?.uniqueCode || `SOAL-${String(qNum).padStart(2, '0')}`,
+          questionText: matchingQ?.questionText || qs.questionText || `Butir Soal Nomor ${qNum}`,
+          correctAnswer: correctKey,
+          options: matchingQ?.options || [
+            { key: 'A', text: 'Pilihan A' },
+            { key: 'B', text: 'Pilihan B' },
+            { key: 'C', text: 'Pilihan C' },
+            { key: 'D', text: 'Pilihan D' },
+            { key: 'E', text: 'Pilihan E' },
+          ],
+          totalRespondents: totalResp,
+          correctCount: qs.correctCount,
+          incorrectCount: qs.wrongCount,
+          unansweredCount: 0,
+          correctPercentage: Math.round(pVal * 100),
+          incorrectPercentage: Math.round((1 - pVal) * 100),
+          unansweredPercentage: 0,
+          difficultyIndex: pVal,
+          difficultyCategory: diffCategory,
+          discriminationIndex: dVal,
+          discriminationCategory: discCategory,
+          distractorCounts: distCounts,
+          informativeStatus: (pVal >= 0.70 ? 'Easy' : pVal >= 0.30 ? 'Moderate' : 'Difficult') as any,
+          discriminationStatus: (dVal >= 0.40 ? 'Good Discrimination' : dVal >= 0.20 ? 'Moderate Discrimination' : 'Poor Discrimination') as any,
+          distractorStats: distStats,
+          reviewRecommendation: isReview ? 'Needs Review' : 'Good / Valid Question',
+          reviewReasons: isReview ? ['Daya pembeda rendah atau tingkat kesukaran ekstrem'] : [],
+          pedagogicalNote: isReview
+            ? 'Butir soal perlu ditelaah kembali konstruksi distraktor atau kejelasan teks sebelum digunakan kembali.'
+            : 'Butir soal memiliki mutu baik dan daya pembeda yang memadai untuk bank soal.',
+          subjectId: activeSubject.id,
+          materialId: matchingQ?.materialId || '',
+          competencyId: matchingQ?.competencyId || '',
+        };
+      });
+    }
+
+    return [];
+  }, [
+    activeSubject,
+    matchedSumatifTryout,
+    dbService,
+    psychometricsClassFilter,
+    currentUser,
+    relevantSubjectQuestions,
+    answers,
+    targetStudentIdSet,
+    scores,
+    materials,
+    competencies,
+    analytics,
+  ]);
+
+  // Handler Export Item Analysis Excel
+  const handleExportItemAnalysisExcel = () => {
+    if (questionAnalysisResults.length === 0) {
+      onShowToast('Tidak ada data butir soal untuk diunduh.');
+      return;
+    }
+    const pkgTitle = activePackage ? `${activePackage.code}_${activePackage.title}` : 'Asesmen_Sumatif';
+    const subName = activeSubject?.name || 'Mata_Pelajaran';
+    const activeCls = classes.find(c => c.id === psychometricsClassFilter);
+    const classSuffix = activeCls ? `_${activeCls.name.replace(/\s+/g, '_')}` : '_Semua_Kelas';
+
+    ExportService.exportItemAnalysisExcel(
+      `${pkgTitle}${classSuffix}`,
+      subName,
+      questionAnalysisResults
+    );
+    onShowToast(`Laporan Analisis Butir Soal Excel (${subName}) berhasil diunduh!`);
   };
 
   // EMPTY STATE: Jika belum ada wadah SAS / SAT yang dibuat
@@ -454,32 +653,140 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
         </div>
       )}
 
-      {/* ── KONTEN SUB-TAB 2: ANALISIS BUTIR SOAL & PSIKOMETRI ── */}
+      {/* ── KONTEN SUB-TAB 2: ANALISIS BUTIR SOAL & PSIKOMETRI (PERSIS TRY OUT) ── */}
       {subTab === 'PSYCHOMETRICS' && (
         <div className="space-y-6">
-          {analytics && analytics.questionStats.length > 0 ? (
+          {/* 1. Critical Pedagogical Disclaimer Banner */}
+          <div className="bg-amber-50 dark:bg-amber-950/40 border-l-4 border-amber-500 p-4 rounded-r-2xl shadow-xs flex items-start space-x-3 transition-colors">
+            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <h4 className="text-xs font-bold text-amber-900 dark:text-amber-200 uppercase tracking-wider">
+                Pedoman Interpretasi Status Butir Soal (Pedagogical Rule)
+              </h4>
+              <p className="text-xs text-amber-800 dark:text-amber-300 mt-1 leading-relaxed">
+                {AnalyticsService.PEDAGOGICAL_DISCLAIMER}
+              </p>
+            </div>
+          </div>
+
+          {/* 2. Header & Filter Controls */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs flex flex-wrap items-center justify-between gap-3 transition-colors">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-emerald-600" />
+                <span>Analisis Butir Soal &amp; Pilihan Pengecoh ({activePackage?.assessmentType || 'SAS/SAT'})</span>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Rekapitulasi jumlah siswa menjawab benar, salah, kosong, tingkat kesukaran (p), daya pembeda (D), dan sebaran opsi A/B/C/D/E.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-slate-500 dark:text-slate-400 font-medium">Wadah:</span>
+              <select
+                value={activePackage?.id || ''}
+                onChange={e => onSelectPackageId(e.target.value)}
+                className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 text-slate-800 dark:text-slate-200 font-semibold focus:outline-hidden"
+              >
+                {packages.map(p => (
+                  <option key={p.id} value={p.id}>
+                    [{p.assessmentType}] {p.title}
+                  </option>
+                ))}
+              </select>
+
+              <div className="flex items-center space-x-1.5 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-lg px-2.5 py-1 text-emerald-900 dark:text-emerald-200 font-bold ml-1">
+                <BookOpen className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>{activeSubject?.name || 'Mata Pelajaran'}</span>
+              </div>
+
+              <span className="text-slate-500 dark:text-slate-400 font-medium ml-2">Kelas / Rombel:</span>
+              <select
+                value={psychometricsClassFilter}
+                onChange={e => setPsychometricsClassFilter(e.target.value)}
+                className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 text-slate-800 dark:text-slate-200 font-semibold focus:outline-hidden"
+              >
+                <option value="ALL">Semua Kelas Target ({targetClassesForPackage.length} Kelas)</option>
+                {targetClassesForPackage.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                disabled={questionAnalysisResults.length === 0}
+                onClick={handleExportItemAnalysisExcel}
+                className={`ml-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition-colors shadow-2xs ${
+                  questionAnalysisResults.length === 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                }`}
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Unduh Excel</span>
+              </button>
+            </div>
+          </div>
+
+          {questionAnalysisResults.length > 0 ? (
             <>
-              {/* Grafik Tingkat Ketercapaian per Butir Soal */}
+              {/* 3. Psychometric Metric Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 shadow-2xs transition-colors">
+                  <span className="text-slate-400 dark:text-slate-500 block mb-1">Total Butir Soal</span>
+                  <span className="text-xl font-bold text-slate-900 dark:text-slate-100 font-mono">
+                    {questionAnalysisResults.length} Soal
+                  </span>
+                </div>
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 shadow-2xs transition-colors">
+                  <span className="text-slate-400 dark:text-slate-500 block mb-1">Rata-Rata Daya Pembeda (D)</span>
+                  <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                    {(
+                      questionAnalysisResults.reduce((acc, q) => acc + (q.discriminationIndex || 0), 0) /
+                      questionAnalysisResults.length
+                    ).toFixed(2)}
+                  </span>
+                </div>
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 shadow-2xs transition-colors">
+                  <span className="text-slate-400 dark:text-slate-500 block mb-1">Soal Layak (Valid)</span>
+                  <span className="text-xl font-bold text-emerald-700 dark:text-emerald-400 font-mono">
+                    {questionAnalysisResults.filter(q => q.reviewRecommendation === 'Good / Valid Question').length} Soal
+                  </span>
+                </div>
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 shadow-2xs transition-colors">
+                  <span className="text-slate-400 dark:text-slate-500 block mb-1">Perlu Tinjauan (Needs Review)</span>
+                  <span className="text-xl font-bold text-amber-600 dark:text-amber-400 font-mono">
+                    {questionAnalysisResults.filter(q => q.reviewRecommendation === 'Needs Review').length} Soal
+                  </span>
+                </div>
+              </div>
+
+              {/* 4. Grafik Tingkat Kesukaran (P-Value) */}
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-4">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                    <BarChart3 className="w-4 h-4 text-emerald-600" />
-                    <span>Distribusi Tingkat Kesukaran (P-Value) per Butir Soal</span>
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Batang merah (&lt; 40% benar) menandakan soal yang sulit bagi mayoritas siswa. Batang hijau (&gt; 60% benar) menunjukkan soal mudah.
-                  </p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4 text-emerald-600" />
+                      <span>Distribusi Tingkat Kesukaran (P-Value) per Butir Soal</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Batang merah (&lt; 40% benar) menandakan soal sulit. Batang hijau (&gt; 60% benar) menunjukkan soal mudah.
+                    </p>
+                  </div>
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                    Total {questionAnalysisResults.length} Butir Soal
+                  </span>
                 </div>
 
-                <div className="h-[280px] w-full pt-2">
+                <div className="h-[260px] w-full pt-2">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={analytics.questionStats} margin={{ top: 10, right: 10, left: -20, bottom: 10 }}>
+                    <BarChart data={questionAnalysisResults} margin={{ top: 10, right: 10, left: -20, bottom: 10 }}>
                       <XAxis dataKey="questionNumber" tick={{ fontSize: 11, fontWeight: 600 }} />
                       <YAxis domain={[0, 1]} tick={{ fontSize: 11 }} tickFormatter={v => `${Math.round(v * 100)}%`} />
                       <Tooltip
                         formatter={(val: any, _name: any, props: any) => [
-                          `${Math.round(Number(val) * 100)}% Benar (${props.payload.correctCount}/${props.payload.totalResponses} siswa)`,
-                          `Soal No. ${props.payload.questionNumber} - ${props.payload.difficultyLabel}`,
+                          `${Math.round(Number(val) * 100)}% Benar (${props.payload.correctCount}/${props.payload.totalRespondents} siswa)`,
+                          `Soal No. ${props.payload.questionNumber} - ${props.payload.informativeStatus}`,
                         ]}
                       />
                       <ReferenceLine
@@ -488,11 +795,11 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
                         strokeDasharray="3 3"
                         label={{ value: 'Batas Sulit (40%)', position: 'top', fill: '#ef4444', fontSize: 10 }}
                       />
-                      <Bar dataKey="facilityValue" radius={[4, 4, 0, 0]}>
-                        {analytics.questionStats.map((entry, idx) => (
+                      <Bar dataKey="difficultyIndex" radius={[4, 4, 0, 0]}>
+                        {questionAnalysisResults.map((entry, idx) => (
                           <Cell
                             key={`cell-${idx}`}
-                            fill={entry.facilityValue >= 0.6 ? '#10b981' : entry.facilityValue >= 0.4 ? '#f59e0b' : '#ef4444'}
+                            fill={entry.difficultyIndex >= 0.6 ? '#10b981' : entry.difficultyIndex >= 0.4 ? '#f59e0b' : '#ef4444'}
                           />
                         ))}
                       </Bar>
@@ -501,67 +808,208 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
                 </div>
               </div>
 
-              {/* Tabel Evaluasi Psikometri Butir Soal */}
+              {/* 5. Detailed Question Psychometrics Table (Struktur Persis Try Out) */}
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                     <HelpCircle className="w-4 h-4 text-indigo-600" />
-                    <span>Audit Psikometri &amp; Rekomendasi Butir Soal</span>
+                    <span>Tabel Detail Analisis Butir Soal &amp; Pilihan Pengecoh</span>
                   </h3>
                   <span className="text-xs text-slate-400">
-                    Total {analytics.questionStats.length} Butir Soal Dianalisis
+                    {questionAnalysisResults.length} Butir Soal
                   </span>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs text-left">
-                    <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wider">
+                <div className="overflow-auto max-h-[540px] rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs scrollbar-thin">
+                  <table className="w-full text-left text-xs">
+                    <thead className="sticky top-0 z-20 bg-slate-100 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 font-bold shadow-xs">
                       <tr>
-                        <th className="px-4 py-3 rounded-l-xl">No. Soal</th>
-                        <th className="px-4 py-3">Jumlah Respon</th>
-                        <th className="px-4 py-3">Benar</th>
-                        <th className="px-4 py-3">Tingkat Kesukaran</th>
-                        <th className="px-4 py-3">Daya Pembeda</th>
-                        <th className="px-4 py-3 rounded-r-xl">Rekomendasi Mutu</th>
+                        <th className="py-2.5 px-3 w-12 text-center">No</th>
+                        <th className="py-2.5 px-3 w-28">Kode Soal</th>
+                        <th className="py-2.5 px-3">Teks Ringkas &amp; Kunci</th>
+                        <th className="py-2.5 px-3 w-44 text-center">Rekap Jawaban Siswa</th>
+                        <th className="py-2.5 px-3 w-28 text-center">Kesukaran (p)</th>
+                        <th className="py-2.5 px-3 w-32 text-center">Daya Pembeda (D)</th>
+                        <th className="py-2.5 px-3 w-48 text-center">Sebaran Pilihan (A/B/C/D/E)</th>
+                        <th className="py-2.5 px-3 w-36 text-center">Status Soal</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {analytics.questionStats.map(q => (
-                        <tr key={q.questionNumber} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                          <td className="px-4 py-3 font-bold text-slate-900 dark:text-slate-100">
-                            Soal #{q.questionNumber}
+                      {questionAnalysisResults.map((qa, idx) => (
+                        <tr key={qa.questionId || idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                          <td className="py-3 px-3 text-center font-bold text-slate-500 dark:text-slate-400">
+                            {qa.questionNumber || idx + 1}
                           </td>
-                          <td className="px-4 py-3">{q.totalResponses} Siswa</td>
-                          <td className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">
-                            {q.correctCount} ({Math.round(q.facilityValue * 100)}%)
+                          <td className="py-3 px-3 font-mono font-bold text-indigo-700 dark:text-indigo-400">
+                            {qa.uniqueCode}
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="py-3 px-3">
+                            <div className="text-slate-900 dark:text-slate-100 font-medium line-clamp-1">{qa.questionText}</div>
+                            <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                              <span>Kunci Jawaban Sah:</span>
+                              <span className="text-emerald-700 dark:text-emerald-400 font-mono font-bold bg-emerald-50 dark:bg-emerald-950/60 px-1 py-0.2 rounded border border-emerald-200 dark:border-emerald-800">
+                                {qa.correctAnswer}
+                              </span>
+                              {(() => {
+                                const keyOptText = (qa as any).options?.find((o: any) => o.key === qa.correctAnswer.toUpperCase())?.text;
+                                if (keyOptText && !keyOptText.toLowerCase().startsWith('pilihan')) {
+                                  return (
+                                    <span className="text-slate-600 dark:text-slate-400 truncate max-w-[220px]" title={keyOptText}>
+                                      ({keyOptText})
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <div className="flex items-center justify-center space-x-1.5 text-[11px] font-mono font-bold">
+                              <span
+                                className="bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800"
+                                title={`Benar: ${qa.correctPercentage}%`}
+                              >
+                                {qa.correctCount} Benar
+                              </span>
+                              <span
+                                className="bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 px-2 py-0.5 rounded border border-rose-200 dark:border-rose-800"
+                                title={`Salah: ${qa.incorrectPercentage}%`}
+                              >
+                                {qa.incorrectCount} Salah
+                              </span>
+                              {qa.unansweredCount > 0 && (
+                                <span
+                                  className="bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800"
+                                  title={`Kosong: ${qa.unansweredPercentage}%`}
+                                >
+                                  {qa.unansweredCount} Kosong
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[9px] text-slate-400 mt-1 font-mono">
+                              Total Responden: {qa.totalRespondents} Siswa
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <div className="flex flex-col items-center gap-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                                  {qa.difficultyIndex.toFixed(2)}
+                                </span>
+                                <span
+                                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                    qa.informativeStatus === 'Easy'
+                                      ? 'bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300'
+                                      : qa.informativeStatus === 'Difficult'
+                                      ? 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
+                                      : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
+                                  }`}
+                                >
+                                  {qa.informativeStatus === 'Easy' ? 'Mudah' : qa.informativeStatus === 'Difficult' ? 'Sukar' : 'Sedang'}
+                                </span>
+                              </div>
+                              <div className="w-16 bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full ${
+                                    qa.difficultyIndex >= 0.70
+                                      ? 'bg-blue-500'
+                                      : qa.difficultyIndex >= 0.30
+                                      ? 'bg-emerald-500'
+                                      : 'bg-rose-500'
+                                  }`}
+                                  style={{ width: `${Math.max(10, Math.min(100, qa.difficultyIndex * 100))}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <div className="flex flex-col items-center gap-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                                  {qa.discriminationIndex.toFixed(2)}
+                                </span>
+                                <span
+                                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                    qa.discriminationStatus === 'Good Discrimination'
+                                      ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
+                                      : qa.discriminationStatus === 'Moderate Discrimination'
+                                      ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
+                                      : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
+                                  }`}
+                                >
+                                  {qa.discriminationStatus === 'Good Discrimination'
+                                    ? 'Baik'
+                                    : qa.discriminationStatus === 'Moderate Discrimination'
+                                    ? 'Cukup'
+                                    : 'Jelek'}
+                                </span>
+                              </div>
+                              <div className="w-16 bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full ${
+                                    qa.discriminationIndex >= 0.40
+                                      ? 'bg-emerald-500'
+                                      : qa.discriminationIndex >= 0.20
+                                      ? 'bg-amber-500'
+                                      : 'bg-rose-500'
+                                  }`}
+                                  style={{ width: `${Math.max(10, Math.min(100, Math.max(0, qa.discriminationIndex) * 100))}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 text-center font-mono text-[10px]">
+                            <div className="flex items-center justify-center space-x-1">
+                              {['A', 'B', 'C', 'D', 'E'].map(opt => {
+                                const stat = qa.distractorStats[opt];
+                                const isKey = opt === qa.correctAnswer.toUpperCase();
+                                const optText = (qa as any).options?.find((o: any) => o.key === opt)?.text;
+                                const hasText = optText && !optText.toLowerCase().startsWith('pilihan');
+                                return (
+                                  <span
+                                    key={opt}
+                                    className={`px-1 py-0.5 rounded cursor-help transition-all ${
+                                      isKey
+                                        ? 'bg-emerald-200 dark:bg-emerald-900/80 text-emerald-950 dark:text-emerald-100 font-bold border border-emerald-400 dark:border-emerald-700'
+                                        : stat?.isMisleading
+                                        ? 'bg-rose-200 dark:bg-rose-900/80 text-rose-950 dark:text-rose-100 font-bold border border-rose-400 dark:border-rose-700'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                                    }`}
+                                    title={
+                                      hasText
+                                        ? `${opt} (${optText}): ${stat?.count || 0} pemilih (${stat?.percentage || 0}%)${
+                                            isKey ? ' [KUNCI SAH]' : stat?.isMisleading ? ' [DISTRAKTOR MENYESATKAN]' : ''
+                                          }`
+                                        : `${opt}: ${stat?.count || 0} pemilih (${stat?.percentage || 0}%)${
+                                            isKey ? ' [KUNCI SAH]' : stat?.isMisleading ? ' [DISTRAKTOR MENYESATKAN]' : ''
+                                          }`
+                                    }
+                                  >
+                                    {opt}:{stat?.count || 0}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                            {qa.distractorStats.KOSONG?.count > 0 && (
+                              <div className="text-[9px] text-amber-700 dark:text-amber-400 mt-0.5">
+                                Kosong: {qa.distractorStats.KOSONG.count}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-center">
                             <span
-                              className={`px-2 py-0.5 rounded-md font-semibold text-[11px] ${
-                                q.facilityValue >= 0.6
-                                  ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
-                                  : q.facilityValue >= 0.4
-                                  ? 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300'
-                                  : 'bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300'
+                              className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded ${
+                                qa.reviewRecommendation === 'Needs Review'
+                                  ? 'bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
+                                  : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
                               }`}
                             >
-                              {q.difficultyLabel}
+                              {qa.reviewRecommendation === 'Needs Review' ? 'Perlu Tinjauan' : 'Soal Layak'}
                             </span>
-                          </td>
-                          <td className="px-4 py-3 font-mono font-bold">
-                            {q.discriminationIndex !== undefined ? q.discriminationIndex.toFixed(2) : '-'}
-                          </td>
-                          <td className="px-4 py-3 font-bold">
-                            {q.facilityValue >= 0.3 && q.facilityValue <= 0.85 ? (
-                              <span className="text-emerald-600 flex items-center gap-1">
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                <span>Soal Baik (Layak Disimpan)</span>
-                              </span>
-                            ) : (
-                              <span className="text-amber-600 flex items-center gap-1">
-                                <AlertTriangle className="w-3.5 h-3.5" />
-                                <span>Perlu Direvisi</span>
-                              </span>
+                            {qa.reviewReasons && qa.reviewReasons.length > 0 && (
+                              <div className="text-[9px] text-amber-700 dark:text-amber-400 mt-1 max-w-[140px] mx-auto truncate" title={qa.reviewReasons.join(' | ')}>
+                                {qa.reviewReasons[0]}
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -573,7 +1021,17 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
             </>
           ) : (
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-12 text-center text-slate-400 text-xs">
-              Belum ada data butir soal yang dianalisis untuk wadah ini.
+              <div className="max-w-md mx-auto flex flex-col items-center justify-center space-y-2">
+                <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 flex items-center justify-center">
+                  <Info className="w-5 h-5 text-emerald-500 dark:text-emerald-400" />
+                </div>
+                <div className="font-bold text-slate-800 dark:text-slate-200 text-sm">
+                  Belum Ada Data Butir Soal Terhubung
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                  Belum ada data butir soal atau lembar jawaban siswa yang disinkronkan untuk wadah {activePackage?.title || 'ini'} pada mata pelajaran {activeSubject?.name || 'ini'}. Silakan hubungkan Google Form / Spreadsheet pada menu Asesmen Sumatif.
+                </p>
+              </div>
             </div>
           )}
         </div>
