@@ -5514,31 +5514,38 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                                   </td>
                                   <td className="py-3 px-3 text-center font-mono text-[10px]">
                                     <div className="flex items-center justify-center space-x-1">
-                                      {['A', 'B', 'C', 'D', 'E'].map(opt => {
-                                        const stat = qa.distractorStats[opt];
-                                        const isKey = opt === qa.correctAnswer.toUpperCase();
-                                        const optText = (qa as any).options?.find((o: any) => o.key === opt)?.text;
-                                        const hasText = optText && !optText.toLowerCase().startsWith('pilihan');
-                                        return (
-                                          <span
-                                            key={opt}
-                                            className={`px-1 py-0.5 rounded cursor-help transition-all ${
-                                              isKey
-                                                ? 'bg-emerald-200 dark:bg-emerald-900/80 text-emerald-950 dark:text-emerald-100 font-bold border border-emerald-400 dark:border-emerald-700'
-                                                : stat?.isMisleading
-                                                ? 'bg-rose-200 dark:bg-rose-900/80 text-rose-950 dark:text-rose-100 font-bold border border-rose-400 dark:border-rose-700'
-                                                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-                                            }`}
-                                            title={
-                                              hasText
-                                                ? `${opt} (${optText}): ${stat?.count || 0} pemilih (${stat?.percentage || 0}%)${isKey ? ' [KUNCI SAH]' : stat?.isMisleading ? ' [DISTRAKTOR MENYESATKAN]' : ''}`
-                                                : `${opt}: ${stat?.count || 0} pemilih (${stat?.percentage || 0}%)${isKey ? ' [KUNCI SAH]' : stat?.isMisleading ? ' [DISTRAKTOR MENYESATKAN]' : ''}`
-                                            }
-                                          >
-                                            {opt}:{stat?.count || 0}
-                                          </span>
-                                        );
-                                      })}
+                                      {(() => {
+                                        const validKeys = (Array.isArray((qa as any).options) && (qa as any).options.length > 0)
+                                          ? (qa as any).options.map((o: any) => o.key.toUpperCase()).filter((k: string) => ['A', 'B', 'C', 'D', 'E'].includes(k))
+                                          : Object.keys(qa.distractorStats || {}).filter(k => ['A', 'B', 'C', 'D', 'E'].includes(k) && (k !== 'E' || (qa.distractorStats[k]?.count || 0) > 0));
+                                        const renderKeys = validKeys.length > 0 ? validKeys : ['A', 'B', 'C', 'D'];
+
+                                        return renderKeys.map((opt: string) => {
+                                          const stat = qa.distractorStats?.[opt];
+                                          const isKey = opt === qa.correctAnswer.toUpperCase();
+                                          const optText = (qa as any).options?.find((o: any) => o.key === opt)?.text;
+                                          const hasText = optText && !optText.toLowerCase().startsWith('pilihan');
+                                          return (
+                                            <span
+                                              key={opt}
+                                              className={`px-1 py-0.5 rounded cursor-help transition-all ${
+                                                isKey
+                                                  ? 'bg-emerald-200 dark:bg-emerald-900/80 text-emerald-950 dark:text-emerald-100 font-bold border border-emerald-400 dark:border-emerald-700'
+                                                  : stat?.isMisleading
+                                                  ? 'bg-rose-200 dark:bg-rose-900/80 text-rose-950 dark:text-rose-100 font-bold border border-rose-400 dark:border-rose-700'
+                                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                                              }`}
+                                              title={
+                                                hasText
+                                                  ? `${opt} (${optText}): ${stat?.count || 0} pemilih (${stat?.percentage || 0}%)${isKey ? ' [KUNCI SAH]' : stat?.isMisleading ? ' [DISTRAKTOR MENYESATKAN]' : ''}`
+                                                  : `${opt}: ${stat?.count || 0} pemilih (${stat?.percentage || 0}%)${isKey ? ' [KUNCI SAH]' : stat?.isMisleading ? ' [DISTRAKTOR MENYESATKAN]' : ''}`
+                                              }
+                                            >
+                                              {opt}:{stat?.count || 0}
+                                            </span>
+                                          );
+                                        });
+                                      })()}
                                     </div>
                                     {qa.distractorStats.KOSONG?.count > 0 && (
                                       <div className="text-[9px] text-amber-700 dark:text-amber-400 mt-0.5">

@@ -96,12 +96,13 @@ export class ScoringService {
     const cNorm = boolMap[c.toUpperCase()] || c.toUpperCase();
     if (sNorm === cNorm) return true;
 
-    // Multiple Choice Option Prefix matching (e.g. "A" matches "A. Pilihan" or "A) Pilihan")
+    // Multiple Choice Option Prefix matching (e.g. "A" matches "A. Pilihan", "(A) Pilihan", "[A] Pilihan", "A - Pilihan")
     const extractOptionLetter = (val: string): string | null => {
       const clean = val.trim();
-      const prefix = clean.match(/^([A-Ea-e])[\.\)\:\s]/);
-      if (prefix) return prefix[1].toUpperCase();
+      if (!clean) return null;
       if (['A', 'B', 'C', 'D', 'E'].includes(clean.toUpperCase())) return clean.toUpperCase();
+      const prefix = clean.match(/^\s*(?:\[([A-Ea-e])\]|\(([A-Ea-e])\)|(?:opsi|pilihan)\s+([A-Ea-e])(?:[\.\)\:\-\s]|$)|([A-Ea-e])[\.\)\:\-\s])/i);
+      if (prefix) return (prefix[1] || prefix[2] || prefix[3] || prefix[4]).toUpperCase();
       return null;
     };
 
@@ -139,12 +140,35 @@ export class ScoringService {
     const answerBreakdown: CalculationResult['answerBreakdown'] = {};
 
     questions.forEach(q => {
-      const studentAns = (studentAnswers[q.uniqueCode] || '').trim().toUpperCase();
-      const correctAns = q.correctAnswer.trim().toUpperCase();
+      let studentAns = (studentAnswers[q.uniqueCode] || '').trim().toUpperCase();
+      let correctAns = q.correctAnswer.trim().toUpperCase();
       const questionWeight = config.scoringType === 'CUSTOM_WEIGHT' ? (q.weight || 1) : 1;
 
       // Maximum possible raw points accumulates positive marks for correct responses
       maxPossibleRawScore += config.correctScore * questionWeight;
+
+      // Resolusi opsi jika siswa atau kunci berupa teks penuh yang sesuai dengan teks di q.options
+      if (Array.isArray(q.options) && q.options.length > 0) {
+        const cleanS = studentAns.replace(/\s+/g, ' ').trim();
+        const cleanC = correctAns.replace(/\s+/g, ' ').trim();
+        const strippedS = cleanS.replace(/^[A-E][\.\)\:\-\s]+\s*/, '').trim();
+        const strippedC = cleanC.replace(/^[A-E][\.\)\:\-\s]+\s*/, '').trim();
+
+        q.options.forEach(opt => {
+          const optK = (opt.key || '').trim().toUpperCase();
+          const optT = (opt.text || '').replace(/\s+/g, ' ').trim().toUpperCase();
+          const strippedOptT = optT.replace(/^[A-E][\.\)\:\-\s]+\s*/, '').trim();
+
+          if (optK && optT && !optT.startsWith('PILIHAN ') && !optT.startsWith('OPSI ')) {
+            if (cleanS && (cleanS === optT || (strippedS && strippedS === strippedOptT))) {
+              studentAns = optK;
+            }
+            if (cleanC && (cleanC === optT || (strippedC && strippedC === strippedOptT))) {
+              correctAns = optK;
+            }
+          }
+        });
+      }
 
       const isCorrect = this.isAnswerMatching(studentAns, correctAns);
 

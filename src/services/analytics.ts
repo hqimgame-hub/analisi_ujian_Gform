@@ -322,10 +322,27 @@ export class AnalyticsService {
       let correctCount = 0;
       let incorrectCount = 0;
       let unansweredCount = 0;
-      const rawCounts: Record<string, number> = { A: 0, B: 0, C: 0, D: 0, E: 0, KOSONG: 0 };
+
+      // Tentukan opsi yang sah untuk butir soal ini (misal SMP 4 opsi: A..D, atau SMA 5 opsi: A..E)
+      const validOptionKeys: Array<'A' | 'B' | 'C' | 'D' | 'E'> = (Array.isArray(q.options) && q.options.length > 0)
+        ? q.options
+            .map(o => (o.key || '').trim().toUpperCase())
+            .filter((k): k is 'A' | 'B' | 'C' | 'D' | 'E' => ['A', 'B', 'C', 'D', 'E'].includes(k))
+        : (['A', 'B', 'C', 'D'] as const).slice();
+      const activeOptionKeys: Array<'A' | 'B' | 'C' | 'D' | 'E'> = validOptionKeys.length > 0 ? validOptionKeys : (['A', 'B', 'C', 'D'] as const).slice();
+
+      const rawCounts: Record<string, number> = { KOSONG: 0 };
+      activeOptionKeys.forEach(k => {
+        rawCounts[k] = 0;
+      });
 
       let upperCorrect = 0;
       let lowerCorrect = 0;
+
+      const cleanText = (str: string | undefined | null) =>
+        (str || '').replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim();
+      const stripPrefix = (str: string) =>
+        str.replace(/^\s*(?:\[([A-Ea-e])\]|\(([A-Ea-e])\)|(?:opsi|pilihan)\s+([A-Ea-e])(?:[\.\)\:\-\s]|$)|([A-Ea-e])[\.\)\:\-\s])\s*/i, '').replace(/[\.\,\;]+$/, '').trim();
 
       // Build smart option mapper for this question (handles A..E, explicit prefixes, q.options text, and legacy unmapped full-text answers)
       const textToOptionKey = new Map<string, 'A' | 'B' | 'C' | 'D' | 'E'>();
@@ -334,39 +351,70 @@ export class AnalyticsService {
       if (Array.isArray(q.options)) {
         q.options.forEach(opt => {
           const k = (opt.key || '').trim().toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
-          const t = (opt.text || '').trim().toUpperCase();
-          if (optionKeys.includes(k) && t && t !== `PILIHAN ${k}` && t !== `OPSI ${k}` && t !== k) {
-            textToOptionKey.set(t, k);
+          const tClean = cleanText(opt.text).toUpperCase();
+          const tStripped = stripPrefix(tClean);
+          if (activeOptionKeys.includes(k) && tClean && !tClean.startsWith('PILIHAN ') && !tClean.startsWith('OPSI ') && tClean !== k) {
+            textToOptionKey.set(tClean, k);
+            if (tStripped) textToOptionKey.set(tStripped, k);
             usedOptionKeys.add(k);
           }
         });
       }
 
       const resolveToOptionKey = (rawVal: string | undefined | null): 'A' | 'B' | 'C' | 'D' | 'E' | '' => {
-        const trimmed = (rawVal || '').trim();
-        if (!trimmed) return '';
-        const upper = trimmed.toUpperCase();
-        if (optionKeys.includes(upper as any)) {
+        const cleaned = cleanText(rawVal);
+        if (!cleaned) return '';
+        const upper = cleaned.toUpperCase();
+
+        if (activeOptionKeys.includes(upper as any)) {
           return upper as 'A' | 'B' | 'C' | 'D' | 'E';
         }
-        const prefixMatch = trimmed.match(/^\s*(?:\[([A-Ea-e])\]|(?:opsi|pilihan)\s+([A-Ea-e])(?:[\.\)\:\-\s]|$)|([A-Ea-e])[\.\)\:])/i);
+
+        const prefixMatch = cleaned.match(/^\s*(?:\[([A-Ea-e])\]|\(([A-Ea-e])\)|(?:opsi|pilihan)\s+([A-Ea-e])(?:[\.\)\:\-\s]|$)|([A-Ea-e])[\.\)\:\-\s])/i);
         if (prefixMatch) {
-          return (prefixMatch[1] || prefixMatch[2] || prefixMatch[3]).toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
+          const matchedLetter = (prefixMatch[1] || prefixMatch[2] || prefixMatch[3] || prefixMatch[4]).toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
+          if (activeOptionKeys.includes(matchedLetter)) {
+            return matchedLetter;
+          }
         }
+
         if (upper === 'BENAR' || upper === 'TRUE') return 'A';
         if (upper === 'SALAH' || upper === 'FALSE') return 'B';
 
         const mapped = textToOptionKey.get(upper);
         if (mapped) return mapped;
 
-        // Dynamic fallback for legacy full-text Google Form answers not yet mapped in q.options
-        const nextAvailable = optionKeys.find(k => !usedOptionKeys.has(k)) || 'E';
-        usedOptionKeys.add(nextAvailable);
-        textToOptionKey.set(upper, nextAvailable);
-        return nextAvailable;
+        const stripped = stripPrefix(upper);
+        if (stripped) {
+          const mappedStripped = textToOptionKey.get(stripped);
+          if (mappedStripped) return mappedStripped;
+        }
+
+        // Loose match against q.options
+        if (Array.isArray(q.options)) {
+          const loose = q.options.find(opt => {
+            const optClean = cleanText(opt.text).toUpperCase();
+            const optStripped = stripPrefix(optClean);
+            return (optClean && optClean === upper) || (optStripped && stripped && optStripped === stripped);
+          });
+          if (loose) {
+            const looseKey = loose.key.toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
+            if (activeOptionKeys.includes(looseKey)) return looseKey;
+          }
+        }
+
+        // Dynamic fallback for unmapped options, ONLY within activeOptionKeys, NEVER defaulting to 'E'
+        const nextAvailable = activeOptionKeys.find(k => !usedOptionKeys.has(k));
+        if (nextAvailable) {
+          usedOptionKeys.add(nextAvailable);
+          textToOptionKey.set(upper, nextAvailable);
+          return nextAvailable;
+        }
+
+        return '';
       };
 
-      const resolvedCorrectKey = resolveToOptionKey(q.correctAnswer) || 'A';
+      const resolvedCorrectKey = resolveToOptionKey(q.correctAnswer) || (activeOptionKeys[0] || 'A');
 
       qAnswers.forEach(ans => {
         const rawAns = (ans.studentAnswer || '').trim();
@@ -379,12 +427,18 @@ export class AnalyticsService {
         const resolvedKey = resolveToOptionKey(rawAns);
         if (resolvedKey && rawCounts[resolvedKey] !== undefined) {
           rawCounts[resolvedKey]++;
+        } else if (!resolvedKey) {
+          unansweredCount++;
+          rawCounts.KOSONG++;
         }
 
+        const cleanRawAns = cleanText(rawAns).toUpperCase();
+        const cleanCorrectAns = cleanText(q.correctAnswer).toUpperCase();
         const isAnsCorrect = Boolean(
           ans.isCorrect ||
-          (resolvedKey && resolvedKey === resolvedCorrectKey) ||
-          rawAns.toUpperCase() === (q.correctAnswer || '').trim().toUpperCase()
+          (resolvedKey && resolvedCorrectKey && resolvedKey === resolvedCorrectKey) ||
+          (cleanRawAns && cleanCorrectAns && cleanRawAns === cleanCorrectAns) ||
+          (cleanRawAns && cleanCorrectAns && stripPrefix(cleanRawAns) === stripPrefix(cleanCorrectAns))
         );
 
         if (isAnsCorrect) {
@@ -442,12 +496,12 @@ export class AnalyticsService {
         discriminationCategory = 'BURUK';
       }
 
-      // Distractor Stats & Misleading Check
+      // Distractor Stats & Misleading Check (Hanya untuk opsi yang sah pada soal ini + KOSONG)
       const distractorStats: Record<string, DistractorOptionStat> = {};
       const distractorPercentages: Record<string, number> = {};
       const reviewReasons: string[] = [];
 
-      ['A', 'B', 'C', 'D', 'E', 'KOSONG'].forEach(opt => {
+      [...activeOptionKeys, 'KOSONG'].forEach(opt => {
         const count = rawCounts[opt] || 0;
         const pct = Math.round((count / divisor) * 100 * 10) / 10;
         const isCorrect = opt === resolvedCorrectKey;

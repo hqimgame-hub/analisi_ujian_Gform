@@ -1091,48 +1091,58 @@ export const ItemAnalysisVisualizer: React.FC<ItemAnalysisVisualizerProps> = ({
                           <span className="font-bold text-slate-700 dark:text-slate-300 block mb-2">
                             Analisis Sebaran Pilihan Jawaban Siswa (Efektivitas Pengecoh):
                           </span>
-                          <div className="grid grid-cols-5 gap-2">
-                            {['A', 'B', 'C', 'D', 'E'].map(opt => {
-                              const isCorrectKey = opt === item.correctAnswer;
-                              const stat = item.distractorStats?.[opt];
-                              const count = stat ? stat.count : (item.distractorCounts?.[opt] || 0);
-                              const totalResp = item.totalRespondents || 1;
-                              const pct = stat ? stat.percentage : Math.round((count / totalResp) * 100);
-                              const isDeadDistractor = !isCorrectKey && pct < 5; // Pengecoh mati (< 5%)
+                          {(() => {
+                            const validKeys = (Array.isArray(item.options) && item.options.length > 0)
+                              ? item.options.map((o: any) => o.key.toUpperCase()).filter((k: string) => ['A', 'B', 'C', 'D', 'E'].includes(k))
+                              : Object.keys(item.distractorStats || item.distractorCounts || {}).filter(k => ['A', 'B', 'C', 'D', 'E'].includes(k) && (k !== 'E' || (item.distractorStats?.[k]?.count || item.distractorCounts?.[k] || 0) > 0));
+                            const renderKeys = validKeys.length > 0 ? validKeys : ['A', 'B', 'C', 'D'];
+                            const colsClass = renderKeys.length <= 4 ? 'grid-cols-4' : 'grid-cols-5';
 
-                              return (
-                                <div
-                                  key={opt}
-                                  className={`p-2.5 rounded-xl border text-center transition-all ${
-                                    isCorrectKey
-                                      ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-800'
-                                      : isDeadDistractor
-                                      ? 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 opacity-60'
-                                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-center gap-1 font-mono font-bold text-xs">
-                                    <span className={isCorrectKey ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-700 dark:text-slate-300'}>
-                                      Opsi {opt}
-                                    </span>
-                                    {isCorrectKey && <Check className="w-3.5 h-3.5 text-emerald-600" />}
-                                  </div>
-                                  <div className="text-base font-black font-mono text-slate-900 dark:text-white mt-1">
-                                    {count} <span className="text-[10px] font-normal text-slate-400">({pct}%)</span>
-                                  </div>
-                                  <span className={`text-[9px] font-bold mt-1 block truncate ${
-                                    isCorrectKey
-                                      ? 'text-emerald-700 dark:text-emerald-300'
-                                      : isDeadDistractor
-                                      ? 'text-slate-400'
-                                      : 'text-indigo-600 dark:text-indigo-400'
-                                  }`}>
-                                    {isCorrectKey ? 'KUNCI BENAR' : isDeadDistractor ? 'Pengecoh Mati' : 'Berfungsi Baik'}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
+                            return (
+                              <div className={`grid ${colsClass} gap-2`}>
+                                {renderKeys.map((opt: string) => {
+                                  const isCorrectKey = opt === item.correctAnswer;
+                                  const stat = item.distractorStats?.[opt];
+                                  const count = stat ? stat.count : (item.distractorCounts?.[opt] || 0);
+                                  const totalResp = item.totalRespondents || 1;
+                                  const pct = stat ? stat.percentage : Math.round((count / totalResp) * 100);
+                                  const isDeadDistractor = !isCorrectKey && pct < 5; // Pengecoh mati (< 5%)
+
+                                  return (
+                                    <div
+                                      key={opt}
+                                      className={`p-2.5 rounded-xl border text-center transition-all ${
+                                        isCorrectKey
+                                          ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-800'
+                                          : isDeadDistractor
+                                          ? 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 opacity-60'
+                                          : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-center gap-1 font-mono font-bold text-xs">
+                                        <span className={isCorrectKey ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-700 dark:text-slate-300'}>
+                                          Opsi {opt}
+                                        </span>
+                                        {isCorrectKey && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                                      </div>
+                                      <div className="text-base font-black font-mono text-slate-900 dark:text-white mt-1">
+                                        {count} <span className="text-[10px] font-normal text-slate-400">({pct}%)</span>
+                                      </div>
+                                      <span className={`text-[9px] font-bold mt-1 block truncate ${
+                                        isCorrectKey
+                                          ? 'text-emerald-700 dark:text-emerald-300'
+                                          : isDeadDistractor
+                                          ? 'text-slate-400'
+                                          : 'text-indigo-600 dark:text-indigo-400'
+                                      }`}>
+                                        {isCorrectKey ? 'KUNCI BENAR' : isDeadDistractor ? 'Pengecoh Mati' : 'Berfungsi Baik'}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         {/* Quick Action Links */}

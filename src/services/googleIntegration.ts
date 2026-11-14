@@ -379,11 +379,11 @@ export class GoogleIntegrationService {
       return { letter, text: letter };
     }
 
-    const match = trimmed.match(/^\s*(?:\[([A-Ea-e])\]|(?:opsi|pilihan)\s+([A-Ea-e])(?:[\.\)\:\-\s]|$)|([A-Ea-e])[\.\)\:])(?:\s*(.*))?$/i);
+    const match = trimmed.match(/^\s*(?:\[([A-Ea-e])\]|\(([A-Ea-e])\)|(?:opsi|pilihan)\s+([A-Ea-e])(?:[\.\)\:\-\s]|$)|([A-Ea-e])[\.\)\:\-\s])(?:\s*(.*))?$/i);
     if (!match) return null;
 
-    const letter = (match[1] || match[2] || match[3]).toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
-    const remainder = (match[4] || '').trim();
+    const letter = (match[1] || match[2] || match[3] || match[4]).toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
+    const remainder = (match[5] || '').trim();
     return {
       letter,
       text: remainder || trimmed,
@@ -489,17 +489,6 @@ export class GoogleIntegrationService {
       return !t || t.toLowerCase() === `pilihan ${k.toLowerCase()}` || t.toLowerCase() === `opsi ${k.toLowerCase()}` || t.toUpperCase() === k;
     };
 
-    // Peta opsi A..E saat ini
-    const keyToText = new Map<'A' | 'B' | 'C' | 'D' | 'E', string>();
-    if (Array.isArray(existingOptions)) {
-      existingOptions.forEach(opt => {
-        const k = (opt.key || '').trim().toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
-        if (optionKeys.includes(k) && !isPlaceholderText(opt.text, k)) {
-          keyToText.set(k, opt.text.trim());
-        }
-      });
-    }
-
     const rawValues: string[] = [];
     const rawKeyCell = (answerKeyRow && header && answerKeyRow[header] !== undefined)
       ? String(answerKeyRow[header]).trim()
@@ -520,7 +509,35 @@ export class GoogleIntegrationService {
       rawValues.push(rawKeyCell);
     }
 
-    // 1. Tangkap opsi yang memiliki prefix huruf eksplisit (misal "A. Fotosintesis")
+    // Peta opsi A..E saat ini
+    const keyToText = new Map<'A' | 'B' | 'C' | 'D' | 'E', string>();
+
+    // Cek apakah existingOptions relevan dengan data sheet saat ini
+    if (Array.isArray(existingOptions)) {
+      const existingNonPlaceholder = existingOptions.filter(opt => {
+        const k = (opt.key || '').trim().toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
+        return optionKeys.includes(k) && !isPlaceholderText(opt.text, k);
+      });
+
+      // Jika ada rawValues, periksa apakah ada setidaknya satu nilai yang cocok dengan existingOptions
+      const hasAnyMatch = rawValues.length === 0 || existingNonPlaceholder.some(opt => {
+        const optNorm = opt.text.replace(/\s+/g, ' ').trim().toUpperCase();
+        return rawValues.some(rv => {
+          const rvNorm = rv.replace(/\s+/g, ' ').trim().toUpperCase();
+          return rvNorm === optNorm || rvNorm.includes(optNorm) || optNorm.includes(rvNorm);
+        });
+      });
+
+      // Hanya gunakan existingOptions jika masih relevan atau belum ada data baris sheet
+      if (hasAnyMatch) {
+        existingNonPlaceholder.forEach(opt => {
+          const k = (opt.key || '').trim().toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
+          keyToText.set(k, opt.text.trim());
+        });
+      }
+    }
+
+    // 1. Tangkap opsi yang memiliki prefix huruf eksplisit (misal "A. Fotosintesis" atau "(A) Fotosintesis")
     const unprefixedTexts: string[] = [];
     const seenNormTexts = new Set<string>();
 
@@ -569,12 +586,26 @@ export class GoogleIntegrationService {
       }
     });
 
-    const finalOptions = optionKeys.map(k => ({
+    // 3. Tentukan jumlah opsi aktif secara dinamis:
+    // Jika soal di Google Form hanya memiliki 4 pilihan (A..D, standar SMP/MTs), JANGAN buat opsi E dummy!
+    // Hanya sertakan E jika data eksplisit memiliki opsi E atau terdapat 5 variasi jawaban.
+    let activeOptionKeys: Array<'A' | 'B' | 'C' | 'D' | 'E'> = ['A', 'B', 'C', 'D'];
+    if (keyToText.has('E')) {
+      activeOptionKeys = ['A', 'B', 'C', 'D', 'E'];
+    } else if (keyToText.size === 2 && keyToText.has('A') && keyToText.has('B') && !keyToText.has('C')) {
+      activeOptionKeys = ['A', 'B'];
+    } else if (keyToText.size === 3 && keyToText.has('A') && keyToText.has('B') && keyToText.has('C') && !keyToText.has('D')) {
+      activeOptionKeys = ['A', 'B', 'C'];
+    } else {
+      activeOptionKeys = ['A', 'B', 'C', 'D'];
+    }
+
+    const finalOptions = activeOptionKeys.map(k => ({
       key: k,
       text: keyToText.get(k) || `Pilihan ${k}`,
     }));
 
-    // 3. Tentukan kunci jawaban (correctAnswer) dalam bentuk huruf 'A'..'E'
+    // 4. Tentukan kunci jawaban (correctAnswer) dalam bentuk huruf 'A'..'E'
     const candidateRawCorrect = rawKeyCell || (existingCorrectAnswer || '').trim();
     let finalCorrect = 'A';
 
@@ -587,17 +618,23 @@ export class GoogleIntegrationService {
         if (explicit) {
           finalCorrect = explicit.letter;
         } else {
-          const upperCorr = candidateRawCorrect.toUpperCase();
+          const upperCorr = candidateRawCorrect.replace(/\s+/g, ' ').trim().toUpperCase();
+          const strippedCorr = upperCorr.replace(/^[A-E][\.\)\:\-\s]+\s*/, '').trim();
+
           if (['BENAR', 'TRUE'].includes(upperCorr)) {
             finalCorrect = 'A';
           } else if (['SALAH', 'FALSE'].includes(upperCorr)) {
             finalCorrect = 'B';
+          } else if (activeOptionKeys.includes(upperCorr as any)) {
+            finalCorrect = upperCorr;
           } else {
-            const matchedOpt = finalOptions.find(o => o.text.trim().toUpperCase() === upperCorr);
+            const matchedOpt = finalOptions.find(o => {
+              const optNorm = o.text.replace(/\s+/g, ' ').trim().toUpperCase();
+              const optStripped = optNorm.replace(/^[A-E][\.\)\:\-\s]+\s*/, '').trim();
+              return optNorm === upperCorr || (optStripped && optStripped === strippedCorr);
+            });
             if (matchedOpt) {
               finalCorrect = matchedOpt.key;
-            } else if (optionKeys.includes(upperCorr as any)) {
-              finalCorrect = upperCorr;
             }
           }
         }
@@ -614,7 +651,7 @@ export class GoogleIntegrationService {
    * Menormalisasi jawaban mentah siswa pada satu butir soal menjadi huruf opsi 'A'..'E' (atau '' jika kosong).
    */
   public static normalizeAnswerToOptionKey(rawVal: string, q: Question): string {
-    const trimmed = (rawVal || '').trim();
+    const trimmed = (rawVal || '').replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim();
     if (!trimmed) return '';
 
     const multi = this.extractMultiSelectLetters(trimmed);
@@ -627,20 +664,33 @@ export class GoogleIntegrationService {
     if (['BENAR', 'TRUE'].includes(rawUpper)) return 'A';
     if (['SALAH', 'FALSE'].includes(rawUpper)) return 'B';
 
-    // Cocokkan dengan teks opsi A..E pada butir soal
-    if (Array.isArray(q.options)) {
-      const exactOpt = q.options.find(opt => opt.text.trim().toUpperCase() === rawUpper);
+    const cleanRaw = rawUpper.replace(/^[A-E][\.\)\:\-\s]+\s*/, '').replace(/[\.\,\;]+$/, '').trim();
+
+    // Cocokkan dengan teks opsi butir soal
+    if (Array.isArray(q.options) && q.options.length > 0) {
+      // 1. Exact match (case-insensitive)
+      const exactOpt = q.options.find(opt => {
+        const optText = (opt.text || '').replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
+        return optText === rawUpper;
+      });
       if (exactOpt) return exactOpt.key.toUpperCase();
 
-      // Cocokkan jika opsi memiliki prefix huruf di dalam teksnya atau sebaliknya
+      // 2. Loose match: strip prefix dan tanda baca akhir
       const looseOpt = q.options.find(opt => {
-        const optTextUpper = opt.text.trim().toUpperCase();
-        if (!optTextUpper || optTextUpper === `PILIHAN ${opt.key.toUpperCase()}`) return false;
-        const strippedOpt = optTextUpper.replace(/^[A-E][\.\)\:\-\s]+\s*/, '').trim();
-        const strippedRaw = rawUpper.replace(/^[A-E][\.\)\:\-\s]+\s*/, '').trim();
-        return strippedOpt.length > 0 && strippedOpt === strippedRaw;
+        const optText = (opt.text || '').replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
+        if (!optText || optText === `PILIHAN ${opt.key.toUpperCase()}` || optText === `OPSI ${opt.key.toUpperCase()}`) return false;
+        const optClean = optText.replace(/^[A-E][\.\)\:\-\s]+\s*/, '').replace(/[\.\,\;]+$/, '').trim();
+        return Boolean(optClean && cleanRaw && optClean === cleanRaw);
       });
       if (looseOpt) return looseOpt.key.toUpperCase();
+    }
+
+    // Jika jawaban cocok langsung dengan kunci jawaban yang memiliki format huruf tunggal
+    if (q.correctAnswer) {
+      const cleanCorr = q.correctAnswer.replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
+      if (['A', 'B', 'C', 'D', 'E'].includes(cleanCorr) && rawUpper === cleanCorr) {
+        return cleanCorr;
+      }
     }
 
     return trimmed;
