@@ -797,9 +797,7 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
 
     // If active selected subject is not permitted, select first permitted subject
     if (teacherSubjects.length > 0) {
-      if (!teacherSubjects.includes(selectedSubjectId)) {
-        setSelectedSubjectId(teacherSubjects[0]);
-      }
+      setSelectedSubjectId(prev => (prev && teacherSubjects.includes(prev) ? prev : teacherSubjects[0]));
       setQSubjectId(prev => teacherSubjects.includes(prev) ? prev : teacherSubjects[0]);
       setMatSubjectId(prev => teacherSubjects.includes(prev) ? prev : teacherSubjects[0]);
       setCompSubjectId(prev => teacherSubjects.includes(prev) ? prev : teacherSubjects[0]);
@@ -1189,47 +1187,58 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
 
   const handleSyncSumatifSheet = async (pkg: ExamPackage, subjectId: string) => {
     const allTo = dbService.getTryouts();
+    const pkgCode = (pkg.code || '').toLowerCase().trim();
     let matchTo = allTo.find(t => t.packageId === pkg.id && t.subjectId === subjectId);
     if (!matchTo) {
-      matchTo = allTo.find(t => (t.packageId === pkg.id || t.id.includes(pkg.id)) && (t.subjectId === subjectId || t.id.includes(subjectId)));
+      matchTo = allTo.find(t => (t.packageId === pkg.id || (pkgCode && t.code.toLowerCase().startsWith(pkgCode))) && t.subjectId === subjectId);
     }
-    if (matchTo && matchTo.googleSheetUrl) {
-      await syncTryoutFromSheet(matchTo, true);
-    } else {
-      const subItem = pkg.subjects?.find((s: ExamPackageSubject) => s.subjectId === subjectId);
-      if (subItem?.googleSheetUrl) {
-        const targetClassIds = pkg.targetClassIds || [];
-        const fullSub = subjects.find(s => s.id === subjectId);
-        const newTo: Tryout = {
-          id: `to-sum-${Date.now()}-${subjectId}`,
-          code: `${pkg.code}-${subjectId.slice(-4).toUpperCase()}`,
-          title: `${pkg.title} - ${fullSub?.name || 'Mapel'}`,
-          academicYearId: pkg.academicYearId,
-          packageId: pkg.id,
-          assessmentType: pkg.assessmentType,
-          subjectId: subjectId,
-          targetClassIds: targetClassIds.length > 0 ? targetClassIds : undefined,
-          startDate: pkg.startDate,
-          endDate: pkg.endDate,
-          status: 'ACTIVE',
-          googleSheetUrl: subItem.googleSheetUrl,
-          googleFormUrl: subItem.googleFormUrl || undefined,
-          scoringConfig: {
-            scoringType: 'EQUAL_WEIGHT',
-            maxScore: 100,
-            correctScore: 1,
-            wrongScore: 0,
-            unansweredScore: 0,
-            allowNegativeMarking: false,
-            passingGrade: fullSub?.passingGrade || 75,
-          },
-        };
-        dbService.saveTryout(newTo);
-        setTryouts(dbService.getTryoutsForTeacher(currentUser));
-        await syncTryoutFromSheet(newTo, true);
-      } else {
-        triggerToast('Harap tautkan Google Sheet terlebih dahulu.');
+    const subItem = pkg.subjects?.find((s: ExamPackageSubject) => s.subjectId === subjectId);
+
+    if (matchTo) {
+      if (subItem?.googleSheetUrl && matchTo.googleSheetUrl !== subItem.googleSheetUrl) {
+        matchTo.googleSheetUrl = subItem.googleSheetUrl;
+        matchTo.googleFormUrl = subItem.googleFormUrl || matchTo.googleFormUrl;
+        matchTo.packageId = pkg.id;
+        dbService.saveTryout(matchTo);
       }
+      if (matchTo.googleSheetUrl) {
+        await syncTryoutFromSheet(matchTo, true);
+        return;
+      }
+    }
+
+    if (subItem?.googleSheetUrl) {
+      const targetClassIds = pkg.targetClassIds || [];
+      const fullSub = subjects.find(s => s.id === subjectId);
+      const newTo: Tryout = {
+        id: generateUuid(),
+        code: `${pkg.code}-${subjectId.slice(-4).toUpperCase()}`,
+        title: `${pkg.title} - ${fullSub?.name || 'Mapel'}`,
+        academicYearId: pkg.academicYearId,
+        packageId: pkg.id,
+        assessmentType: pkg.assessmentType,
+        subjectId: subjectId,
+        targetClassIds: targetClassIds.length > 0 ? targetClassIds : undefined,
+        startDate: pkg.startDate,
+        endDate: pkg.endDate,
+        status: 'ACTIVE',
+        googleSheetUrl: subItem.googleSheetUrl,
+        googleFormUrl: subItem.googleFormUrl || undefined,
+        scoringConfig: {
+          scoringType: 'EQUAL_WEIGHT',
+          maxScore: 100,
+          correctScore: 1,
+          wrongScore: 0,
+          unansweredScore: 0,
+          allowNegativeMarking: false,
+          passingGrade: fullSub?.passingGrade || 75,
+        },
+      };
+      dbService.saveTryout(newTo);
+      setTryouts(dbService.getTryoutsForTeacher(currentUser));
+      await syncTryoutFromSheet(newTo, true);
+    } else {
+      triggerToast('Harap tautkan Google Sheet terlebih dahulu.');
     }
   };
 

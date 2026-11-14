@@ -1072,6 +1072,7 @@ export class DatabaseService {
               ...local,
               ...cloudTo,
               id: authoritativeId,
+              packageId: cloudTo.packageId || local.packageId,
               selectedQuestionColumns: mergedSelectedCols,
               answerKey: mergedAnswerKey,
               subjectId: resolvedIsExternal ? (cloudTo.subjectId || undefined) : (cloudTo.subjectId || local.subjectId),
@@ -1115,7 +1116,8 @@ export class DatabaseService {
             this.pendingTryoutIds.has(t.id) ||
             this.pendingTryoutIds.has(idKey) ||
             this.pendingTryoutIds.has(codeKey);
-          if (!existsInCloud && !isPending) {
+          const isPackageTryout = Boolean(t.packageId);
+          if (!existsInCloud && !isPending && !isPackageTryout) {
             removedTryoutIds.add(t.id);
             return false;
           }

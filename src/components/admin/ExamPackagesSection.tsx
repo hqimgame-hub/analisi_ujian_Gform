@@ -374,7 +374,7 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
         );
       } else {
         const newTo: Tryout = {
-          id: `to-sum-${Date.now()}-${editingSubjectItem.subjectId}`,
+          id: generateUuid(),
           code: `${pkg.code}-${editingSubjectItem.subjectId.slice(-4).toUpperCase()}`,
           title: `${pkg.title} - ${editingSubjectItem.subjectName}`,
           academicYearId: pkg.academicYearId,

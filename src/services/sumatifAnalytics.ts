@@ -168,9 +168,17 @@ export class SumatifAnalyticsService {
       // Prioritaskan KKM master dari Admin (subInfo.passingGrade)
       const passingGrade = subInfo?.passingGrade || pkgSub.passingGrade || 75;
 
+      const pkgCode = (pkg.code || '').toLowerCase().trim();
+      const pkgId = (pkg.id || '').toLowerCase().trim();
       const matchingTryoutIds = new Set(
         allTryouts
-          .filter(t => t.packageId === pkg.id && (!t.subjectId || t.subjectId === pkgSub.subjectId))
+          .filter(t => {
+            const tPkgId = (t.packageId || '').toLowerCase().trim();
+            const tCode = (t.code || '').toLowerCase().trim();
+            const isPkgMatch = tPkgId === pkgId || (pkgCode && tCode.startsWith(pkgCode)) || t.id === pkgId;
+            const isSubMatch = !t.subjectId || t.subjectId === pkgSub.subjectId || (t.id && t.id.includes(pkgSub.subjectId));
+            return isPkgMatch && isSubMatch;
+          })
           .map(t => t.id)
       );
       matchingTryoutIds.add(pkg.id);
@@ -264,11 +272,15 @@ export class SumatifAnalyticsService {
     const passingGrade = subInfo?.passingGrade || pkgSub?.passingGrade || 75;
 
     // 1. Tentukan Tryout yang terhubung dengan paket dan mapel ini
-    const matchingTryouts = allTryouts.filter(t =>
-      (t.packageId === pkg.id && (!t.subjectId || t.subjectId === subjectId)) ||
-      (t.id && t.packageId === pkg.id) ||
-      (t.id && t.id.includes(subjectId) && t.packageId === pkg.id)
-    );
+    const pkgCode = (pkg.code || '').toLowerCase().trim();
+    const pkgId = (pkg.id || '').toLowerCase().trim();
+    const matchingTryouts = allTryouts.filter(t => {
+      const tPkgId = (t.packageId || '').toLowerCase().trim();
+      const tCode = (t.code || '').toLowerCase().trim();
+      const isPkgMatch = tPkgId === pkgId || (pkgCode && tCode.startsWith(pkgCode)) || t.id === pkgId;
+      const isSubMatch = !t.subjectId || t.subjectId === subjectId || (t.id && t.id.includes(subjectId));
+      return isPkgMatch && isSubMatch;
+    });
     const matchingTryoutIds = new Set(matchingTryouts.map(t => t.id));
     // Wadah ID itu sendiri juga bisa tersimpan di tryoutId
     matchingTryoutIds.add(pkg.id);
@@ -464,11 +476,19 @@ export class SumatifAnalyticsService {
     });
 
     // Map tryouts per mapel untuk paket ini
+    const pkgCode = (pkg.code || '').toLowerCase().trim();
+    const pkgId = (pkg.id || '').toLowerCase().trim();
     const subjectTryoutMap = new Map<string, Set<string>>();
     subjects.forEach(sub => {
       const tIds = new Set(
         allTryouts
-          .filter(t => t.packageId === pkg.id && (!t.subjectId || t.subjectId === sub.id))
+          .filter(t => {
+            const tPkgId = (t.packageId || '').toLowerCase().trim();
+            const tCode = (t.code || '').toLowerCase().trim();
+            const isPkgMatch = tPkgId === pkgId || (pkgCode && tCode.startsWith(pkgCode)) || t.id === pkgId;
+            const isSubMatch = !t.subjectId || t.subjectId === sub.id || (t.id && t.id.includes(sub.id));
+            return isPkgMatch && isSubMatch;
+          })
           .map(t => t.id)
       );
       tIds.add(pkg.id);

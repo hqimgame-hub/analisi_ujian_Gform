@@ -255,6 +255,7 @@ function toSupabaseTryoutCoreOnly(to: Tryout, supabaseAcademicYearId?: string): 
   const existingMeta = ((to.scoringConfig as any)?._meta || {}) as Record<string, unknown>;
   const meta: Record<string, unknown> = {
     ...existingMeta,
+    packageId: to.packageId,
     selectedQuestionColumns: to.selectedQuestionColumns,
     answerKey: to.answerKey,
     subjectId: to.subjectId,
@@ -300,6 +301,7 @@ function toSupabaseTryout(to: Tryout, supabaseAcademicYearId?: string): Record<s
   const existingMeta = ((to.scoringConfig as any)?._meta || {}) as Record<string, unknown>;
   const meta: Record<string, unknown> = {
     ...existingMeta,
+    packageId: to.packageId,
     selectedQuestionColumns: to.selectedQuestionColumns,
     answerKey: to.answerKey,
     subjectId: to.subjectId,
@@ -383,7 +385,7 @@ function fromSupabaseTryout(row: Record<string, unknown>): Tryout {
     description: row.description ? String(row.description) : undefined,
     googleFormUrl: row.google_form_url ? String(row.google_form_url) : undefined,
     googleSheetUrl: row.google_sheet_url ? String(row.google_sheet_url) : undefined,
-    packageId: row.package_id ? String(row.package_id) : undefined,
+    packageId: row.package_id ? String(row.package_id) : (meta.packageId ? String(meta.packageId) : undefined),
     tryoutGroup: meta.tryoutGroup ? String(meta.tryoutGroup) : undefined,
     targetClassIds: Array.isArray(row.target_class_ids) ? (row.target_class_ids as string[]) : [],
     answerKey: (Array.isArray(row.answer_key) && row.answer_key.length > 0)

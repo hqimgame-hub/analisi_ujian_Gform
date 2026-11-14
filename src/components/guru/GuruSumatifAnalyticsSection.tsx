@@ -111,13 +111,21 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
     return tryouts || [];
   }, [dbService, tryouts]);
 
+  // Skor gabungan (mengambil skor terbaru dari dbService agar realtime)
+  const effectiveScores = useMemo(() => {
+    if (dbService) {
+      return dbService.getScores() || scores || [];
+    }
+    return scores || [];
+  }, [dbService, scores]);
+
   // Hitung Analytics Sumatif menggunakan SumatifAnalyticsService (scoping ketat ke wadah paket ini)
   const analytics: TeacherSumatifAnalytics | null = useMemo(() => {
     if (!activePackage || !effectiveSubject) return null;
     return SumatifAnalyticsService.calculateTeacherAnalytics(
       effectiveSubject.id,
       activePackage,
-      scores,
+      effectiveScores,
       students,
       targetClassesForPackage,
       questions,
@@ -125,7 +133,7 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
       subjects,
       effectiveTryouts
     );
-  }, [activePackage, effectiveSubject, scores, students, targetClassesForPackage, questions, answers, subjects, effectiveTryouts]);
+  }, [activePackage, effectiveSubject, effectiveScores, students, targetClassesForPackage, questions, answers, subjects, effectiveTryouts]);
 
   // Perhitungan metrik ringkasan untuk Tab 1 responsif terhadap filter rombel/kelas
   const summaryMetrics = useMemo(() => {
@@ -268,7 +276,13 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
   // ── KALKULASI ANALISIS BUTIR SOAL MURNI & PSIKOMETRI (SEPERTI TRY OUT) ──
   const matchedSumatifTryout = useMemo(() => {
     if (!activePackage || !effectiveSubject) return null;
-    return effectiveTryouts.find(t => t.packageId === activePackage.id && t.subjectId === effectiveSubject.id) || null;
+    const pkgCode = (activePackage.code || '').toLowerCase().trim();
+    return (
+      effectiveTryouts.find(t =>
+        (t.packageId === activePackage.id || (pkgCode && t.code.toLowerCase().startsWith(pkgCode))) &&
+        t.subjectId === effectiveSubject.id
+      ) || null
+    );
   }, [effectiveTryouts, activePackage, effectiveSubject]);
 
   const relevantSubjectQuestions = useMemo(() => {

@@ -618,8 +618,6 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
             {filteredPackagesWithStats.map(item => {
               const isSelected = activePackageData?.pkg.id === item.pkg.id && viewMode === 'FOCUSED';
               const isSAT = item.pkg.assessmentType === 'SAT';
-              const targetClasses = classes.filter(c => (item.pkg.targetClassIds || []).includes(c.id));
-              const classNames = targetClasses.map(c => c.name).join(', ');
 
               return (
                 <button
@@ -646,14 +644,9 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
                   >
                     {item.pkg.assessmentType}
                   </span>
-                  <span>{item.pkg.title}</span>
-                  {classNames && (
-                    <span className={`text-[10px] font-normal ${isSelected ? 'text-emerald-100' : 'text-slate-400'}`}>
-                      ({classNames})
-                    </span>
-                  )}
+                  <span className="truncate max-w-[180px]">{item.pkg.title}</span>
                   <span
-                    className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
                       isSelected
                         ? item.isComplete
                           ? 'bg-emerald-500 text-white'
@@ -662,18 +655,14 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
                         ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                         : 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
                     }`}
+                    title={`${item.filledSubjects} dari ${item.totalSubjects} mata pelajaran telah terisi link`}
                   >
                     {item.isComplete ? (
-                      <>
-                        <CheckCircle2 className="w-2.5 h-2.5" />
-                        <span>{item.filledSubjects}/{item.totalSubjects} Selesai</span>
-                      </>
+                      <CheckCircle2 className="w-2.5 h-2.5" />
                     ) : (
-                      <>
-                        <AlertCircle className="w-2.5 h-2.5" />
-                        <span>{item.filledSubjects}/{item.totalSubjects} Belum Lengkap</span>
-                      </>
+                      <AlertCircle className="w-2.5 h-2.5" />
                     )}
+                    <span>{item.filledSubjects}/{item.totalSubjects}</span>
                   </span>
                 </button>
               );
