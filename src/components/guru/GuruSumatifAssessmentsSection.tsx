@@ -3,7 +3,7 @@ import {
   FolderKanban, FileSpreadsheet, ExternalLink, RefreshCw,
   CheckCircle2, AlertCircle, Calendar, School, BookOpen,
   Award, Sparkles, X, ChevronRight, ChevronLeft, Link as LinkIcon, Check, Users,
-  Layers, LayoutGrid
+  Layers, LayoutGrid, SlidersHorizontal
 } from 'lucide-react';
 import { ExamPackage, ClassRoom, Subject, User, Tryout } from '../../types/database';
 import { DatabaseService } from '../../services/database';
@@ -15,7 +15,7 @@ interface GuruSumatifAssessmentsSectionProps {
   classes: ClassRoom[];
   subjects: Subject[];
   onNavigateToAnalytics: (pkgId: string, subjectId?: string) => void;
-  onSyncSubjectSheet?: (pkg: ExamPackage, subjectId: string) => Promise<void>;
+  onSyncSubjectSheet?: (pkg: ExamPackage, subjectId: string, forceModal?: boolean) => Promise<void>;
   onShowToast: (msg: string) => void;
 }
 
@@ -55,13 +55,16 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
           const fullSub = subjects.find(s => s.id === pkgSub.subjectId);
           const matchTo = allTo.find(t => t.packageId === pkg.id && t.subjectId === pkgSub.subjectId);
           const responseCount = matchTo ? (dbService.getScoresByTryout(matchTo.id) || []).length : 0;
+          const hasSheet = Boolean(pkgSub.googleSheetUrl?.trim() || matchTo?.googleSheetUrl?.trim());
+          const hasColumns = Boolean(matchTo?.selectedQuestionColumns && matchTo.selectedQuestionColumns.length > 0);
 
           return {
             ...pkgSub,
             subjectName: fullSub?.name || 'Mata Pelajaran',
             subjectCode: fullSub?.code || 'MAPEL',
-            hasSheet: Boolean(pkgSub.googleSheetUrl?.trim()),
-            hasForm: Boolean(pkgSub.googleFormUrl?.trim()),
+            hasSheet,
+            hasColumns,
+            hasForm: Boolean(pkgSub.googleFormUrl?.trim() || matchTo?.googleFormUrl?.trim()),
             responseCount,
             tryoutId: matchTo?.id,
           };
@@ -184,12 +187,14 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
             scoringConfig: {
               ...(matchTryout.scoringConfig || {
                 scoringType: 'EQUAL_WEIGHT',
+                scoreSource: 'GOOGLE_FORM',
                 maxScore: 100,
                 correctScore: 1,
                 wrongScore: 0,
                 unansweredScore: 0,
                 allowNegativeMarking: false,
               }),
+              scoreSource: matchTryout.scoringConfig?.scoreSource || 'GOOGLE_FORM',
               passingGrade: adminKKM,
             },
           },
@@ -197,7 +202,7 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
         );
       } else if (cleanSheet) {
         const newTo: Tryout = {
-          id: `to-sum-${Date.now()}-${editingItem.subjectId}`,
+          id: `to-sum-${pkg.id}-${editingItem.subjectId}`,
           code: `${pkg.code}-${editingItem.subjectId.slice(-4).toUpperCase()}`,
           title: `${pkg.title} - ${editingItem.subjectName}`,
           academicYearId: pkg.academicYearId,
@@ -212,6 +217,7 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
           googleFormUrl: cleanForm || undefined,
           scoringConfig: {
             scoringType: 'EQUAL_WEIGHT',
+            scoreSource: 'GOOGLE_FORM',
             maxScore: 100,
             correctScore: 1,
             wrongScore: 0,
@@ -238,12 +244,12 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
     }
   };
 
-  const handleTriggerSync = async (pkg: ExamPackage, subjectId: string, subjectName: string) => {
+  const handleTriggerSync = async (pkg: ExamPackage, subjectId: string, subjectName: string, forceModal = false) => {
     const key = `${pkg.id}-${subjectId}`;
     setSyncingKey(key);
     try {
       if (onSyncSubjectSheet) {
-        await onSyncSubjectSheet(pkg, subjectId);
+        await onSyncSubjectSheet(pkg, subjectId, forceModal);
       } else {
         // Fallback: cari tryout terkait dan lakukan sinkronisasi
         const allTryouts = dbService.getTryouts();
@@ -512,13 +518,36 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
             <button
               type="button"
               disabled={!hasSheet || isSyncingThis}
-              onClick={() => handleTriggerSync(pkg, subItem.subjectId, subItem.subjectName)}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
-              title="Tarik data respons siswa terbaru dari Google Sheet"
+              onClick={() => handleTriggerSync(pkg, subItem.subjectId, subItem.subjectName, !subItem.hasColumns)}
+              className={`px-4 py-2 ${
+                subItem.hasColumns
+                  ? 'bg-emerald-600 hover:bg-emerald-500'
+                  : 'bg-amber-600 hover:bg-amber-500 animate-pulse'
+              } disabled:opacity-40 disabled:hover:bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors`}
+              title={subItem.hasColumns ? 'Tarik data respons siswa terbaru dari Google Sheet' : 'Pilih dan konfirmasi kolom soal Google Sheet'}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isSyncingThis ? 'animate-spin' : ''}`} />
-              <span>{isSyncingThis ? 'Menyinkronkan...' : 'Tarik Respons Siswa'}</span>
+              <span>
+                {isSyncingThis
+                  ? 'Menyinkronkan...'
+                  : subItem.hasColumns
+                  ? 'Tarik Respons Siswa'
+                  : 'Pilih & Konfirmasi Kolom Soal'}
+              </span>
             </button>
+
+            {hasSheet && subItem.hasColumns && (
+              <button
+                type="button"
+                disabled={isSyncingThis}
+                onClick={() => handleTriggerSync(pkg, subItem.subjectId, subItem.subjectName, true)}
+                className="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                title="Buka ulang pemetaan kolom Sheet untuk mapel ini"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span>Atur Kolom</span>
+              </button>
+            )}
           </div>
 
           <button

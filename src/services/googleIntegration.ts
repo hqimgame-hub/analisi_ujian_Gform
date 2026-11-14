@@ -205,12 +205,19 @@ export class GoogleIntegrationService {
 
   public static autoDetectScoreColumn(headers: string[]): string {
     const scoreKeywords = ['total point', 'total poin', 'skor', 'score', 'nilai akhir', 'total nilai', 'poin', 'nilai'];
+    // 1. Exact match
     for (const kw of scoreKeywords) {
       const found = headers.find(h => h.toLowerCase().trim() === kw);
       if (found) return found;
     }
+    // 2. Controlled substring match: hanya periksa kolom metadata pendek, jangan cocokkan dengan kalimat soal (bertanda tanya atau diawali kata perintah)
     for (const kw of scoreKeywords) {
-      const found = headers.find(h => h.toLowerCase().trim().includes(kw));
+      const found = headers.find(h => {
+        const l = h.toLowerCase().trim();
+        if (l.includes('?') || l.length > 35) return false;
+        if (/^(tentukan|hitung|analisis|jelaskan|sebutkan|apakah|berapakah)\b/i.test(l)) return false;
+        return l.startsWith(kw + ' ') || l.endsWith(' ' + kw) || l.includes('total score') || l.includes('total point') || l.includes('total skor');
+      });
       if (found) return found;
     }
     return '';
@@ -553,10 +560,8 @@ export class GoogleIntegrationService {
       }
     });
 
-    // 2. Urutkan opsi tanpa prefix secara alami (numerik/alfabetis) agar opsi angka/satuan/pilihan terpetakan konsisten
-    unprefixedTexts.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
-
-    // Alokasikan teks jawaban Google Form tanpa prefix huruf ke slot A..E yang masih kosong/placeholder
+    // 2. Alokasikan teks jawaban Google Form tanpa prefix huruf sesuai urutan kemunculan alaminya di sheet
+    // JANGAN lakukan sorting alfabetis agar urutan pilihan ganda asli guru di Google Form tidak teracak
     unprefixedTexts.forEach(txt => {
       const emptyKey = optionKeys.find(k => !keyToText.has(k));
       if (emptyKey) {
@@ -1589,8 +1594,11 @@ export class GoogleIntegrationService {
       const totalUnanswered = Object.values(item.answers).filter(ans => !ans).length;
       const totalIncorrect = questions.length - totalCorrect - totalUnanswered;
 
-      const useGFormScore = isGFormSource && item.rawGFormScore !== undefined && item.rawGFormScore > 0;
-      const finalScoreVal = useGFormScore ? item.rawGFormScore : item.calculatedScore;
+      const hasGFormScore = item.rawGFormScore !== undefined && !isNaN(item.rawGFormScore);
+      const isCustomEngineExplicit = tryout.scoringConfig?.scoreSource === 'CUSTOM_ENGINE';
+      // Nilai dari Google Form (kolom Skor) adalah sumber nilai utama, kecuali jika guru secara eksplisit memilih CUSTOM_ENGINE
+      const useGFormScore = !isCustomEngineExplicit && hasGFormScore;
+      const finalScoreVal = useGFormScore ? item.rawGFormScore! : item.calculatedScore;
 
       newScores.push({
         id: scoreId,

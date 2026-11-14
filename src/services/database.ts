@@ -2402,13 +2402,25 @@ export class DatabaseService {
     });
   }
 
-  public getTryoutsForTeacher(currentUser: any): Tryout[] {
+  public getTryoutsForTeacher(currentUser: any, filterType: 'TRYOUT' | 'SUMATIF' | 'ALL' = 'TRYOUT'): Tryout[] {
     if (!currentUser) return [];
-    if (currentUser.role === 'ADMIN') return this.state.tryouts || [];
+    if (currentUser.role === 'ADMIN') {
+      return (this.state.tryouts || []).filter(t => {
+        if (!t) return false;
+        if (filterType === 'TRYOUT') return !t.assessmentType || t.assessmentType === 'TRYOUT';
+        if (filterType === 'SUMATIF') return t.assessmentType === 'SAT' || t.assessmentType === 'SAS';
+        return true;
+      });
+    }
     const teacher = this.getTeacherByUserId(currentUser);
     const hasUnrestrictedSubjects = !teacher || !teacher.subjectPermissions || teacher.subjectPermissions.length === 0;
     if (hasUnrestrictedSubjects) {
-      return this.state.tryouts || [];
+      return (this.state.tryouts || []).filter(t => {
+        if (!t) return false;
+        if (filterType === 'TRYOUT') return !t.assessmentType || t.assessmentType === 'TRYOUT';
+        if (filterType === 'SUMATIF') return t.assessmentType === 'SAT' || t.assessmentType === 'SAS';
+        return true;
+      });
     }
     const allowedSubjectIds = this.getTeacherAllowedSubjectIds(currentUser);
     const allowedSubjects = new Set(allowedSubjectIds);
@@ -2431,6 +2443,14 @@ export class DatabaseService {
 
     const filtered = (this.state.tryouts || []).filter(t => {
       if (!t) return false;
+
+      // Filter berdasarkan tipe asesmen (Try Out vs Sumatif SAT/SAS)
+      if (filterType === 'TRYOUT' && t.assessmentType && t.assessmentType !== 'TRYOUT') {
+        return false;
+      }
+      if (filterType === 'SUMATIF' && (!t.assessmentType || t.assessmentType === 'TRYOUT')) {
+        return false;
+      }
 
       // 1. KASUS TO EKSTERNAL:
       // Guru mapel HANYA boleh melihat TO Eksternal JIKA mata pelajaran yang diampunya

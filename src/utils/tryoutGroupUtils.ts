@@ -48,6 +48,8 @@ export function getMaxTryoutStage(
 
   if (allTryouts && allTryouts.length > 0) {
     allTryouts.forEach(t => {
+      // Abaikan asesmen non-Tryout (seperti SAT atau SAS) agar tidak memengaruhi siklus TO
+      if (t.assessmentType && t.assessmentType !== 'TRYOUT') return;
       const grp = t.tryoutGroup || extractTryoutStageFromText(t.title) || extractTryoutStageFromText(t.code);
       if (grp && grp !== TRYOUT_GROUP_NONE) {
         const order = getStageOrderNumber(grp);
@@ -60,6 +62,8 @@ export function getMaxTryoutStage(
 
   if (examPackages && examPackages.length > 0) {
     examPackages.forEach(pkg => {
+      // Abaikan paket non-Tryout (seperti SAT atau SAS)
+      if (pkg.assessmentType && pkg.assessmentType !== 'TRYOUT') return;
       const grp = extractTryoutStageFromText(pkg.title) || extractTryoutStageFromText(pkg.code);
       if (grp) {
         const order = getStageOrderNumber(grp);
@@ -207,6 +211,11 @@ function getDirectTryoutStageCandidate(
   tryout: Tryout,
   examPackages: ExamPackage[] = []
 ): { stage: string | null; isExplicitNonDefault: boolean } {
+  // Jika ini adalah asesmen sumatif resmi (SAT / SAS), jangan pernah masukkan ke siklus grafik TO
+  if (tryout.assessmentType && tryout.assessmentType !== 'TRYOUT') {
+    return { stage: TRYOUT_GROUP_NONE, isExplicitNonDefault: true };
+  }
+
   const explicitGroup =
     tryout.tryoutGroup ||
     ((tryout.scoringConfig as any)?._meta?.tryoutGroup as string | undefined);

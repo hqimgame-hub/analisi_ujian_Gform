@@ -144,14 +144,12 @@ export class SumatifAnalyticsService {
         }
       }
     }
-    // 2. Jika tryoutId cocok dengan tryout wadah/mapel ini, ambil skor aktual
+    // 2. Jika tryoutId cocok dengan tryout wadah/mapel ini, ambil skor aktual (prioritaskan googleFormScore asli jika ada)
     if (validTryoutIds && validTryoutIds.has(scoreRecord.tryoutId)) {
-      const calc = scoreRecord.calculatedScore;
       const gForm = scoreRecord.googleFormScore;
-      if (typeof calc === 'number' && calc > 0) return calc;
-      if (typeof gForm === 'number' && gForm > 0) return gForm;
-      if (typeof calc === 'number') return calc;
+      const calc = scoreRecord.calculatedScore;
       if (typeof gForm === 'number') return gForm;
+      if (typeof calc === 'number') return calc;
       return 0;
     }
     return null;

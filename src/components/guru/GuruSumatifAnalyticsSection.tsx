@@ -72,28 +72,42 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
     return packages[0] || null;
   }, [packages, selectedPackageId]);
 
-  // Mapel aktif terpilih (mendukung perpindahan mapel langsung di halaman analisis)
+  // Filter daftar mapel berdasarkan wewenang guru (jika role GURU)
+  const allowedTeacherSubjectIds = useMemo(() => {
+    if (!currentUser || currentUser.role === 'ADMIN' || !dbService) return null;
+    return new Set(dbService.getTeacherAllowedSubjectIds(currentUser));
+  }, [currentUser, dbService]);
+
+  const teacherPermittedSubjects = useMemo(() => {
+    if (!allowedTeacherSubjectIds) return subjects;
+    return subjects.filter(s => allowedTeacherSubjectIds.has(s.id));
+  }, [subjects, allowedTeacherSubjectIds]);
+
+  // Daftar mapel yang diujikan dalam paket ini yang berhak diakses oleh guru
+  const availablePackageSubjects = useMemo(() => {
+    if (!activePackage) return teacherPermittedSubjects;
+    const pkgSubjIds = (activePackage.subjects || []).map(s => s.subjectId);
+    const inPkg = teacherPermittedSubjects.filter(s => pkgSubjIds.includes(s.id));
+    return inPkg.length > 0 ? inPkg : teacherPermittedSubjects;
+  }, [activePackage, teacherPermittedSubjects]);
+
+  // Mapel aktif terpilih (mendukung perpindahan mapel jika guru mengampu > 1 mapel)
   const [selectedSubjId, setSelectedSubjId] = useState<string>(activeSubject?.id || '');
   useEffect(() => {
-    if (activeSubject?.id) {
+    if (activeSubject?.id && availablePackageSubjects.some(s => s.id === activeSubject.id)) {
       setSelectedSubjId(activeSubject.id);
+    } else if (availablePackageSubjects.length > 0) {
+      setSelectedSubjId(availablePackageSubjects[0].id);
     }
-  }, [activeSubject?.id]);
+  }, [activeSubject?.id, availablePackageSubjects]);
 
   const effectiveSubject = useMemo(() => {
     if (selectedSubjId) {
-      return subjects.find(s => s.id === selectedSubjId) || activeSubject;
+      const match = availablePackageSubjects.find(s => s.id === selectedSubjId);
+      if (match) return match;
     }
-    return activeSubject || subjects[0] || null;
-  }, [selectedSubjId, subjects, activeSubject]);
-
-  // Daftar mapel yang diujikan dalam paket ini
-  const availablePackageSubjects = useMemo(() => {
-    if (!activePackage) return subjects;
-    const pkgSubjIds = (activePackage.subjects || []).map(s => s.subjectId);
-    const inPkg = subjects.filter(s => pkgSubjIds.includes(s.id));
-    return inPkg.length > 0 ? inPkg : subjects;
-  }, [activePackage, subjects]);
+    return availablePackageSubjects[0] || activeSubject || null;
+  }, [selectedSubjId, availablePackageSubjects, activeSubject]);
 
   // Target classes for this package (Cascading Class Filter)
   const targetClassesForPackage = useMemo(() => {
@@ -657,8 +671,8 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
               )}
             </div>
 
-            {/* Pilihan Mata Pelajaran Langsung di Halaman Analisis */}
-            {availablePackageSubjects.length > 1 && (
+            {/* Pilihan Mata Pelajaran (Hanya muncul dropdown jika guru mengampu > 1 mapel di paket ini) */}
+            {availablePackageSubjects.length > 1 ? (
               <div className="flex items-center gap-1.5">
                 <span className="text-xs font-semibold text-slate-500 hidden sm:inline">Mapel:</span>
                 <select
@@ -676,7 +690,14 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
                   ))}
                 </select>
               </div>
-            )}
+            ) : effectiveSubject ? (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-slate-500 hidden sm:inline">Mapel:</span>
+                <span className="px-3 py-1 bg-emerald-100/80 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-bold">
+                  {effectiveSubject.name} ({effectiveSubject.code})
+                </span>
+              </div>
+            ) : null}
           </div>
         </div>
 

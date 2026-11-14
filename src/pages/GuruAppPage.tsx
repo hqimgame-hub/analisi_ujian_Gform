@@ -865,7 +865,20 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
       const effectiveColumns = GoogleIntegrationService.reconcileSelectedColumns(selectedColumns, headers, rows);
 
       // Simpan konfigurasi kolom ke tryout agar sinkronisasi susulan tidak perlu pilih ulang
-      dbService.updateTryout(tryout.id, { selectedQuestionColumns: effectiveColumns }, null);
+      dbService.updateTryout(tryout.id, {
+        selectedQuestionColumns: effectiveColumns,
+        scoringConfig: {
+          ...(tryout.scoringConfig || {
+            scoringType: 'EQUAL_WEIGHT',
+            maxScore: 100,
+            correctScore: 1,
+            wrongScore: 0,
+            unansweredScore: 0,
+            allowNegativeMarking: false,
+          }),
+          scoreSource: scoreCol ? 'GOOGLE_FORM' : (tryout.scoringConfig?.scoreSource || 'GOOGLE_FORM'),
+        },
+      }, null);
 
       // Cari mata pelajaran
       const allSubjectsNow = dbService.getSubjects();
@@ -958,10 +971,17 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
           errorMsg: '',
         },
       }));
-      // Otomatis arahkan fokus UI ke tryout yang baru saja disinkronkan
-      setSelectedTryoutId(tryout.id);
-      setStudentTryoutFilter(tryout.id);
-      setPsychometricsTryoutId(tryout.id);
+      // Otomatis arahkan fokus UI ke tryout atau wadah yang baru saja disinkronkan
+      if (tryout.packageId) {
+        setSelectedSumatifPackageId(tryout.packageId);
+      }
+      if (tryout.assessmentType === 'SAT' || tryout.assessmentType === 'SAS') {
+        // Jangan timpa selectedTryoutId milik Try Out reguler jika ini asesmen sumatif
+      } else {
+        setSelectedTryoutId(tryout.id);
+        setStudentTryoutFilter(tryout.id);
+        setPsychometricsTryoutId(tryout.id);
+      }
       if (tryoutSubject) {
         setSelectedSubjectId(tryoutSubject.id);
       }
@@ -1185,7 +1205,7 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
     };
   }, []); // Run on mount only! Mencegah infinite re-polling saat tryouts berubah
 
-  const handleSyncSumatifSheet = async (pkg: ExamPackage, subjectId: string) => {
+  const handleSyncSumatifSheet = async (pkg: ExamPackage, subjectId: string, forceModal = false) => {
     const allTo = dbService.getTryouts();
     const pkgCode = (pkg.code || '').toLowerCase().trim();
     let matchTo = allTo.find(t => t.packageId === pkg.id && t.subjectId === subjectId);
@@ -1202,6 +1222,9 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
         dbService.saveTryout(matchTo);
       }
       if (matchTo.googleSheetUrl) {
+        if (forceModal) {
+          matchTo.selectedQuestionColumns = undefined;
+        }
         await syncTryoutFromSheet(matchTo, true);
         return;
       }
@@ -1211,7 +1234,7 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
       const targetClassIds = pkg.targetClassIds || [];
       const fullSub = subjects.find(s => s.id === subjectId);
       const newTo: Tryout = {
-        id: generateUuid(),
+        id: `to-sum-${pkg.id}-${subjectId}`,
         code: `${pkg.code}-${subjectId.slice(-4).toUpperCase()}`,
         title: `${pkg.title} - ${fullSub?.name || 'Mapel'}`,
         academicYearId: pkg.academicYearId,
@@ -1226,6 +1249,7 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
         googleFormUrl: subItem.googleFormUrl || undefined,
         scoringConfig: {
           scoringType: 'EQUAL_WEIGHT',
+          scoreSource: 'GOOGLE_FORM',
           maxScore: 100,
           correctScore: 1,
           wrongScore: 0,
@@ -2770,8 +2794,8 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
 
                   {/* Panel Ringkasan Kontrol Pengelompokan Siklus TO (TO 1, TO 2, TO 3) Lintas Mapel */}
                   {(() => {
-                    const allGlobalTo = dbService.getTryouts();
-                    const allPkgs = dbService.getExamPackages();
+                    const allGlobalTo = dbService.getTryouts().filter(t => !t.assessmentType || t.assessmentType === 'TRYOUT');
+                    const allPkgs = dbService.getExamPackages().filter(p => !p.assessmentType || p.assessmentType === 'TRYOUT');
                     const usedGroups = Array.from(
                       new Set(
                         allGlobalTo
@@ -2880,9 +2904,9 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                   })()}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {tryouts.map(to => {
-                      const allGlobalTo = dbService.getTryouts();
-                      const allPkgs = dbService.getExamPackages();
+                    {tryouts.filter(to => !to.assessmentType || to.assessmentType === 'TRYOUT').map(to => {
+                      const allGlobalTo = dbService.getTryouts().filter(t => !t.assessmentType || t.assessmentType === 'TRYOUT');
+                      const allPkgs = dbService.getExamPackages().filter(p => !p.assessmentType || p.assessmentType === 'TRYOUT');
                       const currentGroup = resolveTryoutGroup(to, allGlobalTo, allPkgs);
                       const groupCoverage =
                         currentGroup !== TRYOUT_GROUP_NONE
@@ -3280,7 +3304,7 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                   currentUser={currentUser}
                   packages={teacherSumatifPackages}
                   classes={classes}
-                  subjects={subjects}
+                  subjects={permittedSubjects.length > 0 ? permittedSubjects : subjects}
                   onNavigateToAnalytics={(pkgId, subjectId) => {
                     setSelectedSumatifPackageId(pkgId);
                     if (subjectId) {
@@ -8895,7 +8919,7 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                   scores={scores}
                   questions={questions}
                   answers={dbService.getAnswers()}
-                  subjects={subjects}
+                  subjects={permittedSubjects.length > 0 ? permittedSubjects : subjects}
                   materials={materials}
                   competencies={competencies}
                   tryouts={tryouts}
@@ -10661,10 +10685,9 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                   className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-slate-900 dark:text-white font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500 transition"
                 >
                   <option value="">-- Tidak Dimasukkan ke Wadah --</option>
-                  {dbService.getExamPackages().map(pkg => (
+                  {dbService.getExamPackages().filter(pkg => !pkg.assessmentType || pkg.assessmentType === 'TRYOUT').map(pkg => (
                     <option key={pkg.id} value={pkg.id}>
-                      {pkg.assessmentType === 'SAS' ? '[SAS] ' : pkg.assessmentType === 'SAT' ? '[SAT] ' : '[TO] '}
-                      {pkg.code} — {pkg.title}
+                      [TO] {pkg.code} — {pkg.title}
                     </option>
                   ))}
                 </select>
@@ -11097,7 +11120,11 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
             <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <FileSpreadsheet className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Pilih Kolom Butir Soal</h3>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                  {columnSelectorTryout.assessmentType === 'SAT' || columnSelectorTryout.assessmentType === 'SAS'
+                    ? `Pemetaan Kolom Asesmen Sumatif (${columnSelectorTryout.assessmentType})`
+                    : 'Pilih Kolom Butir Soal'}
+                </h3>
                 <span className="text-xs text-slate-500 dark:text-slate-400">— {columnSelectorTryout.title || columnSelectorTryout.code}</span>
               </div>
               <button
