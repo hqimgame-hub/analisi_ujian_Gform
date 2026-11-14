@@ -192,9 +192,10 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
       allStudents,
       classes,
       allScores,
-      allSubjects
+      allSubjects,
+      rawTryouts
     );
-  }, [activePackage, isSumatifActive, assignedClassId, allStudents, classes, allScores, allSubjects]);
+  }, [activePackage, isSumatifActive, assignedClassId, allStudents, classes, allScores, allSubjects, rawTryouts]);
 
   const stageGroupMap = useMemo(() => {
     const map: Record<string, TryoutStageGroup> = {};

@@ -52,6 +52,7 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
 }) => {
   // Sub-tabs navigation inside Sumatif Analytics
   const [subTab, setSubTab] = useState<'KKTP_SUMMARY' | 'PSYCHOMETRICS' | 'REKAP_RAPOR'>('KKTP_SUMMARY');
+  const [summaryClassFilter, setSummaryClassFilter] = useState('ALL');
   const [classFilter, setClassFilter] = useState('ALL');
   const [psychometricsClassFilter, setPsychometricsClassFilter] = useState('ALL');
   const [searchStudent, setSearchStudent] = useState('');
@@ -74,7 +75,7 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
     return filtered.length > 0 ? filtered : classes;
   }, [activePackage, classes]);
 
-  // Hitung Analytics Sumatif menggunakan SumatifAnalyticsService
+  // Hitung Analytics Sumatif menggunakan SumatifAnalyticsService (scoping ketat ke wadah paket ini)
   const analytics: TeacherSumatifAnalytics | null = useMemo(() => {
     if (!activePackage || !activeSubject) return null;
     return SumatifAnalyticsService.calculateTeacherAnalytics(
@@ -85,14 +86,66 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
       targetClassesForPackage,
       questions,
       answers,
-      subjects
+      subjects,
+      tryouts
     );
-  }, [activePackage, activeSubject, scores, students, targetClassesForPackage, questions, answers, subjects]);
+  }, [activePackage, activeSubject, scores, students, targetClassesForPackage, questions, answers, subjects, tryouts]);
 
-  // Breakdown capaian per rombel target
+  // Perhitungan metrik ringkasan untuk Tab 1 responsif terhadap filter rombel/kelas
+  const summaryMetrics = useMemo(() => {
+    if (!analytics || analytics.studentCount === 0) {
+      return {
+        avg: 0,
+        passingRate: 0,
+        passingCount: 0,
+        remedialCount: 0,
+        highest: 0,
+        lowest: 0,
+        totalStudents: 0,
+      };
+    }
+    if (summaryClassFilter === 'ALL') {
+      return {
+        avg: analytics.averageScore,
+        passingRate: analytics.passingRatePct,
+        passingCount: analytics.passingCount,
+        remedialCount: analytics.remedialCount,
+        highest: analytics.highestScore,
+        lowest: analytics.lowestScore,
+        totalStudents: analytics.studentCount,
+      };
+    }
+    const selClass = targetClassesForPackage.find(c => c.id === summaryClassFilter);
+    const classStudents = analytics.studentRankings.filter(s => s.className === selClass?.name);
+    const count = classStudents.length;
+    const scoresList = classStudents.map(s => s.score);
+    const sum = scoresList.reduce((a, b) => a + b, 0);
+    const avg = count > 0 ? Math.round((sum / count) * 10) / 10 : 0;
+    const highest = count > 0 ? Math.max(...scoresList) : 0;
+    const lowest = count > 0 ? Math.min(...scoresList) : 0;
+    const passed = classStudents.filter(s => s.isPassed).length;
+    const remedial = count - passed;
+    const passRate = count > 0 ? Math.round((passed / count) * 100) : 0;
+
+    return {
+      avg,
+      passingRate: passRate,
+      passingCount: passed,
+      remedialCount: remedial,
+      highest,
+      lowest,
+      totalStudents: count,
+    };
+  }, [analytics, summaryClassFilter, targetClassesForPackage]);
+
+  // Breakdown capaian per rombel target (difilter jika pengguna memilih kelas tertentu)
   const classBreakdowns = useMemo(() => {
     if (!analytics) return [];
-    return targetClassesForPackage.map(cls => {
+    const sourceClasses = summaryClassFilter === 'ALL'
+      ? targetClassesForPackage
+      : targetClassesForPackage.filter(c => c.id === summaryClassFilter);
+
+    return sourceClasses.map(cls => {
       const classStudents = analytics.studentRankings.filter(s => s.className === cls.name);
       const studentCount = classStudents.length;
       const scoresList = classStudents.map(s => s.score);
@@ -115,7 +168,7 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
         passingRatePct: passRate,
       };
     });
-  }, [analytics, targetClassesForPackage]);
+  }, [analytics, targetClassesForPackage, summaryClassFilter]);
 
   // Saring data siswa untuk Tab Rekap Rapor
   const filteredStudentRankings = useMemo(() => {
@@ -124,7 +177,12 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
       // 1. Filter rombel/kelas
       if (classFilter !== 'ALL') {
         const studentObj = students.find(st => st.id === s.studentId);
-        if (studentObj && studentObj.classId !== classFilter) return false;
+        const selClass = targetClassesForPackage.find(c => c.id === classFilter);
+        if (studentObj) {
+          if (studentObj.classId !== classFilter) return false;
+        } else if (selClass && s.className !== selClass.name) {
+          return false;
+        }
       }
       // 2. Filter status ketuntasan KKTP
       if (kktpStatusFilter === 'TUNTAS' && !s.isPassed) return false;
@@ -140,7 +198,7 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
       }
       return true;
     });
-  }, [analytics, classFilter, kktpStatusFilter, searchStudent, students]);
+  }, [analytics, classFilter, kktpStatusFilter, searchStudent, students, targetClassesForPackage]);
 
   // Handler Export CSV Nilai Siap Rapor
   const handleExportCsv = () => {
@@ -218,11 +276,18 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
       if (dbCalc && dbCalc.length > 0) return dbCalc;
     }
 
-    // Prioritas 2: Hitung langsung dengan calculateQuestionItemAnalysis dari AnalyticsService
-    if (relevantSubjectQuestions.length > 0) {
+    // Prioritas 2: Hitung langsung dengan calculateQuestionItemAnalysis dari AnalyticsService (scoping ke tryout wadah ini)
+    if (relevantSubjectQuestions.length > 0 && matchedSumatifTryout) {
       const qIds = new Set(relevantSubjectQuestions.map(q => q.id));
-      const filteredAns = answers.filter(a => qIds.has(a.questionId) && targetStudentIdSet.has(a.studentId));
-      const filteredScores = scores.filter(s => targetStudentIdSet.has(s.studentId));
+      const filteredAns = answers.filter(a =>
+        qIds.has(a.questionId) &&
+        targetStudentIdSet.has(a.studentId) &&
+        a.tryoutId === matchedSumatifTryout.id
+      );
+      const filteredScores = scores.filter(s =>
+        targetStudentIdSet.has(s.studentId) &&
+        s.tryoutId === matchedSumatifTryout.id
+      );
 
       if (filteredAns.length > 0) {
         const directCalc = AnalyticsService.calculateQuestionItemAnalysis(
@@ -505,9 +570,33 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
       {/* ── KONTEN SUB-TAB 1: GRAFIK & KETUNTASAN KKTP ── */}
       {subTab === 'KKTP_SUMMARY' && (
         <div className="space-y-6">
-          {analytics ? (
+          {analytics && analytics.studentCount > 0 ? (
             <>
-              {/* Summary Metric Cards */}
+              {/* Filter Rombel Interaktif Tab 1 */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-emerald-600" />
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Filter Analisis Rombel / Kelas:
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={summaryClassFilter}
+                    onChange={e => setSummaryClassFilter(e.target.value)}
+                    className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer"
+                  >
+                    <option value="ALL">Semua Kelas Target ({targetClassesForPackage.length} Kelas)</option>
+                    {targetClassesForPackage.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Summary Metric Cards (Responsif Terhadap Filter Kelas) */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-xs">
                   <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
@@ -515,7 +604,7 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
                   </span>
                   <div className="flex items-baseline gap-1 mt-1.5">
                     <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400">
-                      {analytics.averageScore}
+                      {summaryMetrics.avg}
                     </span>
                     <span className="text-xs text-slate-400">/ 100</span>
                   </div>
@@ -530,9 +619,9 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
                   </span>
                   <div className="flex items-baseline gap-1 mt-1.5">
                     <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400">
-                      {analytics.passingRatePct}%
+                      {summaryMetrics.passingRate}%
                     </span>
-                    <span className="text-xs text-slate-400">({analytics.passingCount} siswa)</span>
+                    <span className="text-xs text-slate-400">({summaryMetrics.passingCount} siswa)</span>
                   </div>
                   <span className="text-[10px] text-emerald-600 font-semibold mt-1 block">
                     Nilai ≥ Batas KKTP
@@ -546,10 +635,10 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
                   <div className="flex items-baseline gap-1 mt-1.5">
                     <span
                       className={`text-3xl font-black ${
-                        analytics.remedialCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'
+                        summaryMetrics.remedialCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'
                       }`}
                     >
-                      {analytics.remedialCount}
+                      {summaryMetrics.remedialCount}
                     </span>
                     <span className="text-xs text-slate-400">siswa</span>
                   </div>
@@ -564,11 +653,11 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
                   </span>
                   <div className="flex items-baseline gap-2 mt-1.5">
                     <span className="text-2xl font-black text-teal-600 dark:text-teal-400">
-                      {analytics.highestScore}
+                      {summaryMetrics.highest}
                     </span>
                     <span className="text-xs text-slate-400">s/d</span>
                     <span className="text-2xl font-black text-amber-600 dark:text-amber-400">
-                      {analytics.lowestScore}
+                      {summaryMetrics.lowest}
                     </span>
                   </div>
                   <span className="text-[10px] text-slate-400 mt-1 block">
@@ -647,7 +736,18 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
             </>
           ) : (
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-12 text-center text-slate-400 text-xs">
-              Belum ada data nilai respons yang disinkronkan untuk wadah ini.
+              <div className="max-w-md mx-auto flex flex-col items-center justify-center space-y-2">
+                <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 flex items-center justify-center">
+                  <Info className="w-5 h-5 text-emerald-500 dark:text-emerald-400" />
+                </div>
+                <div className="font-bold text-slate-800 dark:text-slate-200 text-sm">
+                  Belum Ada Data Respon Nilai Terhubung
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                  Belum ada data nilai respons siswa yang disinkronkan untuk mata pelajaran <strong>{activeSubject?.name || 'ini'}</strong> pada wadah <strong>{activePackage?.title || 'ini'}</strong>.
+                  Guru mata pelajaran dapat menautkan link Google Form atau Spreadsheet pada tab <strong>Wadah &amp; Bank Soal SAT/SAS</strong> untuk menampilkan analisis secara realtime.
+                </p>
+              </div>
             </div>
           )}
         </div>
@@ -1105,6 +1205,26 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
                 />
               </div>
             </div>
+          </div>
+
+          {/* Indikator Jumlah Data Terfilter */}
+          <div className="flex items-center justify-between text-xs text-slate-500 font-medium px-1">
+            <span>
+              Menampilkan <strong>{filteredStudentRankings.length}</strong> dari <strong>{analytics?.studentCount || 0}</strong> siswa terdata
+            </span>
+            {(classFilter !== 'ALL' || kktpStatusFilter !== 'ALL' || searchStudent.trim()) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setClassFilter('ALL');
+                  setKktpStatusFilter('ALL');
+                  setSearchStudent('');
+                }}
+                className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline cursor-pointer"
+              >
+                Reset Semua Filter
+              </button>
+            )}
           </div>
 
           {/* Tabel Nilai Siswa Siap Rapor */}

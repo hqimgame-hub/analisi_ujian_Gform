@@ -509,9 +509,10 @@ export const StudentPortalPage: React.FC = () => {
       studentClassObj || undefined,
       activePackage,
       allScores,
-      allSubjects
+      allSubjects,
+      allTryouts
     );
-  }, [verifiedStudent, studentClassObj, activePackage, isSumatifPackage, allScores, allSubjects]);
+  }, [verifiedStudent, studentClassObj, activePackage, isSumatifPackage, allScores, allSubjects, allTryouts]);
 
   // Helper untuk mengekstrak skor mapel dari Score object dengan matching multi-key (id, nama, kode)
   const resolveSubjectScoreFromScoreObj = (

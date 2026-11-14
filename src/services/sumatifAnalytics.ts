@@ -10,7 +10,7 @@
  * - Leger Rapor Kelas & Deteksi Siswa Berisiko (At-Risk >= 3 remedial) untuk Wali Kelas
  */
 
-import { Student, Score, Subject, Question, Answer, ClassRoom, ExamPackage } from '../types/database';
+import { Student, Score, Subject, Question, Answer, ClassRoom, ExamPackage, Tryout } from '../types/database';
 
 export interface StudentSubjectScoreItem {
   subjectId: string;
@@ -121,14 +121,25 @@ export interface WaliKelasLegerResult {
 
 export class SumatifAnalyticsService {
   /**
-   * Helper ekstraksi nilai mapel dari record Score (mendukung subjectScores map maupun calculatedScore fallback)
+   * Helper ekstraksi nilai mapel dari record Score secara ketat (scoping tryout & subject)
    */
-  public static extractScoreForSubject(scoreRecord: Score | undefined, subjectId: string): number {
-    if (!scoreRecord) return 0;
+  public static extractScoreForSubject(
+    scoreRecord: Score | undefined,
+    subjectId: string,
+    validTryoutIds?: Set<string>
+  ): number | null {
+    if (!scoreRecord) return null;
+    if (validTryoutIds && validTryoutIds.size > 0 && !validTryoutIds.has(scoreRecord.tryoutId)) {
+      return null;
+    }
     if (scoreRecord.subjectScores && typeof scoreRecord.subjectScores[subjectId] === 'number') {
       return scoreRecord.subjectScores[subjectId];
     }
-    return scoreRecord.calculatedScore ?? scoreRecord.googleFormScore ?? 0;
+    // Jika tryoutId cocok dengan tryout wadah/mapel ini, ambil calculatedScore/googleFormScore
+    if (validTryoutIds && validTryoutIds.has(scoreRecord.tryoutId)) {
+      return scoreRecord.calculatedScore ?? scoreRecord.googleFormScore ?? 0;
+    }
+    return null;
   }
 
   /**
@@ -139,13 +150,16 @@ export class SumatifAnalyticsService {
     studentClass: ClassRoom | undefined,
     pkg: ExamPackage,
     allScores: Score[],
-    allSubjects: Subject[]
+    allSubjects: Subject[],
+    allTryouts: Tryout[] = []
   ): StudentSumatifProfile {
     const pkgSubjects = pkg.subjects || [];
-    const studentScores = allScores.filter(s => s.studentId === student.id);
 
     const subjectScores: StudentSubjectScoreItem[] = [];
     const radarData: StudentSumatifProfile['radarData'] = [];
+
+    let totalScore = 0;
+    let gradedCount = 0;
 
     pkgSubjects.forEach(pkgSub => {
       const subInfo = allSubjects.find(s => s.id === pkgSub.subjectId);
@@ -153,14 +167,34 @@ export class SumatifAnalyticsService {
       const subName = subInfo?.name || 'Mata Pelajaran';
       const passingGrade = pkgSub.passingGrade || subInfo?.passingGrade || 75;
 
-      // Cari skor siswa untuk mapel ini di wadah terkait
-      const matchScore = studentScores.find(s => {
-        return s.subjectScores && typeof s.subjectScores[pkgSub.subjectId] === 'number';
-      }) || studentScores[0];
+      const matchingTryoutIds = new Set(
+        allTryouts
+          .filter(t => t.packageId === pkg.id && (!t.subjectId || t.subjectId === pkgSub.subjectId))
+          .map(t => t.id)
+      );
+      matchingTryoutIds.add(pkg.id);
 
-      const rawScore = this.extractScoreForSubject(matchScore, pkgSub.subjectId);
-      const roundedScore = Math.round(rawScore * 10) / 10;
-      const isPassed = roundedScore >= passingGrade;
+      // Cari skor siswa khusus untuk tryout wadah ini
+      const studentScores = allScores.filter(s =>
+        s.studentId === student.id && matchingTryoutIds.has(s.tryoutId)
+      );
+
+      let rawScore: number | null = null;
+      for (const rec of studentScores) {
+        const val = this.extractScoreForSubject(rec, pkgSub.subjectId, matchingTryoutIds);
+        if (val !== null) {
+          if (rawScore === null || val > rawScore) rawScore = val;
+        }
+      }
+
+      const hasGrade = rawScore !== null;
+      const roundedScore = hasGrade ? Math.round(rawScore! * 10) / 10 : 0;
+      const isPassed = hasGrade && roundedScore >= passingGrade;
+
+      if (hasGrade) {
+        totalScore += roundedScore;
+        gradedCount += 1;
+      }
 
       subjectScores.push({
         subjectId: pkgSub.subjectId,
@@ -169,7 +203,7 @@ export class SumatifAnalyticsService {
         score: roundedScore,
         passingGrade,
         isPassed,
-        status: isPassed ? 'TUNTAS' : 'REMEDIAL',
+        status: !hasGrade ? 'REMEDIAL' : (isPassed ? 'TUNTAS' : 'REMEDIAL'),
       });
 
       radarData.push({
@@ -181,14 +215,12 @@ export class SumatifAnalyticsService {
       });
     });
 
-    const totalScore = subjectScores.reduce((acc, curr) => acc + curr.score, 0);
-    const validCount = subjectScores.length || 1;
-    const averageScore = Math.round((totalScore / validCount) * 10) / 10;
-    const scoresOnly = subjectScores.map(s => s.score);
+    const averageScore = gradedCount > 0 ? Math.round((totalScore / gradedCount) * 10) / 10 : 0;
+    const scoresOnly = subjectScores.filter(s => s.score > 0).map(s => s.score);
     const highestScore = scoresOnly.length > 0 ? Math.max(...scoresOnly) : 0;
     const lowestScore = scoresOnly.length > 0 ? Math.min(...scoresOnly) : 0;
     const passedCount = subjectScores.filter(s => s.isPassed).length;
-    const remedialCount = subjectScores.filter(s => !s.isPassed).length;
+    const remedialCount = subjectScores.filter(s => !s.isPassed && s.score > 0).length;
     const isAtRisk = remedialCount >= 3;
 
     return {
@@ -212,7 +244,7 @@ export class SumatifAnalyticsService {
 
   /**
    * Menghitung Analisis Butir Soal Murni (Psikometri) dan Capaian Kelas untuk Guru
-   * Tanpa memerlukan tagging TP / Materi sama sekali!
+   * Scoping ketat ke wadah paket SAT/SAS, rombel target, dan deduplikasi studentId.
    */
   public static calculateTeacherAnalytics(
     subjectId: string,
@@ -222,19 +254,53 @@ export class SumatifAnalyticsService {
     allClasses: ClassRoom[],
     allQuestions: Question[],
     allAnswers: Answer[],
-    allSubjects: Subject[]
+    allSubjects: Subject[],
+    allTryouts: Tryout[] = []
   ): TeacherSumatifAnalytics {
     const subInfo = allSubjects.find(s => s.id === subjectId);
     const pkgSub = pkg.subjects?.find(s => s.subjectId === subjectId);
     const passingGrade = pkgSub?.passingGrade || subInfo?.passingGrade || 75;
 
-    // Filter siswa yang memiliki skor untuk mapel ini
-    const scoresWithSub = allScores.map(s => ({
-      scoreRecord: s,
-      studentId: s.studentId,
-      scoreValue: this.extractScoreForSubject(s, subjectId),
-    })).filter(item => item.scoreValue > 0 || (item.scoreRecord.subjectScores && typeof item.scoreRecord.subjectScores[subjectId] === 'number'));
+    // 1. Tentukan Tryout yang terhubung dengan paket dan mapel ini
+    const matchingTryouts = allTryouts.filter(t =>
+      t.packageId === pkg.id && (!t.subjectId || t.subjectId === subjectId)
+    );
+    const matchingTryoutIds = new Set(matchingTryouts.map(t => t.id));
+    // Wadah ID itu sendiri juga bisa tersimpan di tryoutId
+    matchingTryoutIds.add(pkg.id);
 
+    // 2. Tentukan target siswa berdasarkan targetClassIds paket ujian
+    const targetClassIds = new Set(
+      pkg.targetClassIds && pkg.targetClassIds.length > 0
+        ? pkg.targetClassIds
+        : allClasses.map(c => c.id)
+    );
+    const targetStudents = allStudents.filter(s =>
+      targetClassIds.has(s.classId) && !s.isAnswerKeyAccount
+    );
+    const targetStudentIdSet = new Set(targetStudents.map(s => s.id));
+
+    // 3. Ambil skor yang BENAR-BENAR milik tryout paket ini dan siswa kelas target
+    // Lakukan deduplikasi per studentId (ambil skor tertinggi jika ada multiple submissions)
+    const studentScoreMap = new Map<string, { scoreRecord: Score; studentId: string; scoreValue: number }>();
+
+    allScores.forEach(s => {
+      if (!targetStudentIdSet.has(s.studentId)) return;
+
+      const scVal = this.extractScoreForSubject(s, subjectId, matchingTryoutIds);
+      if (scVal === null) return; // Bukan skor untuk wadah/mapel ini
+
+      const existing = studentScoreMap.get(s.studentId);
+      if (!existing || scVal > existing.scoreValue) {
+        studentScoreMap.set(s.studentId, {
+          scoreRecord: s,
+          studentId: s.studentId,
+          scoreValue: scVal,
+        });
+      }
+    });
+
+    const scoresWithSub = Array.from(studentScoreMap.values());
     const studentCount = scoresWithSub.length;
     const scoreValues = scoresWithSub.map(s => s.scoreValue);
     const totalScore = scoreValues.reduce((a, b) => a + b, 0);
@@ -264,66 +330,88 @@ export class SumatifAnalyticsService {
       .sort((a, b) => b.score - a.score)
       .map((item, idx) => ({ ...item, rank: idx + 1 }));
 
-    // Hitung Analisis Butir Soal Murni per Nomor Soal
-    // Kelompokkan siswa menjadi Kelompok Atas (27%) dan Kelompok Bawah (27%) untuk Daya Pembeda
-    const sortedScores = [...scoresWithSub].sort((a, b) => b.scoreValue - a.scoreValue);
-    const groupSize = Math.max(1, Math.round(sortedScores.length * 0.27));
-    const upperGroupStudentIds = new Set(sortedScores.slice(0, groupSize).map(s => s.studentId));
-    const lowerGroupStudentIds = new Set(sortedScores.slice(-groupSize).map(s => s.studentId));
-
-    // Ambil soal yang relevan untuk mapel ini
+    // 4. Hitung Analisis Butir Soal Murni per Nomor Soal (hanya dari tryout wadah ini)
     const subjectQuestions = allQuestions
-      .filter(q => q.subjectId === subjectId)
+      .filter(q => {
+        if (matchingTryoutIds.size > 0 && (q as any).tryoutId) {
+          return matchingTryoutIds.has((q as any).tryoutId) && q.subjectId === subjectId;
+        }
+        return q.subjectId === subjectId;
+      })
       .sort((a, b) => (a.questionNumber || 0) - (b.questionNumber || 0));
 
-    const questionStats: QuestionItemStat[] = subjectQuestions.map((q, idx) => {
-      const qNum = q.questionNumber || idx + 1;
-      const answersForQ = allAnswers.filter(a => a.questionId === q.id);
-      const totalResp = answersForQ.length || 1;
-      const correctResp = answersForQ.filter(a => a.isCorrect).length;
-      const wrongResp = totalResp - correctResp;
+    // Jika belum ada siswa yang mengerjakan wadah ini, questionStats kosong
+    let questionStats: QuestionItemStat[] = [];
+    if (studentCount > 0 && subjectQuestions.length > 0) {
+      const sortedScores = [...scoresWithSub].sort((a, b) => b.scoreValue - a.scoreValue);
+      const groupSize = Math.max(1, Math.round(sortedScores.length * 0.27));
+      const upperGroupStudentIds = new Set(sortedScores.slice(0, groupSize).map(s => s.studentId));
+      const lowerGroupStudentIds = new Set(sortedScores.slice(-groupSize).map(s => s.studentId));
 
-      // P-Value (Tingkat Kesukaran)
-      const pVal = Math.round((correctResp / totalResp) * 100) / 100;
-      let diffLabel: QuestionItemStat['difficultyLabel'] = 'Sedang';
-      if (pVal > 0.80) diffLabel = 'Sangat Mudah';
-      else if (pVal > 0.60) diffLabel = 'Mudah';
-      else if (pVal > 0.40) diffLabel = 'Sedang';
-      else if (pVal > 0.20) diffLabel = 'Sukar';
-      else diffLabel = 'Sangat Sukar';
+      const relevantAnswers = allAnswers.filter(a =>
+        (matchingTryoutIds.has(a.tryoutId) || matchingTryoutIds.has(pkg.id)) &&
+        targetStudentIdSet.has(a.studentId)
+      );
 
-      // D-Value (Daya Pembeda) = (Ru - Rl) / N_group
-      const correctUpper = answersForQ.filter(a => a.isCorrect && upperGroupStudentIds.has(a.studentId)).length;
-      const correctLower = answersForQ.filter(a => a.isCorrect && lowerGroupStudentIds.has(a.studentId)).length;
-      const rawD = (correctUpper - correctLower) / (groupSize || 1);
-      const dVal = Math.round(Math.max(-1, Math.min(1, rawD)) * 100) / 100;
+      questionStats = subjectQuestions.map((q, idx) => {
+        const qNum = q.questionNumber || idx + 1;
+        const answersForQ = relevantAnswers.filter(a => a.questionId === q.id);
+        const totalResp = answersForQ.length;
+        if (totalResp === 0) {
+          return {
+            questionNumber: qNum,
+            questionText: q.questionText,
+            totalResponses: 0,
+            correctCount: 0,
+            wrongCount: 0,
+            facilityValue: 0,
+            difficultyLabel: 'Sedang' as const,
+            discriminationIndex: 0,
+            discriminationLabel: 'Cukup' as const,
+            isReviewRecommended: false,
+          };
+        }
 
-      let discLabel: QuestionItemStat['discriminationLabel'] = 'Baik';
-      let isReview = false;
-      if (dVal >= 0.40) {
-        discLabel = 'Sangat Baik';
-      } else if (dVal >= 0.30) {
-        discLabel = 'Baik';
-      } else if (dVal >= 0.20) {
-        discLabel = 'Cukup';
-      } else {
-        discLabel = 'Buruk / Perlu Ditinjau';
-        isReview = true;
-      }
+        const correctResp = answersForQ.filter(a => a.isCorrect).length;
+        const wrongResp = totalResp - correctResp;
+        const pVal = Math.round((correctResp / totalResp) * 100) / 100;
 
-      return {
-        questionNumber: qNum,
-        questionText: q.questionText,
-        totalResponses: totalResp,
-        correctCount: correctResp,
-        wrongCount: wrongResp,
-        facilityValue: pVal,
-        difficultyLabel: diffLabel,
-        discriminationIndex: dVal,
-        discriminationLabel: discLabel,
-        isReviewRecommended: isReview,
-      };
-    });
+        let diffLabel: QuestionItemStat['difficultyLabel'] = 'Sedang';
+        if (pVal > 0.80) diffLabel = 'Sangat Mudah';
+        else if (pVal > 0.60) diffLabel = 'Mudah';
+        else if (pVal > 0.40) diffLabel = 'Sedang';
+        else if (pVal > 0.20) diffLabel = 'Sukar';
+        else diffLabel = 'Sangat Sukar';
+
+        const correctUpper = answersForQ.filter(a => a.isCorrect && upperGroupStudentIds.has(a.studentId)).length;
+        const correctLower = answersForQ.filter(a => a.isCorrect && lowerGroupStudentIds.has(a.studentId)).length;
+        const rawD = (correctUpper - correctLower) / (groupSize || 1);
+        const dVal = Math.round(Math.max(-1, Math.min(1, rawD)) * 100) / 100;
+
+        let discLabel: QuestionItemStat['discriminationLabel'] = 'Baik';
+        let isReview = false;
+        if (dVal >= 0.40) discLabel = 'Sangat Baik';
+        else if (dVal >= 0.30) discLabel = 'Baik';
+        else if (dVal >= 0.20) discLabel = 'Cukup';
+        else {
+          discLabel = 'Buruk / Perlu Ditinjau';
+          isReview = true;
+        }
+
+        return {
+          questionNumber: qNum,
+          questionText: q.questionText,
+          totalResponses: totalResp,
+          correctCount: correctResp,
+          wrongCount: wrongResp,
+          facilityValue: pVal,
+          difficultyLabel: diffLabel,
+          discriminationIndex: dVal,
+          discriminationLabel: discLabel,
+          isReviewRecommended: isReview,
+        };
+      });
+    }
 
     return {
       subjectId,
@@ -346,6 +434,7 @@ export class SumatifAnalyticsService {
 
   /**
    * Menghitung Leger Nilai Rapor Satu Rombel Kelas untuk Wali Kelas (SAS / SAT)
+   * Scoping ketat per mapel wadah paket SAT/SAS, hanya menghitung nilai aktual.
    */
   public static calculateWaliKelasLeger(
     classId: string,
@@ -353,7 +442,8 @@ export class SumatifAnalyticsService {
     allStudents: Student[],
     allClasses: ClassRoom[],
     allScores: Score[],
-    allSubjects: Subject[]
+    allSubjects: Subject[],
+    allTryouts: Tryout[] = []
   ): WaliKelasLegerResult {
     const targetClass = allClasses.find(c => c.id === classId);
     const classStudents = allStudents.filter(s => s.classId === classId && !s.isAnswerKeyAccount);
@@ -368,26 +458,62 @@ export class SumatifAnalyticsService {
       };
     });
 
+    // Map tryouts per mapel untuk paket ini
+    const subjectTryoutMap = new Map<string, Set<string>>();
+    subjects.forEach(sub => {
+      const tIds = new Set(
+        allTryouts
+          .filter(t => t.packageId === pkg.id && (!t.subjectId || t.subjectId === sub.id))
+          .map(t => t.id)
+      );
+      tIds.add(pkg.id);
+      subjectTryoutMap.set(sub.id, tIds);
+    });
+
     const rows: LegerStudentRow[] = classStudents.map(student => {
       const scoresBySubjectId: Record<string, number> = {};
       const scoresBySubjectCode: Record<string, number> = {};
       const remedialSubjectCodes: string[] = [];
       let totalScore = 0;
+      let gradedSubjectsCount = 0;
 
       subjects.forEach(sub => {
-        const studentScoreRecords = allScores.filter(s => s.studentId === student.id);
-        const matchRecord = studentScoreRecords.find(s => s.subjectScores && typeof s.subjectScores[sub.id] === 'number') || studentScoreRecords[0];
-        const sc = Math.round(this.extractScoreForSubject(matchRecord, sub.id) * 10) / 10;
-        scoresBySubjectId[sub.id] = sc;
-        scoresBySubjectCode[sub.code] = sc;
-        totalScore += sc;
+        const validTryoutIds = subjectTryoutMap.get(sub.id);
+        const studentScoreRecords = allScores.filter(s =>
+          s.studentId === student.id && validTryoutIds && validTryoutIds.has(s.tryoutId)
+        );
 
-        if (sc < sub.passingGrade) {
-          remedialSubjectCodes.push(sub.code);
+        let sc: number | null = null;
+        if (studentScoreRecords.length > 0) {
+          // Cari skor tertinggi jika ada lebih dari satu submisi
+          for (const rec of studentScoreRecords) {
+            const val = this.extractScoreForSubject(rec, sub.id, validTryoutIds);
+            if (val !== null) {
+              if (sc === null || val > sc) sc = val;
+            }
+          }
+        }
+
+        if (sc !== null) {
+          const rounded = Math.round(sc * 10) / 10;
+          scoresBySubjectId[sub.id] = rounded;
+          scoresBySubjectCode[sub.code] = rounded;
+          totalScore += rounded;
+          gradedSubjectsCount += 1;
+
+          if (rounded < sub.passingGrade) {
+            remedialSubjectCodes.push(sub.code);
+          }
+        } else {
+          // Belum ada nilai untuk mapel ini di wadah ini
+          scoresBySubjectId[sub.id] = 0;
+          scoresBySubjectCode[sub.code] = 0;
         }
       });
 
-      const avg = subjects.length > 0 ? Math.round((totalScore / subjects.length) * 10) / 10 : 0;
+      const avg = gradedSubjectsCount > 0
+        ? Math.round((totalScore / gradedSubjectsCount) * 10) / 10
+        : 0;
       const remedialCount = remedialSubjectCodes.length;
 
       return {
@@ -401,31 +527,53 @@ export class SumatifAnalyticsService {
         rank: 1,
         remedialSubjectCodes,
         remedialCount,
+        // Siswa hanya dianggap berisiko jika minimal 3 mapel yang SUDAH dinilai ternyata remedial
         isAtRisk: remedialCount >= 3,
       };
     });
 
-    // Urutkan peringkat berdasarkan totalScore / averageScore descending
+    // Urutkan peringkat berdasarkan totalScore descending
     rows.sort((a, b) => b.totalScore - a.totalScore);
     rows.forEach((r, idx) => {
       r.rank = idx + 1;
     });
 
-    // Hitung rata-rata tiap mata pelajaran di kelas
+    // Hitung rata-rata tiap mata pelajaran di kelas (hanya dari siswa yang memiliki nilai riil)
     const subjectAverages: Record<string, number> = {};
     let totalAllScores = 0;
-    let totalScorePoints = 0;
+    let totalGradedEntries = 0;
 
     subjects.forEach(sub => {
-      const allSubjectScores = rows.map(r => r.scoresBySubjectId[sub.id] || 0);
-      const sum = allSubjectScores.reduce((a, b) => a + b, 0);
-      const avg = rows.length > 0 ? Math.round((sum / rows.length) * 10) / 10 : 0;
-      subjectAverages[sub.id] = avg;
-      totalAllScores += sum;
-      totalScorePoints += rows.length;
+      const validTryoutIds = subjectTryoutMap.get(sub.id);
+      const scoresForSub: number[] = [];
+
+      classStudents.forEach(st => {
+        const studentScoreRecords = allScores.filter(s =>
+          s.studentId === st.id && validTryoutIds && validTryoutIds.has(s.tryoutId)
+        );
+        for (const rec of studentScoreRecords) {
+          const val = this.extractScoreForSubject(rec, sub.id, validTryoutIds);
+          if (val !== null) {
+            scoresForSub.push(val);
+            break;
+          }
+        }
+      });
+
+      if (scoresForSub.length > 0) {
+        const sum = scoresForSub.reduce((a, b) => a + b, 0);
+        const avg = Math.round((sum / scoresForSub.length) * 10) / 10;
+        subjectAverages[sub.id] = avg;
+        totalAllScores += sum;
+        totalGradedEntries += scoresForSub.length;
+      } else {
+        subjectAverages[sub.id] = 0;
+      }
     });
 
-    const overallClassAverage = totalScorePoints > 0 ? Math.round((totalAllScores / totalScorePoints) * 10) / 10 : 0;
+    const overallClassAverage = totalGradedEntries > 0
+      ? Math.round((totalAllScores / totalGradedEntries) * 10) / 10
+      : 0;
     const atRiskStudents = rows.filter(r => r.isAtRisk);
 
     return {
