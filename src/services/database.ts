@@ -37,6 +37,7 @@ import { generateUuid, isValidUuid } from '../utils/idUtils';
 const STORAGE_KEY = 'school_tryout_analytics_db_v1';
 const SCHOOL_PROFILE_CACHE_KEY = 'wikan_school_profile_cache_v1';
 const DELETED_TRYOUTS_KEY = 'school_tryout_deleted_ids_v1';
+const DELETED_PACKAGES_KEY = 'school_exam_packages_deleted_ids_v1';
 const DELETED_SUBJECTS_KEY = 'school_tryout_deleted_subjects_v1';
 const DELETED_EXPLANATIONS_KEY = 'school_tryout_deleted_explanations_v1';
 const LIVE_MONITORING_CACHE_KEY = 'wikan_live_monitoring_cache_v1';
@@ -452,6 +453,63 @@ export class DatabaseService {
       }
     } catch (e) {
       console.warn('[DB] Gagal membersihkan tombstone tryout:', e);
+    }
+  }
+
+  /**
+   * Helper tombstone: Mendapatkan daftar identifier dan kode paket ujian yang sudah dihapus.
+   */
+  private getDeletedPackageIdentifiers(): Set<string> {
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(DELETED_PACKAGES_KEY) : null;
+      const parsed = raw ? JSON.parse(raw) : [];
+      const set = new Set<string>();
+      (Array.isArray(parsed) ? parsed : []).forEach((x: string) => {
+        const val = String(x).toLowerCase().trim();
+        if (val) set.add(val);
+      });
+      return set;
+    } catch {
+      return new Set<string>();
+    }
+  }
+
+  /**
+   * Helper tombstone: Mencatat paket ujian yang dihapus ke localStorage agar persisten lintas sesi.
+   */
+  private recordDeletedPackageIdentifier(...idsOrCodes: (string | undefined)[]): void {
+    try {
+      const set = this.getDeletedPackageIdentifiers();
+      idsOrCodes.forEach(item => {
+        if (item && item.trim()) {
+          const val = item.toLowerCase().trim();
+          if (val) set.add(val);
+        }
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(DELETED_PACKAGES_KEY, JSON.stringify(Array.from(set)));
+      }
+    } catch (e) {
+      console.warn('[DB] Gagal menyimpan tombstone paket ujian yang dihapus:', e);
+    }
+  }
+
+  /**
+   * Helper tombstone: Membebaskan kembali identifier/kode paket ujian saat pengguna membuat paket baru.
+   */
+  private removeDeletedPackageIdentifier(...idsOrCodes: (string | undefined)[]): void {
+    try {
+      const set = this.getDeletedPackageIdentifiers();
+      idsOrCodes.forEach(item => {
+        if (item && item.trim()) {
+          set.delete(item.toLowerCase().trim());
+        }
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(DELETED_PACKAGES_KEY, JSON.stringify(Array.from(set)));
+      }
+    } catch (e) {
+      console.warn('[DB] Gagal membersihkan tombstone paket ujian:', e);
     }
   }
 
@@ -883,11 +941,22 @@ export class DatabaseService {
       }
     }
 
-    // Merge exam packages (by code)
+    // Merge exam packages (by id or code)
     if (cloud.examPackages && Array.isArray(cloud.examPackages)) {
       if (!this.state.examPackages) this.state.examPackages = [];
+      const deletedPkgs = this.getDeletedPackageIdentifiers();
+
       cloud.examPackages.forEach(cloudPkg => {
-        const idx = this.state.examPackages.findIndex(p => p.code.toLowerCase() === cloudPkg.code.toLowerCase());
+        const idKey = (cloudPkg.id || '').toLowerCase().trim();
+        const codeKey = (cloudPkg.code || '').toLowerCase().trim();
+        if (deletedPkgs.has(idKey) || (codeKey && deletedPkgs.has(codeKey))) {
+          return;
+        }
+
+        const idx = this.state.examPackages.findIndex(
+          p => (p.id && cloudPkg.id && p.id.toLowerCase() === cloudPkg.id.toLowerCase()) ||
+               (p.code && cloudPkg.code && p.code.toLowerCase().trim() === cloudPkg.code.toLowerCase().trim())
+        );
         if (idx === -1) {
           this.state.examPackages.push(cloudPkg);
           changed = true;
@@ -900,6 +969,7 @@ export class DatabaseService {
             local.id !== cloudPkg.id ||
             local.title !== cloudPkg.title ||
             local.status !== cloudPkg.status ||
+            local.assessmentType !== cloudPkg.assessmentType ||
             local.updatedAt !== cloudPkg.updatedAt ||
             localSubsJson !== cloudSubsJson
           ) {
@@ -909,23 +979,28 @@ export class DatabaseService {
         }
       });
 
-      // Reconcile deleted exam packages jika cloud sudah terinisialisasi
-      if (this.supabaseInitDone || cloud.students.length > 0 || (cloud.tryouts && cloud.tryouts.length > 0)) {
-        const cloudPkgCodes = new Set(cloud.examPackages.map(p => (p.code || '').toLowerCase().trim()));
-        const cloudPkgIds = new Set(cloud.examPackages.map(p => (p.id || '').toLowerCase().trim()));
-        const beforePkgCount = this.state.examPackages.length;
-        this.state.examPackages = this.state.examPackages.filter(p => {
-          const idKey = (p.id || '').toLowerCase().trim();
-          const codeKey = (p.code || '').toLowerCase().trim();
-          return (
-            cloudPkgIds.has(idKey) ||
-            cloudPkgCodes.has(codeKey) ||
-            this.pendingPackageIds.has(p.id) ||
-            this.pendingPackageIds.has(codeKey)
-          );
-        });
-        if (this.state.examPackages.length !== beforePkgCount) {
-          changed = true;
+      // Hapus hanya paket ujian yang BENAR-BENAR ada di daftar tombstone terhapus
+      const beforePkgCount = this.state.examPackages.length;
+      this.state.examPackages = this.state.examPackages.filter(p => {
+        const idKey = (p.id || '').toLowerCase().trim();
+        const codeKey = (p.code || '').toLowerCase().trim();
+        return !deletedPkgs.has(idKey) && (!codeKey || !deletedPkgs.has(codeKey));
+      });
+      if (this.state.examPackages.length !== beforePkgCount) {
+        changed = true;
+      }
+
+      // Auto-push paket ujian lokal yang belum ada di cloud ke Supabase
+      const cloudPkgCodes = new Set(cloud.examPackages.map(p => (p.code || '').toLowerCase().trim()));
+      const cloudPkgIds = new Set(cloud.examPackages.map(p => (p.id || '').toLowerCase().trim()));
+      const unsyncedPackages = this.state.examPackages.filter(p => {
+        const idKey = (p.id || '').toLowerCase().trim();
+        const codeKey = (p.code || '').toLowerCase().trim();
+        return !cloudPkgIds.has(idKey) && !cloudPkgCodes.has(codeKey);
+      });
+      if (unsyncedPackages.length > 0 && this.supabaseSyncEnabled) {
+        for (const up of unsyncedPackages) {
+          sdb.syncExamPackage(up).catch(() => {});
         }
       }
     }
@@ -1437,6 +1512,19 @@ export class DatabaseService {
         if (unsyncedExplanations.length > 0) {
           for (const exp of unsyncedExplanations) {
             await sdb.syncExplanation(exp);
+          }
+        }
+
+        const cloudPkgCodes = new Set((cloudState.examPackages || []).map(p => (p.code || '').toLowerCase().trim()));
+        const cloudPkgIds = new Set((cloudState.examPackages || []).map(p => (p.id || '').toLowerCase().trim()));
+        const unsyncedPackages = (this.state.examPackages || []).filter(p => {
+          const idKey = (p.id || '').toLowerCase().trim();
+          const codeKey = (p.code || '').toLowerCase().trim();
+          return !cloudPkgIds.has(idKey) && !cloudPkgCodes.has(codeKey);
+        });
+        if (unsyncedPackages.length > 0) {
+          for (const pkg of unsyncedPackages) {
+            await sdb.syncExamPackage(pkg);
           }
         }
       }
@@ -2983,7 +3071,15 @@ export class DatabaseService {
     if (!this.state.examPackages) {
       this.state.examPackages = [];
     }
-    const existingIdx = this.state.examPackages.findIndex(p => p.id === pkg.id);
+    if (!pkg.id || !isValidUuid(pkg.id)) {
+      pkg.id = generateUuid();
+    }
+    // Bebaskan id dan kode dari tombstone
+    this.removeDeletedPackageIdentifier(pkg.id, pkg.code);
+
+    const existingIdx = this.state.examPackages.findIndex(
+      p => p.id === pkg.id || (p.code && pkg.code && p.code.toLowerCase().trim() === pkg.code.toLowerCase().trim())
+    );
     const now = new Date().toISOString();
     const toSave: ExamPackage = {
       ...pkg,
@@ -3026,6 +3122,7 @@ export class DatabaseService {
     }
     const pkg = this.getExamPackageById(id);
     if (!pkg) return;
+    this.recordDeletedPackageIdentifier(pkg.id, pkg.code);
     this.state.examPackages = (this.state.examPackages || []).filter(p => p.id !== id);
     if (currentUser) {
       this.logAudit(currentUser, 'DELETE_EXAM_PACKAGE', 'TRYOUT', `Menghapus Paket Ujian: ${pkg.title} (${pkg.code})`);

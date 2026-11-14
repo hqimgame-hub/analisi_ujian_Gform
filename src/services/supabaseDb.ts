@@ -201,11 +201,16 @@ function fromSupabaseSubject(row: Record<string, unknown>): Subject {
 }
 
 function toSupabaseExamPackage(pkg: ExamPackage, supabaseAcademicYearId?: string): Record<string, unknown> {
+  const ayId = (supabaseAcademicYearId && isValidUuid(supabaseAcademicYearId))
+    ? supabaseAcademicYearId
+    : (isValidUuid(pkg.academicYearId) ? pkg.academicYearId : '0ffe2ac4-48bd-400b-ae8c-05ecff36e4a1');
+
   return {
+    ...(isValidUuid(pkg.id) ? { id: pkg.id } : {}),
     code: pkg.code,
     title: pkg.title,
     assessment_type: pkg.assessmentType || 'TRYOUT',
-    academic_year_id: supabaseAcademicYearId || pkg.academicYearId,
+    academic_year_id: ayId,
     target_grades: pkg.targetGrades || [],
     target_class_ids: pkg.targetClassIds || [],
     start_date: pkg.startDate || new Date().toISOString(),
@@ -216,18 +221,29 @@ function toSupabaseExamPackage(pkg: ExamPackage, supabaseAcademicYearId?: string
 }
 
 function fromSupabaseExamPackage(row: Record<string, unknown>, subjects: ExamPackageSubject[] = []): ExamPackage {
+  let assessmentType = (row.assessment_type as ExamPackage['assessmentType']) || 'TRYOUT';
+  const desc = row.description ? String(row.description) : '';
+  const code = String(row.code || '').toUpperCase();
+  if (desc.includes('[TYPE:SAT]') || code.startsWith('SAT-')) {
+    assessmentType = 'SAT';
+  } else if (desc.includes('[TYPE:SAS]') || code.startsWith('SAS-')) {
+    assessmentType = 'SAS';
+  }
+
+  const cleanDescription = desc.replace(/\[TYPE:(SAT|SAS)\]\s*/g, '').trim() || undefined;
+
   return {
     id: String(row.id),
     code: String(row.code),
     title: String(row.title),
-    assessmentType: (row.assessment_type as ExamPackage['assessmentType']) || 'TRYOUT',
+    assessmentType,
     academicYearId: String(row.academic_year_id),
     targetGrades: Array.isArray(row.target_grades) ? (row.target_grades as string[]) : [],
     targetClassIds: Array.isArray(row.target_class_ids) ? (row.target_class_ids as string[]) : [],
     startDate: String(row.start_date || new Date().toISOString()),
     endDate: String(row.end_date || new Date().toISOString()),
     status: (row.status as ExamPackage['status']) || 'ACTIVE',
-    description: row.description ? String(row.description) : undefined,
+    description: cleanDescription,
     subjects: subjects,
     createdAt: row.created_at ? String(row.created_at) : undefined,
     updatedAt: row.updated_at ? String(row.updated_at) : undefined,
@@ -1305,7 +1321,7 @@ class SupabaseDbService {
   public async syncExamPackage(pkg: ExamPackage, supabaseAcademicYearId?: string): Promise<void> {
     if (!this.isAvailable() || !supabase) return;
     try {
-      const ayId = supabaseAcademicYearId || pkg.academicYearId;
+      const ayId = supabaseAcademicYearId || (isValidUuid(pkg.academicYearId) ? pkg.academicYearId : this.cachedAcademicYearId || '0ffe2ac4-48bd-400b-ae8c-05ecff36e4a1');
       let existing: { id: string } | null = null;
 
       if (isValidUuid(pkg.id)) {
@@ -1332,11 +1348,39 @@ class SupabaseDbService {
       if (existing?.id) {
         pkgId = String(existing.id);
         const { error } = await supabase.from('exam_packages').update(payload).eq('id', pkgId);
-        if (error) this.log('syncExamPackage update error: ' + error.message, 'warn');
+        if (error) {
+          if (error.message && (error.message.includes('check constraint') || (error as any).code === '23514')) {
+            const fallbackType = (pkg.assessmentType === 'SAT' || pkg.assessmentType === 'SAS') ? 'PAS' : 'TRYOUT';
+            const fallbackDesc = `[TYPE:${pkg.assessmentType}] ${payload.description || ''}`.trim();
+            const { error: retryErr } = await supabase.from('exam_packages').update({
+              ...payload,
+              assessment_type: fallbackType,
+              description: fallbackDesc
+            }).eq('id', pkgId);
+            if (retryErr) this.log('syncExamPackage update retry error: ' + retryErr.message, 'warn');
+          } else {
+            this.log('syncExamPackage update error: ' + error.message, 'warn');
+          }
+        }
       } else {
         const { data: inserted, error } = await supabase.from('exam_packages').insert(payload).select('id').single();
         if (error) {
-          this.log('syncExamPackage insert error: ' + error.message, 'warn');
+          if (error.message && (error.message.includes('check constraint') || (error as any).code === '23514')) {
+            const fallbackType = (pkg.assessmentType === 'SAT' || pkg.assessmentType === 'SAS') ? 'PAS' : 'TRYOUT';
+            const fallbackDesc = `[TYPE:${pkg.assessmentType}] ${payload.description || ''}`.trim();
+            const { data: retryData, error: retryErr } = await supabase.from('exam_packages').insert({
+              ...payload,
+              assessment_type: fallbackType,
+              description: fallbackDesc
+            }).select('id').single();
+            if (retryErr) {
+              this.log('syncExamPackage insert retry error: ' + retryErr.message, 'warn');
+            } else if (retryData) {
+              pkgId = String((retryData as any).id);
+            }
+          } else {
+            this.log('syncExamPackage insert error: ' + error.message, 'warn');
+          }
         } else if (inserted) {
           pkgId = String((inserted as any).id);
         }

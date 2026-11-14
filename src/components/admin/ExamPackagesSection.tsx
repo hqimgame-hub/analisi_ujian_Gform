@@ -10,6 +10,7 @@ import {
   AcademicYear, TryoutStatus, AssessmentType
 } from '../../types/database';
 import { DatabaseService } from '../../services/database';
+import { generateUuid } from '../../utils/idUtils';
 
 interface ExamPackagesSectionProps {
   dbService: DatabaseService;
@@ -212,7 +213,7 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
         const found = existing.subjects.find(s => s.subjectId === subId);
         if (found) return found;
         return {
-          id: `pkg-sub-${Date.now()}-${subId}`,
+          id: generateUuid(),
           packageId: existing.id,
           subjectId: subId,
           totalQuestions: 40,
@@ -240,9 +241,9 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
       dbService.saveExamPackage(updatedPkg, currentUser);
       onShowToast(`Paket Ujian '${updatedPkg.title}' berhasil diperbarui.`);
     } else {
-      const newPkgId = `pkt-${Date.now()}`;
-      const newSubjects: ExamPackageSubject[] = formSubjectIds.map((subId, idx) => ({
-        id: `pkg-sub-${Date.now()}-${idx}`,
+      const newPkgId = generateUuid();
+      const newSubjects: ExamPackageSubject[] = formSubjectIds.map((subId) => ({
+        id: generateUuid(),
         packageId: newPkgId,
         subjectId: subId,
         totalQuestions: 40,
