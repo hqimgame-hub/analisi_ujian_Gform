@@ -64,6 +64,7 @@ type GuruTab =
   | 'COMPETENCIES'
   | 'STUDENTS'
   | 'CLASSES'
+  | 'ANALYTICS_TO'
   | 'ANALYTICS'
   | 'PROGRESS_TRACKING'
   | 'SUMATIF_ANALYTICS'
@@ -768,6 +769,7 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
 
   // Phase 9: Analytics Engine UI States
   const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
+  const [toAnalyticsSubTab, setToAnalyticsSubTab] = useState<'PROGRESS' | 'ITEM_ANALYSIS' | 'REPORTS'>('PROGRESS');
   const [analyticsSubTab, setAnalyticsSubTab] = useState<'OVERALL' | 'CLASS' | 'STUDENT' | 'PSYCHOMETRICS' | 'SUMATIF_EVALUATION'>('OVERALL');
   const [selectedSumatifPackageId, setSelectedSumatifPackageId] = useState<string>('');
   const [analyticsYearFilter, setAnalyticsYearFilter] = useState('ALL');
@@ -1186,7 +1188,18 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
 
   const handleTabChange = (tab: GuruTab) => {
     setIsLoading(true);
-    setActiveTab(tab);
+    if (tab === 'PROGRESS_TRACKING') {
+      setToAnalyticsSubTab('PROGRESS');
+      setActiveTab('ANALYTICS_TO');
+    } else if (tab === 'ANALYTICS') {
+      setToAnalyticsSubTab('ITEM_ANALYSIS');
+      setActiveTab('ANALYTICS_TO');
+    } else if (tab === 'REPORTS') {
+      setToAnalyticsSubTab('REPORTS');
+      setActiveTab('ANALYTICS_TO');
+    } else {
+      setActiveTab(tab);
+    }
     setSidebarOpen(false);
     setTimeout(() => setIsLoading(false), 150);
   };
@@ -1246,6 +1259,12 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
       subjects
     );
   }, [activeSumatifPackage, activeSubjectObj, scores, students, classes, questions, subjects]);
+
+  const isToAnalyticsActive =
+    activeTab === 'ANALYTICS_TO' ||
+    activeTab === 'ANALYTICS' ||
+    activeTab === 'PROGRESS_TRACKING' ||
+    activeTab === 'REPORTS';
 
   // Auto-init selectedTryoutId jika kosong atau tidak valid
   useEffect(() => {
@@ -2122,31 +2141,26 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
           </div>
 
           <button
-            onClick={() => handleTabChange('PROGRESS_TRACKING')}
+            onClick={() => handleTabChange('ANALYTICS_TO')}
             className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
-              activeTab === 'PROGRESS_TRACKING'
+              activeTab === 'ANALYTICS_TO' || activeTab === 'ANALYTICS' || activeTab === 'PROGRESS_TRACKING' || activeTab === 'REPORTS'
                 ? 'bg-teal-600 text-white font-semibold shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <div className="flex items-center space-x-2.5">
-              <TrendingUp className={`w-4 h-4 ${activeTab === 'PROGRESS_TRACKING' ? 'text-white' : 'text-slate-400'}`} />
-              <span>Grafik Siklus Try Out</span>
+              <TrendingUp className={`w-4 h-4 ${activeTab === 'ANALYTICS_TO' || activeTab === 'ANALYTICS' || activeTab === 'PROGRESS_TRACKING' || activeTab === 'REPORTS' ? 'text-white' : 'text-slate-400'}`} />
+              <span>Analisis Try Out</span>
             </div>
-          </button>
-
-          <button
-            onClick={() => handleTabChange('ANALYTICS')}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
-              activeTab === 'ANALYTICS'
-                ? 'bg-teal-600 text-white font-semibold shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <div className="flex items-center space-x-2.5">
-              <BarChart3 className={`w-4 h-4 ${activeTab === 'ANALYTICS' ? 'text-white' : 'text-slate-400'}`} />
-              <span>Analisis Butir Soal TO</span>
-            </div>
+            <span
+              className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                activeTab === 'ANALYTICS_TO' || activeTab === 'ANALYTICS' || activeTab === 'PROGRESS_TRACKING' || activeTab === 'REPORTS'
+                  ? 'bg-teal-700 text-white'
+                  : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+              }`}
+            >
+              3 Sub-Menu
+            </span>
           </button>
 
           <button
@@ -2170,18 +2184,6 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                 {teacherSumatifPackages.length}
               </span>
             )}
-          </button>
-
-          <button
-            onClick={() => handleTabChange('REPORTS')}
-            className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
-              activeTab === 'REPORTS'
-                ? 'bg-teal-600 text-white font-semibold shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Download className={`w-4 h-4 ${activeTab === 'REPORTS' ? 'text-white' : 'text-slate-400'}`} />
-            <span>Laporan &amp; Ekspor Nilai TO</span>
           </button>
 
           <button
@@ -3766,8 +3768,68 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                 </div>
               )}
 
+              {/* HEADER TERPADU: PUSAT ANALISIS & LAPORAN TRY OUT */}
+              {isToAnalyticsActive && (
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-teal-50 dark:bg-teal-950 flex items-center justify-center text-teal-600 dark:text-teal-400">
+                        <TrendingUp className="w-4 h-4" />
+                      </div>
+                      <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                        Pusat Analisis &amp; Laporan Try Out
+                      </h2>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Pelacakan perkembangan siklus TO, audit butir soal &amp; daya beda, serta rekapitulasi nilai Try Out.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setToAnalyticsSubTab('PROGRESS')}
+                      className={`px-3.5 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                        toAnalyticsSubTab === 'PROGRESS'
+                          ? 'bg-teal-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <TrendingUp className="w-3.5 h-3.5" />
+                      <span>1. Grafik Siklus TO</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setToAnalyticsSubTab('ITEM_ANALYSIS')}
+                      className={`px-3.5 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                        toAnalyticsSubTab === 'ITEM_ANALYSIS'
+                          ? 'bg-teal-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <BarChart3 className="w-3.5 h-3.5" />
+                      <span>2. Analisis Butir Soal TO</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setToAnalyticsSubTab('REPORTS')}
+                      className={`px-3.5 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                        toAnalyticsSubTab === 'REPORTS'
+                          ? 'bg-teal-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>3. Laporan &amp; Ekspor TO</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* TAB 8: ANALYTICS NAVIGATION — PHASE 9 ANALYTICS ENGINE */}
-              {activeTab === 'ANALYTICS' && (
+              {isToAnalyticsActive && toAnalyticsSubTab === 'ITEM_ANALYSIS' && (
                 <div className="space-y-5">
                   {/* Top Bar: Sub-Navigation Tabs */}
                   <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3 transition-colors">
@@ -5524,7 +5586,7 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
               )}
 
               {/* TAB 8.5: PROGRESS TRACKING */}
-              {activeTab === 'PROGRESS_TRACKING' && (
+              {isToAnalyticsActive && toAnalyticsSubTab === 'PROGRESS' && (
                 <div className="space-y-6">
                   {/* Top Control Bar & Sub-Navigation */}
                   <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs space-y-4 transition-colors">
@@ -7768,7 +7830,7 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
               )}
 
               {/* TAB 10: REPORTS NAVIGATION — PHASE 11 REPORTING ENGINE */}
-              {activeTab === 'REPORTS' && (
+              {isToAnalyticsActive && toAnalyticsSubTab === 'REPORTS' && (
                 <div className="space-y-6">
                   {/* Top Bar Header & Control */}
                   <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm space-y-4 transition-colors">
