@@ -3,7 +3,8 @@ import {
   School, Users, TrendingUp, Download, CheckCircle2, AlertTriangle,
   BookOpen, Search, ArrowRight, Award, FileSpreadsheet, Key, ChevronRight,
   ShieldCheck, RefreshCw, Phone, Mail, UserCheck, Calendar, Filter, HelpCircle,
-  ArrowUp, ArrowDown, Activity, Save, BarChart3, Info, GraduationCap, SlidersHorizontal, Eye, X
+  ArrowUp, ArrowDown, Activity, Save, BarChart3, Info, GraduationCap, SlidersHorizontal, Eye, X,
+  ShieldAlert
 } from 'lucide-react';
 import { dbService } from '../services/database';
 import { ExportService } from '../services/export';
@@ -25,11 +26,11 @@ interface WaliKelasAppPageProps {
 
 type WaliKelasTab =
   | 'OVERVIEW'
-  | 'TRYOUT_PROGRESS'
-  | 'GRADEBOOK'
-  | 'LEGER_RAPOR'
-  | 'STUDENT_DIRECTORY'
-  | 'SUBJECT_ANALYTICS';
+  | 'TRYOUT_EVALUATION'
+  | 'SUMATIF_LEGER';
+
+type WalasToSubTab = 'PROGRESS' | 'GRADEBOOK' | 'LEGER_TO';
+type WalasSumatifSubTab = 'OVERVIEW_RISK' | 'LEGER_TABLE' | 'NOTES_EXPORT';
 
 export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
   currentUser: initialUser,
@@ -37,6 +38,8 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
 }) => {
   const [currentUser, setCurrentUser] = useState<User>(initialUser);
   const [activeTab, setActiveTab] = useState<WaliKelasTab>('OVERVIEW');
+  const [walasToSubTab, setWalasToSubTab] = useState<WalasToSubTab>('PROGRESS');
+  const [walasSumatifSubTab, setWalasSumatifSubTab] = useState<WalasSumatifSubTab>('LEGER_TABLE');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStudentId, setSelectedStudentId] = useState<string>('s-1');
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('ALL');
@@ -53,7 +56,7 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
   // Wali Kelas Notes State per student ID
   const [waliNotes, setWaliNotes] = useState<Record<string, string>>({});
   const [selectedTryoutId, setSelectedTryoutId] = useState<string>('');
-  const [selectedPackageId, setSelectedPackageId] = useState<string>('ALL');
+  const [selectedPackageId, setSelectedPackageId] = useState<string>('');
 
   // Local Reactive Database States
   const [teachers, setTeachers] = useState(dbService.getTeachers());
@@ -147,15 +150,37 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
 
   // Wadah Ujian terdaftar untuk rombel binaan ini (SAS / SAT / TO)
   const packagesForWalas = useMemo(() => {
-    return dbService.getExamPackagesForWaliKelas(assignedClassId);
-  }, [assignedClassId, rawTryouts]);
+    const list = dbService.getExamPackagesForWaliKelas(assignedClassId);
+    if (list.length > 0) return list;
+    return dbService.getExamPackages().filter(pkg => {
+      if (pkg.targetClassIds && pkg.targetClassIds.length > 0) {
+        return pkg.targetClassIds.includes(assignedClassId);
+      }
+      if (pkg.targetGrades && pkg.targetGrades.length > 0 && assignedClass.gradeLevel) {
+        return pkg.targetGrades.includes(assignedClass.gradeLevel);
+      }
+      return false;
+    });
+  }, [assignedClassId, assignedClass.gradeLevel, rawTryouts]);
+
+  const sumatifPackagesForWalas = useMemo(() => {
+    return packagesForWalas.filter(pkg => pkg.assessmentType === 'SAS' || pkg.assessmentType === 'SAT');
+  }, [packagesForWalas]);
+
+  useEffect(() => {
+    if (sumatifPackagesForWalas.length > 0) {
+      if (!selectedPackageId || !sumatifPackagesForWalas.some(p => p.id === selectedPackageId)) {
+        setSelectedPackageId(sumatifPackagesForWalas[0].id);
+      }
+    }
+  }, [sumatifPackagesForWalas, selectedPackageId]);
 
   const activePackage = useMemo(() => {
-    if (selectedPackageId && selectedPackageId !== 'ALL') {
-      return packagesForWalas.find(p => p.id === selectedPackageId);
+    if (selectedPackageId) {
+      return sumatifPackagesForWalas.find(p => p.id === selectedPackageId) || packagesForWalas.find(p => p.id === selectedPackageId);
     }
-    return undefined;
-  }, [packagesForWalas, selectedPackageId]);
+    return sumatifPackagesForWalas[0] || undefined;
+  }, [selectedPackageId, sumatifPackagesForWalas, packagesForWalas]);
 
   const isSumatifActive = activePackage?.assessmentType === 'SAS' || activePackage?.assessmentType === 'SAT';
 
@@ -298,70 +323,63 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
         </header>
 
         {/* Tab Navigation Menu */}
-        <div className="bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-1">
+        <div className="bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               onClick={() => setActiveTab('OVERVIEW')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === 'OVERVIEW'
                   ? 'bg-emerald-600 text-white shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
             >
               <School className="w-4 h-4" />
-              <span>Ringkasan Rombel</span>
+              <span>1. Rombel &amp; Siswa</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+                activeTab === 'OVERVIEW' ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+              }`}>
+                {activeStudentList.length}
+              </span>
             </button>
 
             <button
-              onClick={() => setActiveTab('TRYOUT_PROGRESS')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                activeTab === 'TRYOUT_PROGRESS'
+              onClick={() => setActiveTab('TRYOUT_EVALUATION')}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                activeTab === 'TRYOUT_EVALUATION'
                   ? 'bg-emerald-600 text-white shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
             >
               <TrendingUp className="w-4 h-4" />
-              <span>Grafik Perkembangan TryOut</span>
+              <span>2. Evaluasi Try Out</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+                activeTab === 'TRYOUT_EVALUATION' ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+              }`}>
+                {allTryouts.length} Siklus
+              </span>
             </button>
 
             <button
-              onClick={() => setActiveTab('GRADEBOOK')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                activeTab === 'GRADEBOOK'
+              onClick={() => setActiveTab('SUMATIF_LEGER')}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                activeTab === 'SUMATIF_LEGER'
                   ? 'bg-emerald-600 text-white shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
             >
-              <GraduationCap className="w-4 h-4" />
-              <span>Buku Nilai Siswa</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('LEGER_RAPOR')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                activeTab === 'LEGER_RAPOR'
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
-              }`}
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span>Leger &amp; Catatan Rapor</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('STUDENT_DIRECTORY')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                activeTab === 'STUDENT_DIRECTORY'
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              <span>Direktori Siswa ({activeStudentList.length})</span>
+              <Award className="w-4 h-4" />
+              <span>3. Leger Asesmen Sumatif (SAS/SAT)</span>
+              {sumatifPackagesForWalas.length > 0 && (
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                  activeTab === 'SUMATIF_LEGER' ? 'bg-white/20 text-white' : 'bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300'
+                }`}>
+                  {sumatifPackagesForWalas.length} Wadah
+                </span>
+              )}
             </button>
           </div>
 
-          <div className="relative shrink-0 w-full sm:w-64">
+          <div className="relative shrink-0 w-full md:w-64">
             <input
               type="text"
               value={searchQuery}
@@ -479,7 +497,10 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
                       <p className="text-xs text-slate-500">Perkembangan rata-rata kelas di setiap tahapan TryOut</p>
                     </div>
                     <button
-                      onClick={() => setActiveTab('TRYOUT_PROGRESS')}
+                      onClick={() => {
+                        setActiveTab('TRYOUT_EVALUATION');
+                        setWalasToSubTab('PROGRESS');
+                      }}
                       className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1 cursor-pointer"
                     >
                       <span>Detail Grafik</span>
@@ -539,7 +560,10 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
                   )}
 
                   <button
-                    onClick={() => setActiveTab('LEGER_RAPOR')}
+                    onClick={() => {
+                      setActiveTab('TRYOUT_EVALUATION');
+                      setWalasToSubTab('LEGER_TO');
+                    }}
                     className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer text-center"
                   >
                     Buka Leger Multimapel Lengkap &rarr;
@@ -547,12 +571,130 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
                 </div>
 
               </div>
+
+              {/* Direktori Siswa Rombel Terintegrasi */}
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+                <div className="border-b border-slate-100 dark:border-slate-800 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <Users className="w-5 h-5 text-emerald-600" />
+                      <span>Direktori Siswa Rombel {assignedClass.name}</span>
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Daftar data pokok dan akun siswa binaan wali kelas sesuai master data dari Admin.
+                    </p>
+                  </div>
+                  <div className="text-xs font-mono font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-xl self-start sm:self-auto">
+                    Total: {filteredStudents.length} Siswa
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredStudents.map(s => (
+                    <div key={s.id} className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center font-bold text-sm">
+                          {s.name.charAt(0)}
+                        </div>
+                        <span className="text-[11px] font-mono font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 px-2.5 py-1 rounded-lg">
+                          NISN: {s.nisn}
+                        </span>
+                      </div>
+
+                      <div>
+                        <div className="font-bold text-sm text-slate-900 dark:text-slate-100">{s.name}</div>
+                        <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-1 font-mono">
+                          <School className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Rombel: {assignedClass.name}</span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-200 dark:border-slate-800 text-xs space-y-1.5">
+                        <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                          <span className="flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Tgl Lahir (Password):</span>
+                          </span>
+                          <strong className="font-mono text-slate-900 dark:text-slate-100">{s.birthDate || '14/05/2008'}</strong>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedStudentDetail(s)}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold text-[11px] hover:bg-emerald-100 dark:hover:bg-emerald-900/50 flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Lihat Rekam Jejak</span>
+                        </button>
+
+                        <span className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
+                          <UserCheck className="w-3.5 h-3.5" />
+                          <span>Aktif</span>
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           );
         })()}
 
-        {/* TAB 2: TRYOUT PROGRESS CHART */}
-        {activeTab === 'TRYOUT_PROGRESS' && (() => {
+        {/* TAB 2: EVALUASI TRY OUT (HUB TERPADU) */}
+        {activeTab === 'TRYOUT_EVALUATION' && (
+          <div className="space-y-6">
+            {/* Sub-Navigasi Horizontal untuk Try Out */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setWalasToSubTab('PROGRESS')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    walasToSubTab === 'PROGRESS'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  <span>1. Grafik Siklus TO</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setWalasToSubTab('GRADEBOOK')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    walasToSubTab === 'GRADEBOOK'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  <span>2. Buku Nilai Siswa TO</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setWalasToSubTab('LEGER_TO')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    walasToSubTab === 'LEGER_TO'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>3. Leger Nilai &amp; Catatan TO</span>
+                </button>
+              </div>
+
+              <div className="text-[11px] font-mono text-slate-500 px-2">
+                Rombel: <strong>{assignedClass.name}</strong> · KKM Acuan: <strong>{rombelKKM.toFixed(1)} Poin</strong>
+              </div>
+            </div>
+
+            {/* Sub-Tab 1: Grafik Perkembangan Try Out */}
+            {walasToSubTab === 'PROGRESS' && (() => {
           // Hitung rata-rata rombel per Siklus TO (TO 1, TO 2, ...):
           // - "Semua Mapel": rata-rata gabungan (komposit) mapel tiap siswa pada siklus tsb.
           // - Mapel tertentu: rata-rata nilai mapel tsb pada siklus tsb.
@@ -1037,8 +1179,8 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
           );
         })()}
 
-        {/* TAB BUKU NILAI SISWA (GRADEBOOK MATRIX) */}
-        {activeTab === 'GRADEBOOK' && (() => {
+            {/* Sub-Tab 2: Buku Nilai Siswa (Gradebook Matrix) */}
+            {walasToSubTab === 'GRADEBOOK' && (() => {
           // List of Tryouts — hanya pakai data nyata dari Supabase, tidak ada dummy
           const tryoutOptions = allTryouts;
 
@@ -1533,196 +1675,22 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
           );
         })()}
 
-        {/* Modal Detail Rekam Jejak Nilai Siswa — di luar semua IIFE agar selalu ter-render */}
-        {selectedStudentDetail && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
-            onClick={() => setSelectedStudentDetail(null)}
-          >
-            <div
-              className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-2xl w-full p-6 space-y-5 animate-in zoom-in-95 duration-200"
-              onClick={e => e.stopPropagation()}
-            >
-              {/* Modal Header */}
-              <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center font-bold text-lg shadow-xs">
-                    {selectedStudentDetail.name.charAt(0)}
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
-                      {selectedStudentDetail.name}
-                    </h3>
-                    <p className="text-xs text-slate-500 font-mono">
-                      NISN: {selectedStudentDetail.nisn} · Kelas: {assignedClass.name}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setSelectedStudentDetail(null)}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Matrix Rincian Semua TO vs Semua Mapel untuk Siswa Ini */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 font-mono">
-                  Rekam Jejak Seluruh Try Out &amp; Mata Pelajaran
-                </h4>
-                <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-                  <table className="w-full text-xs text-left">
-                    <thead className="bg-slate-100 dark:bg-slate-950 font-bold text-slate-700 dark:text-slate-300 font-mono">
-                      <tr>
-                        <th className="p-2.5">Mata Pelajaran</th>
-                        {allTryouts.map(t => (
-                          <th key={t.id} className="p-2.5 text-center whitespace-nowrap">
-                            {t.code || t.title.split('—')[0]}
-                          </th>
-                        ))}
-                        <th className="p-2.5 text-center">Rata-Rata</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
-                      {allSubjects.map(sub => {
-                        const scores = allTryouts.map(t => getStudentSubjectScore(selectedStudentDetail.id, t.id, sub.id));
-                        const realScores = scores.filter((v): v is number => v !== null);
-                        const avg = realScores.length > 0 ? Math.round((realScores.reduce((a, b) => a + b, 0) / realScores.length) * 10) / 10 : null;
-                        return (
-                          <tr key={sub.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                            <td className="p-2.5 font-sans font-bold text-slate-900 dark:text-slate-100">
-                              {sub.name}
-                            </td>
-                            {scores.map((val, idx) => {
-                              const pass = val !== null && val >= (sub.passingGrade || rombelKKM);
-                              return (
-                                <td key={idx} className="p-2.5 text-center">
-                                  <span className={`px-2 py-0.5 rounded font-bold ${val === null ? 'text-slate-400 bg-slate-100 dark:bg-slate-800' : pass ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40' : 'text-rose-600 bg-rose-50 dark:bg-rose-950/40'}`}>
-                                    {val !== null ? val.toFixed(1) : '—'}
-                                  </span>
-                                </td>
-                              );
-                            })}
-                            <td className="p-2.5 text-center font-black text-slate-900 dark:text-white bg-slate-50 dark:bg-slate-800">
-                              {avg !== null ? avg.toFixed(1) : <span className="text-slate-400 font-normal text-xs">—</span>}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Catatan Khusus Wali Kelas */}
-              <div className="space-y-1.5 p-3.5 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800">
-                <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono uppercase">
-                  Catatan Wali Kelas untuk Siswa Ini:
-                </span>
-                <p className="text-xs text-slate-600 dark:text-slate-400 italic">
-                  "{waliNotes[selectedStudentDetail.id] || 'Siswa menunjukkan motivasi dan potensi belajar yang konsisten baik.'}"
-                </p>
-              </div>
-
-              <div className="flex justify-end pt-2">
-                <button
-                  onClick={() => setSelectedStudentDetail(null)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl cursor-pointer"
-                >
-                  Tutup Jendela
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: LEGER NILAI MULTIMAPEL & CATATAN RAPOR (TRY OUT / SAS / SAT) */}
-        {activeTab === 'LEGER_RAPOR' && (
-          isSumatifActive && sumatifLeger ? (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                      Wadah: {activePackage?.assessmentType}
-                    </span>
-                    <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
-                      {activePackage?.title}
-                    </h2>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Buku Leger Nilai Sumatif Kelas {assignedClass.name} untuk pengisian nilai e-Rapor dan evaluasi ketuntasan.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <label className="text-xs font-semibold text-slate-500">Pilih Wadah:</label>
-                  <select
-                    value={selectedPackageId}
-                    onChange={e => setSelectedPackageId(e.target.value)}
-                    className="px-3 py-2 bg-indigo-50 dark:bg-indigo-950/80 border border-indigo-200 dark:border-indigo-800 rounded-xl text-xs font-bold text-indigo-700 dark:text-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-                  >
-                    <option value="ALL">📋 Mode Try Out (Standar)</option>
-                    {packagesForWalas.map(pkg => (
-                      <option key={pkg.id} value={pkg.id}>
-                        📦 {pkg.assessmentType === 'SAS' ? '[SAS] ' : pkg.assessmentType === 'SAT' ? '[SAT] ' : '[TO] '}
-                        {pkg.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <WaliKelasLegerSection
-                leger={sumatifLeger}
-                onExportExcel={() => {
-                  ExportService.exportWaliKelasLegerExcel({
-                    className: assignedClass.name,
-                    waliKelasName: currentUser.name,
-                    kkm: 75,
-                    subjects: sumatifLeger.subjects.map(s => ({ id: s.id, name: s.name })),
-                    students: allStudents.filter(s => s.classId === assignedClassId && !s.isAnswerKeyAccount),
-                    getStudentScore: (sId, subId) => {
-                      const row = sumatifLeger.rows.find(r => r.studentId === sId);
-                      return row?.scoresBySubjectId[subId] ?? null;
-                    },
-                    schoolProfile: dbService.getSchoolProfile(),
-                  });
-                }}
-              />
-            </div>
-          ) : (
+        {/* Sub-Tab 3: Leger Nilai & Catatan Pembimbing Try Out */}
+        {walasToSubTab === 'LEGER_TO' && (
           <div className="space-y-6">
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs p-6 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
                 <div>
                   <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                     <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
-                    <span>Leger Nilai Multimapel &amp; Catatan Pembimbing Wali Kelas</span>
+                    <span>Leger Nilai Multimapel &amp; Catatan Pembimbing Try Out</span>
                   </h2>
                   <p className="text-xs text-slate-500">
-                    Rekapitulasi seluruh nilai mata pelajaran siswa Rombel {assignedClass.name} beserta penginputan catatan pembimbing.
+                    Rekapitulasi seluruh nilai mata pelajaran siswa Rombel {assignedClass.name} pada latihan Try Out beserta catatan pembimbing.
                   </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2.5">
-                  {packagesForWalas.length > 0 && (
-                    <select
-                      value={selectedPackageId}
-                      onChange={e => setSelectedPackageId(e.target.value)}
-                      className="px-3 py-2 bg-indigo-50 dark:bg-indigo-950/80 border border-indigo-200 dark:border-indigo-800 rounded-xl text-xs font-bold text-indigo-700 dark:text-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-                    >
-                      <option value="ALL">📋 Mode Try Out (Standar)</option>
-                      {packagesForWalas.map(pkg => (
-                        <option key={pkg.id} value={pkg.id}>
-                          📦 {pkg.assessmentType === 'SAS' ? '[SAS] ' : pkg.assessmentType === 'SAT' ? '[SAT] ' : '[TO] '}
-                          {pkg.title}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-
                   {allTryouts.length > 0 && (
                     <select
                       value={selectedTryoutId || (allTryouts[0]?.id ?? '')}
@@ -1738,6 +1706,35 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
                   )}
 
                   <button
+                    type="button"
+                    onClick={() => {
+                      try {
+                        ExportService.exportWaliKelasLegerExcel({
+                          className: assignedClass.name,
+                          waliKelasName: currentUser.name,
+                          kkm: rombelKKM,
+                          subjects: allSubjects,
+                          students: activeStudentList,
+                          getStudentScore: (studentId, subjectId) => {
+                            const targetTOId = selectedTryoutId || (allTryouts[0]?.id ?? '');
+                            return getStudentSubjectScore(studentId, targetTOId, subjectId);
+                          },
+                          waliNotes,
+                        });
+                        triggerToast(`Leger Nilai Multimapel ${assignedClass.name} berhasil diekspor ke Excel (.xlsx).`);
+                      } catch (err) {
+                        console.error('Failed to export Leger Excel:', err);
+                        triggerToast('Gagal mengekspor Leger Excel.');
+                      }
+                    }}
+                    className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-emerald-300 font-bold text-xs rounded-xl border border-emerald-500/40 shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Ekspor Excel (.xlsx)</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => {
                       triggerToast('Seluruh catatan Wali Kelas berhasil disimpan.');
                     }}
@@ -1827,71 +1824,509 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
               </div>
             </div>
           </div>
-          )
         )}
+      </div>
+    )}
 
-        {/* TAB 4: DIREKTORI SISWA */}
-        {activeTab === 'STUDENT_DIRECTORY' && (
-          <div className="space-y-6">
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
-              <div className="border-b border-slate-100 dark:border-slate-800 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                    <Users className="w-5 h-5 text-emerald-600" />
-                    <span>Direktori Siswa Rombel {assignedClass.name}</span>
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    Daftar data pokok siswa sesuai master data yang diinputkan oleh Admin.
-                  </p>
-                </div>
-                <div className="text-xs font-mono font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-xl self-start sm:self-auto">
-                  Total: {filteredStudents.length} Siswa
-                </div>
+    {/* Modal Detail Rekam Jejak Nilai Siswa — di luar semua IIFE agar selalu ter-render */}
+    {selectedStudentDetail && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+        onClick={() => setSelectedStudentDetail(null)}
+      >
+        <div
+          className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-2xl w-full p-6 space-y-5 animate-in zoom-in-95 duration-200"
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Modal Header */}
+          <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center font-bold text-lg shadow-xs">
+                {selectedStudentDetail.name.charAt(0)}
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredStudents.map(s => (
-                  <div key={s.id} className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center font-bold text-sm">
-                        {s.name.charAt(0)}
-                      </div>
-                      <span className="text-[11px] font-mono font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 px-2.5 py-1 rounded-lg">
-                        NISN: {s.nisn}
-                      </span>
-                    </div>
-
-                    <div>
-                      <div className="font-bold text-sm text-slate-900 dark:text-slate-100">{s.name}</div>
-                      <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-1 font-mono">
-                        <School className="w-3.5 h-3.5 text-slate-400" />
-                        <span>Rombel: {assignedClass.name}</span>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-200 dark:border-slate-800 text-xs space-y-1.5">
-                      <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                        <span className="flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Tgl Lahir (Password):</span>
-                        </span>
-                        <strong className="font-mono text-slate-900 dark:text-slate-100">{s.birthDate || '14/05/2008'}</strong>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between text-xs font-mono">
-                      <span className="text-[11px] text-slate-500">Status Akun:</span>
-                      <span className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
-                        <UserCheck className="w-3.5 h-3.5" />
-                        <span>Aktif &amp; Terverifikasi</span>
-                      </span>
-                    </div>
-                  </div>
-                ))}
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                  {selectedStudentDetail.name}
+                </h3>
+                <p className="text-xs text-slate-500 font-mono">
+                  NISN: {selectedStudentDetail.nisn} · Kelas: {assignedClass.name}
+                </p>
               </div>
             </div>
+            <button
+              onClick={() => setSelectedStudentDetail(null)}
+              className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
+
+          {/* Matrix Rincian Semua TO vs Semua Mapel untuk Siswa Ini */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 font-mono">
+              Rekam Jejak Seluruh Try Out &amp; Mata Pelajaran
+            </h4>
+            <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-100 dark:bg-slate-950 font-bold text-slate-700 dark:text-slate-300 font-mono">
+                  <tr>
+                    <th className="p-2.5">Mata Pelajaran</th>
+                    {allTryouts.map(t => (
+                      <th key={t.id} className="p-2.5 text-center whitespace-nowrap">
+                        {t.code || t.title.split('—')[0]}
+                      </th>
+                    ))}
+                    <th className="p-2.5 text-center">Rata-Rata</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
+                  {allSubjects.map(sub => {
+                    const scores = allTryouts.map(t => getStudentSubjectScore(selectedStudentDetail.id, t.id, sub.id));
+                    const realScores = scores.filter((v): v is number => v !== null);
+                    const avg = realScores.length > 0 ? Math.round((realScores.reduce((a, b) => a + b, 0) / realScores.length) * 10) / 10 : null;
+                    return (
+                      <tr key={sub.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <td className="p-2.5 font-sans font-bold text-slate-900 dark:text-slate-100">
+                          {sub.name}
+                        </td>
+                        {scores.map((val, idx) => {
+                          const pass = val !== null && val >= (sub.passingGrade || rombelKKM);
+                          return (
+                            <td key={idx} className="p-2.5 text-center">
+                              <span className={`px-2 py-0.5 rounded font-bold ${val === null ? 'text-slate-400 bg-slate-100 dark:bg-slate-800' : pass ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40' : 'text-rose-600 bg-rose-50 dark:bg-rose-950/40'}`}>
+                                {val !== null ? val.toFixed(1) : '—'}
+                              </span>
+                            </td>
+                          );
+                        })}
+                        <td className="p-2.5 text-center font-black text-slate-900 dark:text-white bg-slate-50 dark:bg-slate-800">
+                          {avg !== null ? avg.toFixed(1) : <span className="text-slate-400 font-normal text-xs">—</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Catatan Khusus Wali Kelas */}
+          <div className="space-y-1.5 p-3.5 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800">
+            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono uppercase">
+              Catatan Wali Kelas untuk Siswa Ini:
+            </span>
+            <p className="text-xs text-slate-600 dark:text-slate-400 italic">
+              "{waliNotes[selectedStudentDetail.id] || 'Siswa menunjukkan motivasi dan potensi belajar yang konsisten baik.'}"
+            </p>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              onClick={() => setSelectedStudentDetail(null)}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl cursor-pointer"
+            >
+              Tutup Jendela
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* TAB 3: LEGER ASESMEN SUMATIF (SAS / SAT) */}
+    {activeTab === 'SUMATIF_LEGER' && (
+      <div className="space-y-6">
+        {sumatifPackagesForWalas.length === 0 ? (
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-12 text-center space-y-3 shadow-xs">
+            <Award className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto stroke-[1.5]" />
+            <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">
+              Belum Ada Wadah Asesmen Sumatif (SAS/SAT) untuk Kelas {assignedClass.name}
+            </h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              Halaman ini dikhususkan untuk kompilasi nilai murni skala 0–100 dan buku leger e-Rapor resmi semesteran. Wadah akan aktif secara otomatis begitu Admin membuat wadah SAS atau SAT yang menargetkan rombel {assignedClass.name}.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Top Context Switcher Card */}
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-5">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                      {activePackage?.assessmentType === 'SAT' ? 'Sumatif Akhir Tahun (SAT)' : 'Sumatif Akhir Semester (SAS)'}
+                    </span>
+                    <span className="text-xs font-mono text-slate-400">·</span>
+                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                      Kelas {assignedClass.name}
+                    </span>
+                  </div>
+                  <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-100 mt-1">
+                    {activePackage?.title}
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Buku Leger Nilai Sumatif Kelas {assignedClass.name} untuk pengisian nilai e-Rapor, evaluasi ketuntasan KKTP, dan deteksi siswa berisiko.
+                  </p>
+                </div>
+
+                {/* Switcher Button Group */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold text-slate-500">Pilih Wadah:</span>
+                  <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800">
+                    {sumatifPackagesForWalas.map(pkg => {
+                      const isSelected = (activePackage?.id === pkg.id);
+                      return (
+                        <button
+                          key={pkg.id}
+                          type="button"
+                          onClick={() => setSelectedPackageId(pkg.id)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                            isSelected
+                              ? 'bg-indigo-600 text-white shadow-xs'
+                              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                          }`}
+                        >
+                          <span>{pkg.assessmentType === 'SAT' ? '📦 SAT' : '📦 SAS'}</span>
+                          <span>{pkg.code || pkg.title}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Sub-Tabs for Sumatif */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setWalasSumatifSubTab('OVERVIEW_RISK')}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      walasSumatifSubTab === 'OVERVIEW_RISK'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <ShieldAlert className="w-3.5 h-3.5" />
+                    <span>1. Ringkasan &amp; Siswa Berisiko</span>
+                    {sumatifLeger && sumatifLeger.atRiskStudentsCount > 0 && (
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500 text-white font-bold">
+                        {sumatifLeger.atRiskStudentsCount}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setWalasSumatifSubTab('LEGER_TABLE')}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      walasSumatifSubTab === 'LEGER_TABLE'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                    <span>2. Leger Nilai Multimapel (0–100) &amp; Ranking</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setWalasSumatifSubTab('NOTES_EXPORT')}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      walasSumatifSubTab === 'NOTES_EXPORT'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>3. Catatan Rapor &amp; Ekspor Excel</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!sumatifLeger) return;
+                      ExportService.exportWaliKelasLegerExcel({
+                        className: assignedClass.name,
+                        waliKelasName: currentUser.name,
+                        kkm: 75,
+                        subjects: sumatifLeger.subjects.map(s => ({ id: s.id, name: s.name })),
+                        students: allStudents.filter(s => s.classId === assignedClassId && !s.isAnswerKeyAccount),
+                        getStudentScore: (sId, subId) => {
+                          const row = sumatifLeger.rows.find(r => r.studentId === sId);
+                          return row?.scoresBySubjectId[subId] ?? null;
+                        },
+                        schoolProfile: dbService.getSchoolProfile(),
+                        waliNotes,
+                      });
+                      triggerToast(`Buku Leger ${activePackage?.title} berhasil diekspor ke Excel (.xlsx).`);
+                    }}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Ekspor Leger Excel</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Sub-Tab Content */}
+            {sumatifLeger && (
+              <>
+                {walasSumatifSubTab === 'OVERVIEW_RISK' && (
+                  <div className="space-y-6">
+                    {/* Summary Stats Cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs">
+                        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                          Rata-rata Kelas
+                        </span>
+                        <div className="flex items-baseline gap-1 mt-1">
+                          <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400 font-mono">
+                            {sumatifLeger.overallClassAverage}
+                          </span>
+                          <span className="text-xs text-slate-400">/ 100</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 mt-1 block">
+                          Rata-rata seluruh mapel
+                        </span>
+                      </div>
+
+                      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs">
+                        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                          Total Siswa
+                        </span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-2xl font-black text-slate-800 dark:text-slate-100 font-mono">
+                            {sumatifLeger.totalStudents}
+                          </span>
+                          <Users className="w-4 h-4 text-slate-400" />
+                        </div>
+                        <span className="text-[10px] text-slate-400 mt-1 block">
+                          Rombel {sumatifLeger.className}
+                        </span>
+                      </div>
+
+                      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs">
+                        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                          Siswa Berisiko (≥ 3 Mapel)
+                        </span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className={`text-2xl font-black font-mono ${sumatifLeger.atRiskStudentsCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600'}`}>
+                            {sumatifLeger.atRiskStudentsCount}
+                          </span>
+                          {sumatifLeger.atRiskStudentsCount > 0 ? (
+                            <AlertTriangle className="w-4 h-4 text-amber-500" />
+                          ) : (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                          )}
+                        </div>
+                        <span className="text-[10px] text-slate-400 mt-1 block">
+                          {sumatifLeger.atRiskStudentsCount > 0 ? 'Perlu intervensi wali kelas' : 'Seluruh siswa aman'}
+                        </span>
+                      </div>
+
+                      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs">
+                        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                          Mata Pelajaran Diuji
+                        </span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-2xl font-black text-purple-600 dark:text-purple-400 font-mono">
+                            {sumatifLeger.subjects.length}
+                          </span>
+                          <BookOpen className="w-4 h-4 text-purple-500" />
+                        </div>
+                        <span className="text-[10px] text-slate-400 mt-1 block">
+                          Dalam wadah {sumatifLeger.packageType}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Banner & Detailed At-Risk Student List */}
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-4">
+                      <div className="flex items-start gap-3">
+                        <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                        <div>
+                          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                            Deteksi &amp; Intervensi Siswa Berisiko (At-Risk Students)
+                          </h3>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {sumatifLeger.packageType === 'SAT'
+                              ? 'Pada Asesmen Sumatif Akhir Tahun (SAT), siswa dengan 3 atau lebih mata pelajaran di bawah kriteria ketercapaian tujuan pembelajaran (KKTP) menjadi pertimbangan kritis dalam rapat pleno kenaikan kelas.'
+                              : 'Siswa dengan 3 atau lebih mata pelajaran di bawah KKTP memerlukan pendampingan dan bimbingan remedial terarah sebelum cetak e-Rapor akhir semester.'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {sumatifLeger.atRiskStudentsCount === 0 ? (
+                        <div className="p-8 text-center bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl border border-emerald-200/60 dark:border-emerald-800/60 space-y-2">
+                          <CheckCircle2 className="w-10 h-10 text-emerald-600 dark:text-emerald-400 mx-auto" />
+                          <h4 className="text-sm font-bold text-emerald-900 dark:text-emerald-200">
+                            Luar Biasa! Tidak Ada Siswa Berisiko
+                          </h4>
+                          <p className="text-xs text-emerald-700 dark:text-emerald-300 max-w-md mx-auto">
+                            Seluruh siswa di kelas {sumatifLeger.className} memiliki catatan remedial kurang dari 3 mata pelajaran. Kriteria ketuntasan kelas terpenuhi dengan baik.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {sumatifLeger.atRiskStudents.map(student => (
+                            <div key={student.studentId} className="p-4 bg-amber-50/50 dark:bg-amber-950/30 rounded-2xl border border-amber-200 dark:border-amber-800/80 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-mono font-bold px-2 py-0.5 bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-200 rounded-md">
+                                    Rank #{student.rank}
+                                  </span>
+                                  <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                                    {student.studentName}
+                                  </h4>
+                                </div>
+                                <span className="text-[11px] font-mono text-slate-500">
+                                  NISN: {student.nisn}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center justify-between text-xs pt-1 border-t border-amber-200/60 dark:border-amber-800/60">
+                                <span className="text-slate-600 dark:text-slate-400">Rata-rata: <strong>{student.averageScore}</strong></span>
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
+                                  {student.remedialCount} Mapel Belum Tuntas
+                                </span>
+                              </div>
+
+                              <div className="space-y-1">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300 font-mono">
+                                  Mata Pelajaran di Bawah KKTP:
+                                </span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {student.remedialSubjectCodes.map(code => (
+                                    <span key={code} className="px-2 py-0.5 bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 rounded font-mono text-[10px] font-bold">
+                                      {code}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {walasSumatifSubTab === 'LEGER_TABLE' && (
+                  <WaliKelasLegerSection
+                    leger={sumatifLeger}
+                    onExportExcel={() => {
+                      ExportService.exportWaliKelasLegerExcel({
+                        className: assignedClass.name,
+                        waliKelasName: currentUser.name,
+                        kkm: 75,
+                        subjects: sumatifLeger.subjects.map(s => ({ id: s.id, name: s.name })),
+                        students: allStudents.filter(s => s.classId === assignedClassId && !s.isAnswerKeyAccount),
+                        getStudentScore: (sId, subId) => {
+                          const row = sumatifLeger.rows.find(r => r.studentId === sId);
+                          return row?.scoresBySubjectId[subId] ?? null;
+                        },
+                        schoolProfile: dbService.getSchoolProfile(),
+                        waliNotes,
+                      });
+                      triggerToast(`Buku Leger ${activePackage?.title} berhasil diekspor ke Excel (.xlsx).`);
+                    }}
+                  />
+                )}
+
+                {walasSumatifSubTab === 'NOTES_EXPORT' && (
+                  <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
+                      <div>
+                        <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                          <Save className="w-5 h-5 text-indigo-600" />
+                          <span>Catatan Pembimbing Wali Kelas &amp; Ekspor Rapor</span>
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Tuliskan catatan evaluasi perkembangan siswa untuk dicetak ke e-Rapor resmi semester ini.
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            triggerToast('Seluruh catatan Wali Kelas untuk rapor berhasil disimpan.');
+                          }}
+                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
+                        >
+                          <Save className="w-4 h-4" />
+                          <span>Simpan Catatan Rapor</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="overflow-auto max-h-[500px] rounded-2xl border border-slate-200 dark:border-slate-800 scrollbar-thin">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead className="bg-slate-100 dark:bg-slate-950 text-slate-700 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-800 uppercase tracking-wider sticky top-0 z-20">
+                          <tr>
+                            <th className="py-3 px-3 text-center w-12">Rank</th>
+                            <th className="py-3 px-4 min-w-[180px]">Nama Siswa</th>
+                            <th className="py-3 px-3 text-center w-24">NISN</th>
+                            <th className="py-3 px-3 text-center w-24">Rata-Rata</th>
+                            <th className="py-3 px-3 text-center w-28">Status</th>
+                            <th className="py-3 px-4 min-w-[260px]">Catatan Pembimbing Wali Kelas</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-sans">
+                          {sumatifLeger.rows.map(row => (
+                            <tr key={row.studentId} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                              <td className="py-3 px-3 text-center font-mono font-bold text-slate-500">
+                                #{row.rank}
+                              </td>
+                              <td className="py-3 px-4 font-bold text-slate-900 dark:text-slate-100">
+                                {row.studentName}
+                              </td>
+                              <td className="py-3 px-3 text-center font-mono text-slate-500">
+                                {row.nisn}
+                              </td>
+                              <td className="py-3 px-3 text-center font-mono font-black text-indigo-600 dark:text-indigo-400">
+                                {row.averageScore}
+                              </td>
+                              <td className="py-3 px-3 text-center">
+                                {row.remedialCount === 0 ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                                    Tuntas Semua
+                                  </span>
+                                ) : (
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    row.isAtRisk
+                                      ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
+                                      : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                                  }`}>
+                                    {row.remedialCount} Remedial
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-4">
+                                <input
+                                  type="text"
+                                  value={waliNotes[row.studentId] || ''}
+                                  onChange={e => setWaliNotes({ ...waliNotes, [row.studentId]: e.target.value })}
+                                  placeholder="Ketik catatan bimbingan wali kelas..."
+                                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </>
         )}
+      </div>
+    )}
 
       </div>
     </div>
