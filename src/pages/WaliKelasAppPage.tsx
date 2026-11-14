@@ -12,6 +12,9 @@ import { User, Student, ClassRoom, Subject, Score, Tryout, ExamPackage } from '.
 import { WaliKelasLegerSection } from '../components/walikelas/WaliKelasLegerSection';
 import { SumatifAnalyticsService } from '../services/sumatifAnalytics';
 import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell, Legend
+} from 'recharts';
+import {
   buildTryoutStageGroups,
   getStudentStageSubjectScore,
   getStudentStageCompositeScore,
@@ -30,7 +33,7 @@ type WaliKelasTab =
   | 'SUMATIF_LEGER';
 
 type WalasToSubTab = 'PROGRESS' | 'GRADEBOOK' | 'LEGER_TO';
-type WalasSumatifSubTab = 'OVERVIEW_RISK' | 'LEGER_TABLE' | 'NOTES_EXPORT';
+type WalasSumatifSubTab = 'OVERVIEW_RISK' | 'STUDENT_CARDS' | 'LEGER_TABLE' | 'NOTES_EXPORT';
 
 export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
   currentUser: initialUser,
@@ -39,7 +42,7 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
   const [currentUser, setCurrentUser] = useState<User>(initialUser);
   const [activeTab, setActiveTab] = useState<WaliKelasTab>('OVERVIEW');
   const [walasToSubTab, setWalasToSubTab] = useState<WalasToSubTab>('PROGRESS');
-  const [walasSumatifSubTab, setWalasSumatifSubTab] = useState<WalasSumatifSubTab>('LEGER_TABLE');
+  const [walasSumatifSubTab, setWalasSumatifSubTab] = useState<WalasSumatifSubTab>('OVERVIEW_RISK');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStudentId, setSelectedStudentId] = useState<string>('s-1');
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('ALL');
@@ -52,6 +55,11 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
   const [gradebookStatusFilter, setGradebookStatusFilter] = useState<'ALL' | 'PASS' | 'REMEDIAL'>('ALL');
   const [gradebookSortBy, setGradebookSortBy] = useState<'NAME' | 'SCORE_DESC' | 'SCORE_ASC'>('NAME');
   const [selectedStudentDetail, setSelectedStudentDetail] = useState<Student | null>(null);
+
+  // States for SAT/SAS Buku Nilai Siswa
+  const [sumatifSearchQuery, setSumatifSearchQuery] = useState('');
+  const [sumatifStudentFilter, setSumatifStudentFilter] = useState<'ALL' | 'PASSED_ALL' | 'HAS_REMEDIAL' | 'AT_RISK'>('ALL');
+  const [selectedSumatifStudentId, setSelectedSumatifStudentId] = useState<string>('');
 
   // Wali Kelas Notes State per student ID
   const [waliNotes, setWaliNotes] = useState<Record<string, string>>({});
@@ -100,14 +108,6 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
 
   const assignedClassId = assignedClass.id;
 
-  // Dapatkan KKM acuan dari mata pelajaran di Admin
-  const rombelKKM = useMemo(() => {
-    if (allSubjects.length === 0) return 75.0;
-    // Rata-rata KKM dari seluruh mata pelajaran aktif yang diatur Admin
-    const validKKMs = allSubjects.map(s => Number(s.passingGrade) || 75.0);
-    return Math.round((validKKMs.reduce((a, b) => a + b, 0) / validKKMs.length) * 10) / 10;
-  }, [allSubjects]);
-
   // Scoped Tryouts: Hanya tryout (per-mapel) yang menargetkan kelas binaan wali kelas
   const classScopedTryouts = useMemo(() => {
     return rawTryouts.filter(t => {
@@ -147,6 +147,33 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
       })
       .filter(stage => stage.tryouts.length > 0);
   }, [rawTryouts, classScopedTryouts]);
+
+  // Mata Pelajaran yang benar-benar aktif dan diujikan dalam Try Out untuk rombel ini
+  const toSubjects = useMemo(() => {
+    const subjIdSet = new Set<string>();
+    tryoutStageGroups.forEach(stage => {
+      Object.keys(stage.subjectTryoutMap).forEach(sid => subjIdSet.add(sid));
+      stage.tryouts.forEach(t => {
+        if (t.subjectId) subjIdSet.add(t.subjectId);
+      });
+    });
+    classScopedTryouts.forEach(t => {
+      const pkg = t.packageId ? dbService.getExamPackageById(t.packageId) : null;
+      if (!pkg || (pkg.assessmentType !== 'SAT' && pkg.assessmentType !== 'SAS')) {
+        if (t.subjectId) subjIdSet.add(t.subjectId);
+      }
+    });
+    const filtered = allSubjects.filter(s => subjIdSet.has(s.id));
+    return filtered.length > 0 ? filtered : allSubjects;
+  }, [tryoutStageGroups, classScopedTryouts, allSubjects]);
+
+  // Dapatkan KKM acuan dari mata pelajaran Try Out (atau seluruh mapel aktif)
+  const rombelKKM = useMemo(() => {
+    const targetSubjs = toSubjects.length > 0 ? toSubjects : allSubjects;
+    if (targetSubjs.length === 0) return 75.0;
+    const validKKMs = targetSubjs.map(s => Number(s.passingGrade) || 75.0);
+    return Math.round((validKKMs.reduce((a, b) => a + b, 0) / validKKMs.length) * 10) / 10;
+  }, [toSubjects, allSubjects]);
 
   // Wadah Ujian terdaftar untuk rombel binaan ini (SAS / SAT / TO)
   const packagesForWalas = useMemo(() => {
@@ -196,6 +223,61 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
       rawTryouts
     );
   }, [activePackage, isSumatifActive, assignedClassId, allStudents, classes, allScores, allSubjects, rawTryouts]);
+
+  // Data Grafik Rata-rata & Ketuntasan per Mata Pelajaran pada wadah SAT/SAS
+  const sumatifSubjectChartData = useMemo(() => {
+    if (!sumatifLeger) return [];
+    return sumatifLeger.subjects.map(sub => {
+      const avg = sumatifLeger.subjectAverages[sub.id] || 0;
+      const scores = sumatifLeger.rows
+        .map(r => r.scoresBySubjectId[sub.id])
+        .filter((s): s is number => s !== undefined && s > 0);
+      const highest = scores.length > 0 ? Math.max(...scores) : 0;
+      const lowest = scores.length > 0 ? Math.min(...scores) : 0;
+      const passed = sumatifLeger.rows.filter(r => (r.scoresBySubjectId[sub.id] || 0) >= sub.passingGrade).length;
+      const remedial = sumatifLeger.rows.length - passed;
+      const passRate = sumatifLeger.rows.length > 0 ? Math.round((passed / sumatifLeger.rows.length) * 100) : 0;
+      return {
+        id: sub.id,
+        name: sub.name,
+        code: sub.code,
+        avgScore: avg,
+        passingGrade: sub.passingGrade,
+        highest,
+        lowest,
+        passed,
+        remedial,
+        passRate,
+      };
+    });
+  }, [sumatifLeger]);
+
+  // Data Siswa Terfilter untuk Sub-Tab Buku Nilai Siswa (SAT/SAS)
+  const sumatifFilteredRows = useMemo(() => {
+    if (!sumatifLeger) return [];
+    return sumatifLeger.rows.filter(r => {
+      if (sumatifStudentFilter === 'PASSED_ALL' && r.remedialCount > 0) return false;
+      if (sumatifStudentFilter === 'HAS_REMEDIAL' && r.remedialCount === 0) return false;
+      if (sumatifStudentFilter === 'AT_RISK' && !r.isAtRisk) return false;
+      if (sumatifSearchQuery.trim()) {
+        const q = sumatifSearchQuery.toLowerCase();
+        return (
+          r.studentName.toLowerCase().includes(q) ||
+          (r.nisn && r.nisn.includes(q))
+        );
+      }
+      return true;
+    });
+  }, [sumatifLeger, sumatifStudentFilter, sumatifSearchQuery]);
+
+  // Siswa aktif terpilih pada Sub-Tab Buku Nilai Siswa (SAT/SAS)
+  const activeSumatifStudentRow = useMemo(() => {
+    if (!sumatifLeger) return null;
+    if (selectedSumatifStudentId) {
+      return sumatifLeger.rows.find(r => r.studentId === selectedSumatifStudentId) || sumatifFilteredRows[0] || sumatifLeger.rows[0] || null;
+    }
+    return sumatifFilteredRows[0] || sumatifLeger.rows[0] || null;
+  }, [sumatifLeger, selectedSumatifStudentId, sumatifFilteredRows]);
 
   const stageGroupMap = useMemo(() => {
     const map: Record<string, TryoutStageGroup> = {};
@@ -369,7 +451,7 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
               }`}
             >
               <Award className="w-4 h-4" />
-              <span>3. Leger Asesmen Sumatif (SAS/SAT)</span>
+              <span>3. Evaluasi SAT/SAS</span>
               {sumatifPackagesForWalas.length > 0 && (
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
                   activeTab === 'SUMATIF_LEGER' ? 'bg-white/20 text-white' : 'bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300'
@@ -705,7 +787,7 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
             activeStudentList.forEach(st => {
               if (selectedSubjectFilter === 'ALL') {
                 if (!stage) return;
-                const res = getStudentStageCompositeScore(st.id, stage, allSubjects, allScores);
+                const res = getStudentStageCompositeScore(st.id, stage, toSubjects, allScores);
                 if (res.compositeScore !== null) values.push(res.compositeScore);
               } else {
                 const v = getStudentSubjectScore(st.id, to.id, selectedSubjectFilter);
@@ -722,8 +804,8 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
 
           const hasProgressData = tryoutProgressData.some(d => d.avgScore !== null);
 
-          // Subject-by-subject data (nilai mapel dibaca per siklus TO, tanpa mencampur mapel lain)
-          const subjectBreakdown = allSubjects.map(sub => {
+          // Subject-by-subject data (nilai mapel dibaca per siklus TO, hanya untuk mapel aktif Try Out)
+          const subjectBreakdown = toSubjects.map(sub => {
             const subKKM = Number(sub.passingGrade) || 75.0;
             const allSubjValues: number[] = [];
             const toAvgs = allTryouts.map(to => {
@@ -769,7 +851,7 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
                     </p>
                   </div>
 
-                  {allSubjects.length > 0 && (
+                  {toSubjects.length > 0 && (
                     <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs font-semibold overflow-x-auto flex-nowrap sm:flex-wrap">
                       <button
                         type="button"
@@ -782,7 +864,7 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
                       >
                         Semua Mapel
                       </button>
-                      {allSubjects.map(sub => (
+                      {toSubjects.map(sub => (
                         <button
                           key={sub.id}
                           type="button"
@@ -817,12 +899,12 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
                           <span className="font-bold text-slate-900 dark:text-slate-100">
                             {selectedSubjectFilter === 'ALL' 
                               ? 'Rata-Rata Multimapel Rombel' 
-                              : (allSubjects.find(s => s.id === selectedSubjectFilter)?.name || 'Mata Pelajaran')}
+                              : (toSubjects.find(s => s.id === selectedSubjectFilter)?.name || 'Mata Pelajaran')}
                           </span>
                           <span className="text-[11px] text-slate-400">· Standar KKM {
                             selectedSubjectFilter === 'ALL'
                               ? `${rombelKKM.toFixed(1)} Poin`
-                              : `${(allSubjects.find(s => s.id === selectedSubjectFilter)?.passingGrade ?? 75).toFixed(1)} Poin`
+                              : `${(toSubjects.find(s => s.id === selectedSubjectFilter)?.passingGrade ?? 75).toFixed(1)} Poin`
                           }</span>
                         </div>
                       </div>
@@ -869,7 +951,7 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
                               {(() => {
                                 const targetKKM = selectedSubjectFilter === 'ALL'
                                   ? rombelKKM
-                                  : (allSubjects.find(s => s.id === selectedSubjectFilter)?.passingGrade ?? 75);
+                                  : (toSubjects.find(s => s.id === selectedSubjectFilter)?.passingGrade ?? 75);
                                 const yPos = 260 - ((targetKKM / 100) * 220);
                                 return (
                                   <>
@@ -1188,8 +1270,8 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
           // List of Tryouts — hanya pakai data nyata dari Supabase, tidak ada dummy
           const tryoutOptions = allTryouts;
 
-          // List of Subjects — hanya pakai data nyata
-          const subjectOptions = allSubjects;
+          // List of Subjects — hanya pakai data mata pelajaran aktif pada Try Out
+          const subjectOptions = toSubjects;
 
           // Jika belum ada tryout atau mapel, tampilkan empty state
           if (tryoutOptions.length === 0 || subjectOptions.length === 0) {
@@ -1717,7 +1799,7 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
                           className: assignedClass.name,
                           waliKelasName: currentUser.name,
                           kkm: rombelKKM,
-                          subjects: allSubjects,
+                          subjects: toSubjects,
                           students: activeStudentList,
                           getStudentScore: (studentId, subjectId) => {
                             const targetTOId = selectedTryoutId || (allTryouts[0]?.id ?? '');
@@ -1757,7 +1839,7 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
                       <th className="px-2 py-2 sm:px-3.5 sm:py-3 sticky top-0 left-0 z-40 bg-slate-100 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 w-[130px] min-w-[130px] max-w-[140px] sm:w-auto sm:min-w-[180px] sm:max-w-[240px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
                         Nama Siswa
                       </th>
-                      {allSubjects.map(sub => (
+                      {toSubjects.map(sub => (
                         <th key={sub.id} className="px-1.5 py-2 sm:px-3 sm:py-3 text-center sticky top-0 z-20 bg-slate-100 dark:bg-slate-950 whitespace-nowrap min-w-[65px] sm:min-w-[85px] text-[11px] sm:text-xs">
                           {sub.name}
                         </th>
@@ -1770,14 +1852,14 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {filteredStudents.length === 0 ? (
                       <tr>
-                        <td colSpan={allSubjects.length + 4} className="py-8 text-center text-slate-400">
+                        <td colSpan={toSubjects.length + 4} className="py-8 text-center text-slate-400">
                           Tidak ada siswa dalam rombel ini
                         </td>
                       </tr>
                     ) : filteredStudents.map(s => {
                       const isSelected = selectedStudentId === s.id;
                       const activeTOId = selectedTryoutId || (allTryouts[0]?.id ?? '');
-                      const scores = allSubjects.map(subj => getStudentSubjectScore(s.id, activeTOId, subj.id));
+                      const scores = toSubjects.map(subj => getStudentSubjectScore(s.id, activeTOId, subj.id));
                       const validScores = scores.filter((v): v is number => v !== null);
                       const avg = validScores.length > 0 ? (validScores.reduce((a, b) => a + b, 0) / validScores.length) : null;
                       const status = avg !== null ? (avg >= rombelKKM ? 'TUNTAS' : 'REMEDIAL') : 'BELUM ADA DATA';
@@ -1884,7 +1966,7 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
-                  {allSubjects.map(sub => {
+                  {toSubjects.map(sub => {
                     const scores = allTryouts.map(t => getStudentSubjectScore(selectedStudentDetail.id, t.id, sub.id));
                     const realScores = scores.filter((v): v is number => v !== null);
                     const avg = realScores.length > 0 ? Math.round((realScores.reduce((a, b) => a + b, 0) / realScores.length) * 10) / 10 : null;
@@ -2011,13 +2093,26 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
                     }`}
                   >
-                    <ShieldAlert className="w-3.5 h-3.5" />
-                    <span>1. Ringkasan &amp; Siswa Berisiko</span>
+                    <BarChart3 className="w-3.5 h-3.5" />
+                    <span>1. Grafik &amp; Evaluasi Nilai</span>
                     {sumatifLeger && sumatifLeger.atRiskStudentsCount > 0 && (
                       <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500 text-white font-bold">
                         {sumatifLeger.atRiskStudentsCount}
                       </span>
                     )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setWalasSumatifSubTab('STUDENT_CARDS')}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      walasSumatifSubTab === 'STUDENT_CARDS'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    <span>2. Buku Nilai Siswa (Per-Siswa)</span>
                   </button>
 
                   <button
@@ -2030,7 +2125,7 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
                     }`}
                   >
                     <FileSpreadsheet className="w-3.5 h-3.5" />
-                    <span>2. Leger Nilai Multimapel (0–100) &amp; Ranking</span>
+                    <span>3. Leger Nilai Multimapel &amp; Ranking</span>
                   </button>
 
                   <button
@@ -2043,7 +2138,7 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
                     }`}
                   >
                     <Save className="w-3.5 h-3.5" />
-                    <span>3. Catatan Rapor &amp; Ekspor Excel</span>
+                    <span>4. Catatan Rapor &amp; Ekspor Excel</span>
                   </button>
                 </div>
 
@@ -2148,6 +2243,239 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
                       </div>
                     </div>
 
+                    {/* ── 2 GRAFIK INFORMATIF EVALUASI SAT/SAS KELAS BINAAN ── */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* GRAFIK 1: RATA-RATA NILAI PER MATA PELAJARAN VS BATAS KKTP */}
+                      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-4 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                            <div>
+                              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                <BarChart3 className="w-4 h-4 text-indigo-600" />
+                                <span>Rata-Rata Nilai per Mata Pelajaran</span>
+                              </h3>
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                Perbandingan performa rata-rata kelas {assignedClass.name} terhadap batas KKTP tiap mapel.
+                              </p>
+                            </div>
+                            <span className="text-[11px] font-mono font-bold px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                              KKTP Acuan: {rombelKKM}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="h-[280px] w-full pt-2">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              data={sumatifSubjectChartData}
+                              margin={{ top: 15, right: 10, left: -15, bottom: 5 }}
+                            >
+                              <XAxis
+                                dataKey="code"
+                                tick={{ fontSize: 11, fontWeight: 700 }}
+                                interval={0}
+                              />
+                              <YAxis
+                                domain={[0, 100]}
+                                tick={{ fontSize: 11 }}
+                              />
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (!active || !payload || !payload.length) return null;
+                                  const d = payload[0]?.payload;
+                                  if (!d) return null;
+                                  const isAbove = d.avgScore >= d.passingGrade;
+                                  const diff = Math.round((d.avgScore - d.passingGrade) * 10) / 10;
+                                  return (
+                                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 shadow-xl text-xs space-y-2">
+                                      <div className="font-bold text-slate-900 dark:text-slate-100 border-b border-slate-100 dark:border-slate-800 pb-1.5 flex items-center justify-between gap-4">
+                                        <span>{d.name} ({d.code})</span>
+                                        <span
+                                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                            isAbove
+                                              ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                                              : 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300'
+                                          }`}
+                                        >
+                                          {isAbove ? `+${diff} Poin vs KKTP` : `${diff} Poin vs KKTP`}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center justify-between gap-4">
+                                        <span className="text-slate-600 dark:text-slate-400">Rata-rata Kelas:</span>
+                                        <span className="font-mono font-bold text-base text-indigo-600 dark:text-indigo-400">
+                                          {d.avgScore}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center justify-between gap-4 text-[11px] text-slate-500 dark:text-slate-400">
+                                        <span>Tertinggi: <strong className="text-emerald-600">{d.highest}</strong></span>
+                                        <span>Terendah: <strong className="text-rose-500">{d.lowest}</strong></span>
+                                        <span>KKTP: <strong>{d.passingGrade}</strong></span>
+                                      </div>
+                                    </div>
+                                  );
+                                }}
+                              />
+                              <ReferenceLine
+                                y={rombelKKM}
+                                stroke="#6366f1"
+                                strokeDasharray="4 4"
+                                label={{
+                                  value: `KKTP (${rombelKKM})`,
+                                  position: 'top',
+                                  fill: '#6366f1',
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                }}
+                              />
+                              <Bar
+                                dataKey="avgScore"
+                                name="Rata-rata Skor"
+                                radius={[6, 6, 0, 0]}
+                              >
+                                {sumatifSubjectChartData.map((entry, idx) => (
+                                  <Cell
+                                    key={`cell-sub-${idx}`}
+                                    fill={entry.avgScore >= entry.passingGrade ? '#10b981' : '#f59e0b'}
+                                  />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
+                          <div className="flex items-center gap-3">
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                              Memenuhi KKTP (≥ {rombelKKM})
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                              Di Bawah KKTP (&lt; {rombelKKM})
+                            </span>
+                          </div>
+                          <span className="font-semibold text-slate-600 dark:text-slate-300">
+                            {sumatifLeger.subjects.length} Mata Pelajaran
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* GRAFIK 2: KOMPOSISI KETUNTASAN SISWA PER MATA PELAJARAN */}
+                      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-4 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                            <div>
+                              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                <TrendingUp className="w-4 h-4 text-emerald-600" />
+                                <span>Komposisi Ketuntasan per Mapel</span>
+                              </h3>
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                Rasio jumlah siswa Tuntas vs Remedial pada masing-masing bidang studi.
+                              </p>
+                            </div>
+                            <span className="text-[11px] font-semibold text-slate-400">
+                              Total {sumatifLeger.totalStudents} Siswa
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="h-[280px] w-full pt-2">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              data={sumatifSubjectChartData}
+                              margin={{ top: 15, right: 10, left: -15, bottom: 5 }}
+                            >
+                              <XAxis
+                                dataKey="code"
+                                tick={{ fontSize: 11, fontWeight: 700 }}
+                                interval={0}
+                              />
+                              <YAxis
+                                tick={{ fontSize: 11 }}
+                                allowDecimals={false}
+                              />
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (!active || !payload || !payload.length) return null;
+                                  const d = payload[0]?.payload;
+                                  if (!d) return null;
+                                  return (
+                                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 shadow-xl text-xs space-y-2">
+                                      <div className="font-bold text-slate-900 dark:text-slate-100 border-b border-slate-100 dark:border-slate-800 pb-1.5 flex items-center justify-between gap-4">
+                                        <span>{d.name} ({d.code})</span>
+                                        <span className="text-[10px] text-slate-400 font-mono">
+                                          KKTP: {d.passingGrade}
+                                        </span>
+                                      </div>
+                                      <div className="space-y-1">
+                                        <div className="flex items-center justify-between gap-4 text-emerald-600 dark:text-emerald-400 font-semibold">
+                                          <span className="flex items-center gap-1.5">
+                                            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                            Siswa Tuntas:
+                                          </span>
+                                          <span className="font-mono font-bold">
+                                            {d.passed} siswa ({d.passRate}%)
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-4 text-rose-500 dark:text-rose-400 font-semibold">
+                                          <span className="flex items-center gap-1.5">
+                                            <span className="w-2 h-2 rounded-full bg-rose-500" />
+                                            Perlu Remedial:
+                                          </span>
+                                          <span className="font-mono font-bold">
+                                            {d.remedial} siswa ({100 - d.passRate}%)
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <div className="border-t border-slate-100 dark:border-slate-800 pt-1.5 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                                        <span>Total: <strong>{sumatifLeger.totalStudents} Siswa</strong></span>
+                                        <span>Rata-rata: <strong className="text-indigo-600 dark:text-indigo-400">{d.avgScore}</strong></span>
+                                      </div>
+                                    </div>
+                                  );
+                                }}
+                              />
+                              <Legend
+                                verticalAlign="top"
+                                align="right"
+                                iconType="circle"
+                                iconSize={8}
+                                wrapperStyle={{ fontSize: '11px', paddingBottom: '8px' }}
+                              />
+                              <Bar
+                                dataKey="passed"
+                                name="Siswa Tuntas"
+                                fill="#10b981"
+                                radius={[4, 4, 0, 0]}
+                              />
+                              <Bar
+                                dataKey="remedial"
+                                name="Perlu Remedial"
+                                fill="#f43f5e"
+                                radius={[4, 4, 0, 0]}
+                              />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
+                          <div className="flex items-center gap-3">
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                              Tuntas (≥ KKTP)
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                              Remedial (&lt; KKTP)
+                            </span>
+                          </div>
+                          <span className="font-semibold text-slate-600 dark:text-slate-300">
+                            Wadah {activePackage?.assessmentType}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Banner & Detailed At-Risk Student List */}
                     <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-4">
                       <div className="flex items-start gap-3">
@@ -2215,6 +2543,315 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
                           ))}
                         </div>
                       )}
+                    </div>
+                  </div>
+                )}
+
+                {walasSumatifSubTab === 'STUDENT_CARDS' && (
+                  <div className="space-y-6">
+                    {/* Filter & Search Bar */}
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      {/* Search */}
+                      <div className="relative flex-1 max-w-md">
+                        <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={sumatifSearchQuery}
+                          onChange={e => setSumatifSearchQuery(e.target.value)}
+                          placeholder="Cari nama atau NISN siswa..."
+                          className="w-full pl-10 pr-8 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-semibold text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                        {sumatifSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setSumatifSearchQuery('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Status Filter Buttons */}
+                      <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs font-semibold">
+                        <button
+                          type="button"
+                          onClick={() => setSumatifStudentFilter('ALL')}
+                          className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                            sumatifStudentFilter === 'ALL'
+                              ? 'bg-indigo-600 text-white font-bold shadow-xs'
+                              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                          }`}
+                        >
+                          Semua ({sumatifLeger.rows.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSumatifStudentFilter('PASSED_ALL')}
+                          className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                            sumatifStudentFilter === 'PASSED_ALL'
+                              ? 'bg-emerald-600 text-white font-bold shadow-xs'
+                              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                          }`}
+                        >
+                          Tuntas Semua ({sumatifLeger.rows.filter(r => r.remedialCount === 0).length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSumatifStudentFilter('HAS_REMEDIAL')}
+                          className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                            sumatifStudentFilter === 'HAS_REMEDIAL'
+                              ? 'bg-amber-600 text-white font-bold shadow-xs'
+                              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                          }`}
+                        >
+                          Ada Remedial ({sumatifLeger.rows.filter(r => r.remedialCount > 0).length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSumatifStudentFilter('AT_RISK')}
+                          className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                            sumatifStudentFilter === 'AT_RISK'
+                              ? 'bg-rose-600 text-white font-bold shadow-xs'
+                              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                          }`}
+                        >
+                          Berisiko ({sumatifLeger.atRiskStudentsCount})
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Split View: Left List, Right Detail Card */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                      {/* Left: Student Selector List */}
+                      <div className="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-xs space-y-2 max-h-[680px] overflow-y-auto">
+                        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-2 pb-1 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                          <span>Daftar Siswa ({sumatifFilteredRows.length})</span>
+                          <span>Rata-rata</span>
+                        </div>
+
+                        {sumatifFilteredRows.length === 0 ? (
+                          <div className="py-12 text-center text-slate-400 text-xs">
+                            Tidak ditemukan siswa dengan kriteria filter tersebut.
+                          </div>
+                        ) : (
+                          sumatifFilteredRows.map(row => {
+                            const isSelected = activeSumatifStudentRow?.studentId === row.studentId;
+                            return (
+                              <button
+                                key={row.studentId}
+                                type="button"
+                                onClick={() => setSelectedSumatifStudentId(row.studentId)}
+                                className={`w-full p-3 rounded-2xl text-left transition-all cursor-pointer flex items-center justify-between gap-3 border ${
+                                  isSelected
+                                    ? 'bg-indigo-50 dark:bg-indigo-950/50 border-indigo-300 dark:border-indigo-800 shadow-xs'
+                                    : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-[11px] font-mono font-bold shrink-0 ${
+                                    row.rank === 1
+                                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200'
+                                      : row.rank <= 3
+                                      ? 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200'
+                                      : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                  }`}>
+                                    #{row.rank}
+                                  </span>
+                                  <div className="min-w-0">
+                                    <div className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate">
+                                      {row.studentName}
+                                    </div>
+                                    <div className="text-[10px] font-mono text-slate-400">
+                                      NISN: {row.nisn}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="text-right shrink-0">
+                                  <div className="font-mono font-black text-sm text-indigo-600 dark:text-indigo-400">
+                                    {row.averageScore}
+                                  </div>
+                                  <div className="text-[10px]">
+                                    {row.remedialCount === 0 ? (
+                                      <span className="text-emerald-600 font-semibold">Tuntas</span>
+                                    ) : (
+                                      <span className="text-rose-500 font-bold">{row.remedialCount} Remedial</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+
+                      {/* Right: Comprehensive Student Grade Card */}
+                      <div className="lg:col-span-7">
+                        {activeSumatifStudentRow ? (
+                          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-6">
+                            {/* Card Header */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                              <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-base shadow-xs">
+                                  <GraduationCap className="w-6 h-6" />
+                                </div>
+                                <div>
+                                  <h3 className="text-base font-black text-slate-900 dark:text-slate-100">
+                                    {activeSumatifStudentRow.studentName}
+                                  </h3>
+                                  <p className="text-xs text-slate-500">
+                                    NISN: <span className="font-mono font-semibold">{activeSumatifStudentRow.nisn}</span> · Rombel <strong>{assignedClass.name}</strong> · Paket <strong>{activePackage?.code || activePackage?.title}</strong>
+                                  </p>
+                                </div>
+                              </div>
+
+                              <span className="px-3 py-1.5 rounded-xl text-xs font-mono font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800 shrink-0 self-start sm:self-auto">
+                                Peringkat #{activeSumatifStudentRow.rank} dari {sumatifLeger.totalStudents} Siswa
+                              </span>
+                            </div>
+
+                            {/* Stat Badges */}
+                            <div className="grid grid-cols-3 gap-3">
+                              <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-3.5 border border-slate-200/60 dark:border-slate-700/60 text-center">
+                                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">
+                                  Rata-rata Nilai
+                                </span>
+                                <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400 font-mono mt-1 block">
+                                  {activeSumatifStudentRow.averageScore}
+                                </span>
+                              </div>
+                              <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-3.5 border border-slate-200/60 dark:border-slate-700/60 text-center">
+                                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">
+                                  Mapel Tuntas
+                                </span>
+                                <span className="text-2xl font-black text-emerald-600 font-mono mt-1 block">
+                                  {sumatifLeger.subjects.length - activeSumatifStudentRow.remedialCount}
+                                </span>
+                              </div>
+                              <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-3.5 border border-slate-200/60 dark:border-slate-700/60 text-center">
+                                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">
+                                  Perlu Remedial
+                                </span>
+                                <span className={`text-2xl font-black font-mono mt-1 block ${
+                                  activeSumatifStudentRow.remedialCount > 0 ? 'text-rose-600' : 'text-slate-400'
+                                }`}>
+                                  {activeSumatifStudentRow.remedialCount}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Table of Subjects */}
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5 font-mono">
+                                  <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
+                                  <span>Rincian Nilai per Mata Pelajaran ({activePackage?.assessmentType})</span>
+                                </h4>
+                                <span className="text-[11px] text-slate-400">
+                                  Batas KKTP / KKM Acuan: {rombelKKM}
+                                </span>
+                              </div>
+
+                              <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+                                <table className="w-full text-xs text-left">
+                                  <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wider">
+                                    <tr>
+                                      <th className="px-4 py-2.5">Mata Pelajaran</th>
+                                      <th className="px-3 py-2.5 text-center">KKTP</th>
+                                      <th className="px-3 py-2.5 text-center">Nilai Murni</th>
+                                      <th className="px-3 py-2.5 text-center">Status</th>
+                                      <th className="px-4 py-2.5 w-32">Capaian</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                    {sumatifLeger.subjects.map(sub => {
+                                      const score = activeSumatifStudentRow.scoresBySubjectId[sub.id] ?? 0;
+                                      const isPassed = score >= sub.passingGrade;
+                                      return (
+                                        <tr key={sub.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                          <td className="px-4 py-2.5 font-bold text-slate-900 dark:text-slate-100">
+                                            <div>{sub.name}</div>
+                                            <span className="text-[10px] font-mono text-slate-400">{sub.code}</span>
+                                          </td>
+                                          <td className="px-3 py-2.5 text-center font-mono font-semibold text-slate-500">
+                                            {sub.passingGrade}
+                                          </td>
+                                          <td className="px-3 py-2.5 text-center font-mono font-black text-sm">
+                                            <span className={isPassed ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
+                                              {score}
+                                            </span>
+                                          </td>
+                                          <td className="px-3 py-2.5 text-center">
+                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                              isPassed
+                                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                                                : 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
+                                            }`}>
+                                              {isPassed ? 'TUNTAS' : 'REMEDIAL'}
+                                            </span>
+                                          </td>
+                                          <td className="px-4 py-2.5">
+                                            <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                              <div
+                                                className={`h-full rounded-full ${
+                                                  score >= sub.passingGrade
+                                                    ? 'bg-emerald-500'
+                                                    : score >= sub.passingGrade - 10
+                                                    ? 'bg-amber-500'
+                                                    : 'bg-rose-500'
+                                                }`}
+                                                style={{ width: `${Math.min(100, score)}%` }}
+                                              />
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+
+                            {/* Catatan Pembimbing Wali Kelas Khusus Siswa Ini */}
+                            <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                                <span className="flex items-center gap-1.5">
+                                  <Save className="w-3.5 h-3.5 text-indigo-600" />
+                                  <span>Catatan Pembimbing Wali Kelas untuk Rapor:</span>
+                                </span>
+                                <span className="text-[10px] text-slate-400">Tersimpan otomatis ke database</span>
+                              </label>
+                              <div className="flex gap-2">
+                                <textarea
+                                  rows={2}
+                                  value={waliNotes[activeSumatifStudentRow.studentId] || ''}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setWaliNotes(prev => ({ ...prev, [activeSumatifStudentRow.studentId]: val }));
+                                  }}
+                                  placeholder={`Tulis catatan pembimbingan, rekomendasi tindak lanjut remedial atau apresiasi untuk ${activeSumatifStudentRow.studentName}...`}
+                                  className="flex-1 p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    triggerToast(`Catatan pembimbing untuk ${activeSumatifStudentRow.studentName} berhasil disimpan.`);
+                                  }}
+                                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer self-end"
+                                >
+                                  <Save className="w-3.5 h-3.5" />
+                                  <span>Simpan</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-12 text-center text-slate-400 text-xs">
+                            Pilih siswa di sebelah kiri untuk melihat buku nilai dan profil rapor lengkap.
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
