@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   FolderKanban, FileSpreadsheet, ExternalLink, RefreshCw,
   CheckCircle2, AlertCircle, Calendar, School, BookOpen,
-  Award, Sparkles, X, ChevronRight, Link as LinkIcon, Check, Users
+  Award, Sparkles, X, ChevronRight, ChevronLeft, Link as LinkIcon, Check, Users,
+  Layers, LayoutGrid
 } from 'lucide-react';
 import { ExamPackage, ClassRoom, Subject, User, Tryout } from '../../types/database';
 import { DatabaseService } from '../../services/database';
@@ -31,6 +32,15 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
   const [searchQuery, setSearchQuery] = useState('');
   const [syncingKey, setSyncingKey] = useState<string | null>(null);
 
+  // Mode Tampilan: FOCUSED (Satu Wadah Terpilih per Waktu) vs ALL (Tampilkan Semua Vertikal)
+  const [viewMode, setViewMode] = useState<'FOCUSED' | 'ALL'>('FOCUSED');
+
+  // ID Wadah yang Sedang Dipilih
+  const [selectedPkgId, setSelectedPkgId] = useState<string>(() => {
+    if (packages.length > 0) return packages[0].id;
+    return '';
+  });
+
   // Modal State for Editing Google Form & Google Sheet Links
   const [editingItem, setEditingItem] = useState<{
     pkgId: string;
@@ -41,16 +51,66 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
     formUrl: string;
   } | null>(null);
 
-  // Filter packages by search query
-  const filteredPackages = packages.filter(pkg => {
-    if (!searchQuery.trim()) return true;
+  // Statistik kelengkapan tautan mapel guru per wadah
+  const packagesWithStats = useMemo(() => {
+    return packages.map(pkg => {
+      const userSubjects = (pkg.subjects || []).map(pkgSub => {
+        const fullSub = subjects.find(s => s.id === pkgSub.subjectId);
+        return {
+          ...pkgSub,
+          subjectName: fullSub?.name || 'Mata Pelajaran',
+          subjectCode: fullSub?.code || 'MAPEL',
+          hasSheet: Boolean(pkgSub.googleSheetUrl?.trim()),
+          hasForm: Boolean(pkgSub.googleFormUrl?.trim()),
+        };
+      });
+
+      const totalSubjects = userSubjects.length;
+      const filledSubjects = userSubjects.filter(s => s.hasSheet).length;
+      const isComplete = totalSubjects > 0 && filledSubjects === totalSubjects;
+
+      return {
+        pkg,
+        userSubjects,
+        totalSubjects,
+        filledSubjects,
+        isComplete,
+      };
+    });
+  }, [packages, subjects]);
+
+  const totalAllPackages = packages.length;
+  const completedPackagesCount = packagesWithStats.filter(p => p.isComplete).length;
+  const overallProgressPct = totalAllPackages > 0
+    ? Math.round((completedPackagesCount / totalAllPackages) * 100)
+    : 0;
+
+  // Filter wadah berdasarkan input pencarian
+  const filteredPackagesWithStats = useMemo(() => {
+    if (!searchQuery.trim()) return packagesWithStats;
     const q = searchQuery.toLowerCase();
-    return (
-      pkg.title.toLowerCase().includes(q) ||
-      pkg.code.toLowerCase().includes(q) ||
-      (pkg.description && pkg.description.toLowerCase().includes(q))
+    return packagesWithStats.filter(item =>
+      item.pkg.title.toLowerCase().includes(q) ||
+      item.pkg.code.toLowerCase().includes(q) ||
+      (item.pkg.description && item.pkg.description.toLowerCase().includes(q))
     );
-  });
+  }, [packagesWithStats, searchQuery]);
+
+  // Wadah aktif terpilih pada mode FOCUSED
+  const activePackageData = useMemo(() => {
+    if (filteredPackagesWithStats.length === 0) return null;
+    const found = filteredPackagesWithStats.find(p => p.pkg.id === selectedPkgId);
+    return found || filteredPackagesWithStats[0];
+  }, [filteredPackagesWithStats, selectedPkgId]);
+
+  // Index aktif untuk tombol Previous / Next wadah
+  const activePkgIndex = useMemo(() => {
+    if (!activePackageData) return 0;
+    return filteredPackagesWithStats.findIndex(p => p.pkg.id === activePackageData.pkg.id);
+  }, [filteredPackagesWithStats, activePackageData]);
+
+  const prevPkg = activePkgIndex > 0 ? filteredPackagesWithStats[activePkgIndex - 1] : null;
+  const nextPkg = activePkgIndex < filteredPackagesWithStats.length - 1 ? filteredPackagesWithStats[activePkgIndex + 1] : null;
 
   const handleSaveLink = (e: React.FormEvent) => {
     e.preventDefault();
@@ -231,221 +291,612 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
         </div>
       </div>
 
+      {/* ── QUICK PROGRESS & PILL TAB SELECTOR ── */}
+      {packages.length > 1 && (
+        <div className="space-y-3">
+          {/* Progress Tracker Bar */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5">
+              <span className={`w-2.5 h-2.5 rounded-full ${completedPackagesCount === totalAllPackages ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
+              <span className="text-slate-600 dark:text-slate-300 font-medium">
+                Status Integrasi Link: <strong className="text-slate-900 dark:text-slate-100">{completedPackagesCount} dari {totalAllPackages} Wadah</strong> sudah terhubung lengkap ({overallProgressPct}%)
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">Mode Tampilan:</span>
+              <div className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200 dark:border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('FOCUSED')}
+                  className={`px-3 py-1 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+                    viewMode === 'FOCUSED'
+                      ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-300 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                  title="Tampilkan satu wadah terfokus"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>Fokus 1 Wadah</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('ALL')}
+                  className={`px-3 py-1 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+                    viewMode === 'ALL'
+                      ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-300 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                  title="Tampilkan semua wadah sekaligus"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span>Tampilkan Semua ({packages.length})</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Pill Tab Selector */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+            {filteredPackagesWithStats.map(item => {
+              const isSelected = activePackageData?.pkg.id === item.pkg.id && viewMode === 'FOCUSED';
+              const isSAT = item.pkg.assessmentType === 'SAT';
+              const targetClasses = classes.filter(c => (item.pkg.targetClassIds || []).includes(c.id));
+              const classNames = targetClasses.map(c => c.name).join(', ');
+
+              return (
+                <button
+                  key={item.pkg.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedPkgId(item.pkg.id);
+                    setViewMode('FOCUSED');
+                  }}
+                  className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shrink-0 border ${
+                    isSelected
+                      ? 'bg-emerald-600 text-white shadow-sm border-emerald-600 ring-2 ring-emerald-500/30'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                      isSelected
+                        ? 'bg-emerald-800 text-emerald-100'
+                        : isSAT
+                        ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
+                        : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
+                    }`}
+                  >
+                    {item.pkg.assessmentType}
+                  </span>
+                  <span>{item.pkg.title}</span>
+                  {classNames && (
+                    <span className={`text-[10px] font-normal ${isSelected ? 'text-emerald-100' : 'text-slate-400'}`}>
+                      ({classNames})
+                    </span>
+                  )}
+                  <span
+                    className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      isSelected
+                        ? item.isComplete
+                          ? 'bg-emerald-500 text-white'
+                          : 'bg-amber-500 text-white'
+                        : item.isComplete
+                        ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                        : 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                    }`}
+                  >
+                    {item.isComplete ? (
+                      <>
+                        <CheckCircle2 className="w-2.5 h-2.5" />
+                        <span>{item.filledSubjects}/{item.totalSubjects} Selesai</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="w-2.5 h-2.5" />
+                        <span>{item.filledSubjects}/{item.totalSubjects} Belum Lengkap</span>
+                      </>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ── DAFTAR WADAH SAT / SAS ── */}
       <div className="space-y-4">
-        {filteredPackages.map(pkg => {
-          const isSAT = pkg.assessmentType === 'SAT';
-          const targetClasses = classes.filter(c => (pkg.targetClassIds || []).includes(c.id));
-          const targetGrades = Array.from(new Set(targetClasses.map(c => c.gradeLevel))).sort();
+        {filteredPackagesWithStats.length === 0 ? (
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 text-center text-slate-400 text-xs">
+            Tidak ada wadah SAT / SAS yang cocok dengan pencarian &apos;{searchQuery}&apos;.
+          </div>
+        ) : viewMode === 'FOCUSED' && activePackageData ? (
+          (() => {
+            const item = activePackageData;
+            const pkg = item.pkg;
+            const isSAT = pkg.assessmentType === 'SAT';
+            const targetClasses = classes.filter(c => (pkg.targetClassIds || []).includes(c.id));
+            const targetGrades = Array.from(new Set(targetClasses.map(c => c.gradeLevel))).sort();
 
-          // Saring mata pelajaran yang diampu guru dalam paket ini
-          const userSubjectsInPkg = (pkg.subjects || []).map(pkgSub => {
-            const fullSub = subjects.find(s => s.id === pkgSub.subjectId);
-            return {
-              ...pkgSub,
-              subjectName: fullSub?.name || 'Mata Pelajaran',
-              subjectCode: fullSub?.code || 'MAPEL',
-            };
-          });
+            return (
+              <div
+                key={pkg.id}
+                className="bg-white dark:bg-slate-900 border-2 border-emerald-500/30 rounded-3xl p-5 sm:p-6 shadow-sm space-y-5 transition-all"
+              >
+                {/* Header Kartu Wadah */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-lg border ${
+                          isSAT
+                            ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                            : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                        }`}
+                      >
+                        {isSAT ? 'SAT (Akhir Tahun)' : 'SAS (Akhir Semester)'}
+                      </span>
+                      <span className="text-xs font-mono font-bold text-slate-400">
+                        #{pkg.code}
+                      </span>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                        {pkg.status}
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
+                          item.isComplete
+                            ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                            : 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
+                        }`}
+                      >
+                        {item.isComplete ? (
+                          <>
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            <span>Link Mapel Lengkap ({item.filledSubjects}/{item.totalSubjects})</span>
+                          </>
+                        ) : (
+                          <>
+                            <AlertCircle className="w-3 h-3 text-amber-600" />
+                            <span>Belum Lengkap ({item.filledSubjects}/{item.totalSubjects} Mapel Terisi)</span>
+                          </>
+                        )}
+                      </span>
+                    </div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                      {pkg.title}
+                    </h3>
+                    {pkg.description && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{pkg.description}</p>
+                    )}
+                  </div>
 
-          return (
-            <div
-              key={pkg.id}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-5 transition-all hover:border-emerald-200 dark:hover:border-emerald-800/80"
-            >
-              {/* Header Kartu Wadah */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span
-                      className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-lg border ${
-                        isSAT
-                          ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                          : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                      }`}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => onNavigateToAnalytics(pkg.id)}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                     >
-                      {isSAT ? 'SAT (Akhir Tahun)' : 'SAS (Akhir Semester)'}
-                    </span>
-                    <span className="text-xs font-mono font-bold text-slate-400">
-                      #{pkg.code}
-                    </span>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                      {pkg.status}
+                      <Award className="w-3.5 h-3.5" />
+                      <span>Buka Analisis SAT/SAS</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Baris Meta: Tanggal & Target Kelas */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-50/70 dark:bg-slate-800/40 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                    <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>
+                      Pelaksanaan: <strong>{new Date(pkg.startDate).toLocaleDateString('id-ID')}</strong> s/d <strong>{new Date(pkg.endDate).toLocaleDateString('id-ID')}</strong>
                     </span>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
-                    {pkg.title}
-                  </h3>
-                  {pkg.description && (
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{pkg.description}</p>
-                  )}
+                  <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                    <School className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <span>
+                      Target Kelas: <strong>{targetClasses.length > 0 ? targetClasses.map(c => c.name).join(', ') : 'Semua Kelas'}</strong>
+                      {targetGrades.length > 0 && <span className="text-slate-400"> (Tingkat {targetGrades.join(', ')})</span>}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => onNavigateToAnalytics(pkg.id)}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-                  >
-                    <Award className="w-3.5 h-3.5" />
-                    <span>Buka Analisis SAT/SAS</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
+                {/* Daftar Mata Pelajaran Guru di Wadah Ini */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                      <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Slot Mata Pelajaran Anda ({item.userSubjects.length} Mapel):</span>
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      Silakan isi tautan Google Spreadsheet respons untuk menarik nilai siswa
+                    </span>
+                  </div>
 
-              {/* Baris Meta: Tanggal & Target Kelas */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-50/70 dark:bg-slate-800/40 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800">
-                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                  <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>
-                    Pelaksanaan: <strong>{new Date(pkg.startDate).toLocaleDateString('id-ID')}</strong> s/d <strong>{new Date(pkg.endDate).toLocaleDateString('id-ID')}</strong>
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                  <School className="w-4 h-4 text-indigo-600 shrink-0" />
-                  <span>
-                    Target Kelas: <strong>{targetClasses.length > 0 ? targetClasses.map(c => c.name).join(', ') : 'Semua Kelas'}</strong>
-                    {targetGrades.length > 0 && <span className="text-slate-400"> (Tingkat {targetGrades.join(', ')})</span>}
-                  </span>
-                </div>
-              </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {item.userSubjects.map(subItem => {
+                      const hasSheet = subItem.hasSheet;
+                      const hasForm = subItem.hasForm;
+                      const isSyncingThis = syncingKey === `${pkg.id}-${subItem.subjectId}`;
 
-              {/* Daftar Mata Pelajaran Guru di Wadah Ini */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-                    <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Slot Mata Pelajaran Anda:</span>
-                  </span>
-                  <span className="text-[11px] text-slate-400">
-                    {userSubjectsInPkg.length} Mata Pelajaran Terdaftar
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {userSubjectsInPkg.map(subItem => {
-                    const hasSheet = Boolean(subItem.googleSheetUrl?.trim());
-                    const hasForm = Boolean(subItem.googleFormUrl?.trim());
-                    const isSyncingThis = syncingKey === `${pkg.id}-${subItem.subjectId}`;
-
-                    return (
-                      <div
-                        key={subItem.subjectId}
-                        className="bg-slate-50/90 dark:bg-slate-800/70 border border-slate-200/90 dark:border-slate-700/80 rounded-2xl p-4 space-y-3"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
-                                {subItem.subjectCode}
+                      return (
+                        <div
+                          key={subItem.subjectId}
+                          className="bg-slate-50/90 dark:bg-slate-800/70 border border-slate-200/90 dark:border-slate-700/80 rounded-2xl p-4 space-y-3"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
+                                  {subItem.subjectCode}
+                                </span>
+                                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                                  {subItem.subjectName}
+                                </h4>
+                              </div>
+                              <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                                KKTP Ketuntasan: <strong>{subItem.passingGrade || 75}</strong>
                               </span>
-                              <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                                {subItem.subjectName}
-                              </h4>
                             </div>
-                            <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
-                              KKTP Ketuntasan: <strong>{subItem.passingGrade || 75}</strong>
+
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                                hasSheet
+                                  ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                                  : 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
+                              }`}
+                            >
+                              {hasSheet ? (
+                                <>
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                  <span>Sheet Tertaut</span>
+                                </>
+                              ) : (
+                                <>
+                                  <AlertCircle className="w-3 h-3 text-amber-600" />
+                                  <span>Belum Ada Sheet</span>
+                                </>
+                              )}
                             </span>
                           </div>
 
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                              hasSheet
-                                ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
-                                : 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
-                            }`}
-                          >
-                            {hasSheet ? (
-                              <>
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                <span>Sheet Tertaut</span>
-                              </>
-                            ) : (
-                              <>
-                                <AlertCircle className="w-3 h-3 text-amber-600" />
-                                <span>Belum Ada Sheet</span>
-                              </>
-                            )}
-                          </span>
-                        </div>
+                          {/* Status Tautan Link Google Form & Sheet */}
+                          <div className="space-y-1.5 text-xs">
+                            <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                              <span className="text-[11px] font-semibold text-slate-500">Google Sheet Respons:</span>
+                              {hasSheet ? (
+                                <a
+                                  href={subItem.googleSheetUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline flex items-center gap-1 text-[11px]"
+                                >
+                                  <FileSpreadsheet className="w-3 h-3" />
+                                  <span>Buka Spreadsheet</span>
+                                  <ExternalLink className="w-2.5 h-2.5" />
+                                </a>
+                              ) : (
+                                <span className="text-slate-400 text-[11px] italic">Belum diinput</span>
+                              )}
+                            </div>
 
-                        {/* Status Tautan Link Google Form & Sheet */}
-                        <div className="space-y-1.5 text-xs">
-                          <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
-                            <span className="text-[11px] font-semibold text-slate-500">Google Sheet Respons:</span>
-                            {hasSheet ? (
-                              <a
-                                href={subItem.googleSheetUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline flex items-center gap-1 text-[11px]"
-                              >
-                                <FileSpreadsheet className="w-3 h-3" />
-                                <span>Buka Spreadsheet</span>
-                                <ExternalLink className="w-2.5 h-2.5" />
-                              </a>
-                            ) : (
-                              <span className="text-slate-400 text-[11px] italic">Belum diinput</span>
-                            )}
+                            <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                              <span className="text-[11px] font-semibold text-slate-500">Google Form Soal:</span>
+                              {hasForm ? (
+                                <a
+                                  href={subItem.googleFormUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline flex items-center gap-1 text-[11px]"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  <span>Buka Form</span>
+                                </a>
+                              ) : (
+                                <span className="text-slate-400 text-[11px] italic">Opsional</span>
+                              )}
+                            </div>
                           </div>
 
-                          <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
-                            <span className="text-[11px] font-semibold text-slate-500">Google Form Soal:</span>
-                            {hasForm ? (
-                              <a
-                                href={subItem.googleFormUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline flex items-center gap-1 text-[11px]"
-                              >
-                                <ExternalLink className="w-3 h-3" />
-                                <span>Buka Form</span>
-                              </a>
-                            ) : (
-                              <span className="text-slate-400 text-[11px] italic">Opsional</span>
-                            )}
+                          {/* Action Buttons: Input Link & Sync Respon */}
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setEditingItem({
+                                  pkgId: pkg.id,
+                                  pkgTitle: pkg.title,
+                                  subjectId: subItem.subjectId,
+                                  subjectName: subItem.subjectName,
+                                  sheetUrl: subItem.googleSheetUrl || '',
+                                  formUrl: subItem.googleFormUrl || '',
+                                })
+                              }
+                              className="flex-1 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                            >
+                              <LinkIcon className="w-3 h-3 text-indigo-600" />
+                              <span>{hasSheet ? 'Ganti Tautan' : 'Tautkan Sheet'}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={!hasSheet || isSyncingThis}
+                              onClick={() => handleTriggerSync(pkg, subItem.subjectId, subItem.subjectName)}
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                              title="Tarik data respons siswa terbaru dari Google Sheet"
+                            >
+                              <RefreshCw className={`w-3 h-3 ${isSyncingThis ? 'animate-spin' : ''}`} />
+                              <span>{isSyncingThis ? 'Menyinkronkan...' : 'Tarik Respons'}</span>
+                            </button>
                           </div>
                         </div>
+                      );
+                    })}
+                  </div>
+                </div>
 
-                        {/* Action Buttons: Input Link & Sync Respon */}
-                        <div className="flex items-center gap-2 pt-1">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setEditingItem({
-                                pkgId: pkg.id,
-                                pkgTitle: pkg.title,
-                                subjectId: subItem.subjectId,
-                                subjectName: subItem.subjectName,
-                                sheetUrl: subItem.googleSheetUrl || '',
-                                formUrl: subItem.googleFormUrl || '',
-                              })
-                            }
-                            className="flex-1 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
-                          >
-                            <LinkIcon className="w-3 h-3 text-indigo-600" />
-                            <span>{hasSheet ? 'Ganti Tautan' : 'Tautkan Sheet'}</span>
-                          </button>
+                {/* Step-through Sequential Navigation Bar */}
+                {packages.length > 1 && (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                    {prevPkg ? (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPkgId(prevPkg.pkg.id)}
+                        className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                        <span>Sebelumnya: {prevPkg.pkg.title}</span>
+                      </button>
+                    ) : (
+                      <div />
+                    )}
 
-                          <button
-                            type="button"
-                            disabled={!hasSheet || isSyncingThis}
-                            onClick={() => handleTriggerSync(pkg, subItem.subjectId, subItem.subjectName)}
-                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
-                            title="Tarik data respons siswa terbaru dari Google Sheet"
-                          >
-                            <RefreshCw className={`w-3 h-3 ${isSyncingThis ? 'animate-spin' : ''}`} />
-                            <span>{isSyncingThis ? 'Menyinkronkan...' : 'Tarik Respons'}</span>
-                          </button>
+                    <span className="text-xs font-semibold text-slate-400 text-center">
+                      Wadah {activePkgIndex + 1} dari {packages.length}
+                    </span>
+
+                    {nextPkg ? (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPkgId(nextPkg.pkg.id)}
+                        className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                      >
+                        <span>Selanjutnya: {nextPkg.pkg.title}</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <div />
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()
+        ) : (
+          filteredPackagesWithStats.map(item => {
+            const pkg = item.pkg;
+            const isSAT = pkg.assessmentType === 'SAT';
+            const targetClasses = classes.filter(c => (pkg.targetClassIds || []).includes(c.id));
+            const targetGrades = Array.from(new Set(targetClasses.map(c => c.gradeLevel))).sort();
+
+            return (
+              <div
+                key={pkg.id}
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-5 transition-all hover:border-emerald-200 dark:hover:border-emerald-800/80"
+              >
+                {/* Header Kartu Wadah */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-lg border ${
+                          isSAT
+                            ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                            : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                        }`}
+                      >
+                        {isSAT ? 'SAT (Akhir Tahun)' : 'SAS (Akhir Semester)'}
+                      </span>
+                      <span className="text-xs font-mono font-bold text-slate-400">
+                        #{pkg.code}
+                      </span>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                        {pkg.status}
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                          item.isComplete
+                            ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                            : 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
+                        }`}
+                      >
+                        {item.isComplete ? (
+                          <>
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            <span>Link Lengkap ({item.filledSubjects}/{item.totalSubjects})</span>
+                          </>
+                        ) : (
+                          <>
+                            <AlertCircle className="w-3 h-3 text-amber-600" />
+                            <span>Belum Lengkap ({item.filledSubjects}/{item.totalSubjects})</span>
+                          </>
+                        )}
+                      </span>
+                    </div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                      {pkg.title}
+                    </h3>
+                    {pkg.description && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{pkg.description}</p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => onNavigateToAnalytics(pkg.id)}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                    >
+                      <Award className="w-3.5 h-3.5" />
+                      <span>Buka Analisis SAT/SAS</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Baris Meta: Tanggal & Target Kelas */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-50/70 dark:bg-slate-800/40 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                    <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>
+                      Pelaksanaan: <strong>{new Date(pkg.startDate).toLocaleDateString('id-ID')}</strong> s/d <strong>{new Date(pkg.endDate).toLocaleDateString('id-ID')}</strong>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                    <School className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <span>
+                      Target Kelas: <strong>{targetClasses.length > 0 ? targetClasses.map(c => c.name).join(', ') : 'Semua Kelas'}</strong>
+                      {targetGrades.length > 0 && <span className="text-slate-400"> (Tingkat {targetGrades.join(', ')})</span>}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Daftar Mata Pelajaran Guru di Wadah Ini */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                      <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Slot Mata Pelajaran Anda:</span>
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      {item.userSubjects.length} Mata Pelajaran Terdaftar
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {item.userSubjects.map(subItem => {
+                      const hasSheet = subItem.hasSheet;
+                      const hasForm = subItem.hasForm;
+                      const isSyncingThis = syncingKey === `${pkg.id}-${subItem.subjectId}`;
+
+                      return (
+                        <div
+                          key={subItem.subjectId}
+                          className="bg-slate-50/90 dark:bg-slate-800/70 border border-slate-200/90 dark:border-slate-700/80 rounded-2xl p-4 space-y-3"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
+                                  {subItem.subjectCode}
+                                </span>
+                                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                                  {subItem.subjectName}
+                                </h4>
+                              </div>
+                              <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                                KKTP Ketuntasan: <strong>{subItem.passingGrade || 75}</strong>
+                              </span>
+                            </div>
+
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                                hasSheet
+                                  ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                                  : 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
+                              }`}
+                            >
+                              {hasSheet ? (
+                                <>
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                  <span>Sheet Tertaut</span>
+                                </>
+                              ) : (
+                                <>
+                                  <AlertCircle className="w-3 h-3 text-amber-600" />
+                                  <span>Belum Ada Sheet</span>
+                                </>
+                              )}
+                            </span>
+                          </div>
+
+                          {/* Status Tautan Link Google Form & Sheet */}
+                          <div className="space-y-1.5 text-xs">
+                            <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                              <span className="text-[11px] font-semibold text-slate-500">Google Sheet Respons:</span>
+                              {hasSheet ? (
+                                <a
+                                  href={subItem.googleSheetUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline flex items-center gap-1 text-[11px]"
+                                >
+                                  <FileSpreadsheet className="w-3 h-3" />
+                                  <span>Buka Spreadsheet</span>
+                                  <ExternalLink className="w-2.5 h-2.5" />
+                                </a>
+                              ) : (
+                                <span className="text-slate-400 text-[11px] italic">Belum diinput</span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                              <span className="text-[11px] font-semibold text-slate-500">Google Form Soal:</span>
+                              {hasForm ? (
+                                <a
+                                  href={subItem.googleFormUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline flex items-center gap-1 text-[11px]"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  <span>Buka Form</span>
+                                </a>
+                              ) : (
+                                <span className="text-slate-400 text-[11px] italic">Opsional</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Action Buttons: Input Link & Sync Respon */}
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setEditingItem({
+                                  pkgId: pkg.id,
+                                  pkgTitle: pkg.title,
+                                  subjectId: subItem.subjectId,
+                                  subjectName: subItem.subjectName,
+                                  sheetUrl: subItem.googleSheetUrl || '',
+                                  formUrl: subItem.googleFormUrl || '',
+                                })
+                              }
+                              className="flex-1 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                            >
+                              <LinkIcon className="w-3 h-3 text-indigo-600" />
+                              <span>{hasSheet ? 'Ganti Tautan' : 'Tautkan Sheet'}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={!hasSheet || isSyncingThis}
+                              onClick={() => handleTriggerSync(pkg, subItem.subjectId, subItem.subjectName)}
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                              title="Tarik data respons siswa terbaru dari Google Sheet"
+                            >
+                              <RefreshCw className={`w-3 h-3 ${isSyncingThis ? 'animate-spin' : ''}`} />
+                              <span>{isSyncingThis ? 'Menyinkronkan...' : 'Tarik Respons'}</span>
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
       {/* ── MODAL INPUT TAUTAN GOOGLE FORM & SPREADSHEET RESPON ── */}
