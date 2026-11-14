@@ -8,7 +8,8 @@ import {
   ArrowRight, Lock, RefreshCw, Key, ExternalLink, Link, AlertCircle, Check,
   Calculator, Scale, Play, CheckCheck, Sliders, PieChart, TrendingUp,
   Gauge, Zap, Target, Cpu, Clock, ArrowUp, ArrowDown, Activity, Info,
-  Youtube, Copy, LayoutGrid, Cloud, CheckSquare, Minus, RotateCcw
+  Youtube, Copy, LayoutGrid, Cloud, CheckSquare, Minus, RotateCcw,
+  FolderKanban
 } from 'lucide-react';
 import { dbService } from '../services/database';
 import { GoogleIntegrationService } from '../services/googleIntegration';
@@ -31,6 +32,8 @@ import { generateUuid } from '../utils/idUtils';
 import { ResourceCard } from '../components/ResourceCard';
 import { ItemAnalysisVisualizer } from '../components/ItemAnalysisVisualizer';
 import { GuruSumatifView } from '../components/guru/GuruSumatifView';
+import { GuruSumatifAssessmentsSection } from '../components/guru/GuruSumatifAssessmentsSection';
+import { GuruSumatifAnalyticsSection } from '../components/guru/GuruSumatifAnalyticsSection';
 import { SumatifAnalyticsService } from '../services/sumatifAnalytics';
 import { ExternalTryoutService } from '../services/externalTryout';
 import { ExternalTryoutUploadModal } from '../components/guru/ExternalTryoutUploadModal';
@@ -55,6 +58,7 @@ type GuruTab =
   | 'DASHBOARD'
   | 'WALI_KELAS_PORTAL'
   | 'TRYOUTS'
+  | 'SUMATIF_ASSESSMENTS'
   | 'QUESTION_BANK'
   | 'MATERIALS'
   | 'COMPETENCIES'
@@ -62,6 +66,7 @@ type GuruTab =
   | 'CLASSES'
   | 'ANALYTICS'
   | 'PROGRESS_TRACKING'
+  | 'SUMATIF_ANALYTICS'
   | 'EXPLANATIONS'
   | 'REPORTS'
   | 'IMPORT_SHEETS'
@@ -1198,6 +1203,24 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
   const activeSubjectObj = permittedSubjects[0] || subjects[0];
   const currentSubjectKKM = activeSubjectObj?.passingGrade ?? 75.0;
 
+  // Cascading Class Filter: Hanya tampilkan kelas target sesuai konfigurasi Tryout / Wadah aktif
+  const availableClassesForActiveTryout = useMemo(() => {
+    if (!activeTryout) return classes;
+    const directTargetClassIds = activeTryout.targetClassIds;
+    const pkgTargetClassIds = activeTryout.packageId
+      ? dbService.getExamPackageById(activeTryout.packageId)?.targetClassIds
+      : undefined;
+    const targets = (directTargetClassIds && directTargetClassIds.length > 0)
+      ? directTargetClassIds
+      : (pkgTargetClassIds && pkgTargetClassIds.length > 0)
+      ? pkgTargetClassIds
+      : undefined;
+
+    if (!targets || targets.length === 0) return classes;
+    const matched = classes.filter(c => targets.includes(c.id));
+    return matched.length > 0 ? matched : classes;
+  }, [activeTryout, classes]);
+
   // Wadah Sumatif (SAS & SAT) untuk Guru
   const teacherSumatifPackages = useMemo(() => {
     return dbService.getExamPackages().filter(p => p.assessmentType === 'SAS' || p.assessmentType === 'SAT');
@@ -1975,6 +1998,29 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
           </button>
 
           <button
+            onClick={() => handleTabChange('SUMATIF_ASSESSMENTS')}
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+              activeTab === 'SUMATIF_ASSESSMENTS'
+                ? 'bg-teal-600 text-white font-semibold shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <div className="flex items-center space-x-2.5">
+              <FolderKanban className={`w-4 h-4 ${activeTab === 'SUMATIF_ASSESSMENTS' ? 'text-white' : 'text-slate-400'}`} />
+              <span>Wadah Asesmen (SAS/SAT)</span>
+            </div>
+            {teacherSumatifPackages.length > 0 && (
+              <span
+                className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                  activeTab === 'SUMATIF_ASSESSMENTS' ? 'bg-teal-700 text-white' : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                }`}
+              >
+                {teacherSumatifPackages.length}
+              </span>
+            )}
+          </button>
+
+          <button
             onClick={() => handleTabChange('QUESTION_BANK')}
             className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
               activeTab === 'QUESTION_BANK'
@@ -2072,7 +2118,7 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
           </button>
 
           <div className="pt-2 pb-1 px-3 text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">
-            Pengukuran &amp; Integrasi Data
+            Pusat Analisis &amp; Laporan
           </div>
 
           <button
@@ -2085,7 +2131,7 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
           >
             <div className="flex items-center space-x-2.5">
               <TrendingUp className={`w-4 h-4 ${activeTab === 'PROGRESS_TRACKING' ? 'text-white' : 'text-slate-400'}`} />
-              <span>Grafik &amp; Perkembangan</span>
+              <span>Grafik Siklus Try Out</span>
             </div>
           </button>
 
@@ -2099,8 +2145,31 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
           >
             <div className="flex items-center space-x-2.5">
               <BarChart3 className={`w-4 h-4 ${activeTab === 'ANALYTICS' ? 'text-white' : 'text-slate-400'}`} />
-              <span>Analisis Butir Soal</span>
+              <span>Analisis Butir Soal TO</span>
             </div>
+          </button>
+
+          <button
+            onClick={() => handleTabChange('SUMATIF_ANALYTICS')}
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+              activeTab === 'SUMATIF_ANALYTICS'
+                ? 'bg-emerald-600 text-white font-semibold shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <div className="flex items-center space-x-2.5">
+              <Award className={`w-4 h-4 ${activeTab === 'SUMATIF_ANALYTICS' ? 'text-white' : 'text-emerald-500'}`} />
+              <span>Analisis SAT / SAS</span>
+            </div>
+            {teacherSumatifPackages.length > 0 && (
+              <span
+                className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                  activeTab === 'SUMATIF_ANALYTICS' ? 'bg-emerald-700 text-white' : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                }`}
+              >
+                {teacherSumatifPackages.length}
+              </span>
+            )}
           </button>
 
           <button
@@ -2112,7 +2181,7 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
             }`}
           >
             <Download className={`w-4 h-4 ${activeTab === 'REPORTS' ? 'text-white' : 'text-slate-400'}`} />
-            <span>Laporan &amp; Ekspor</span>
+            <span>Laporan &amp; Ekspor Nilai TO</span>
           </button>
 
           <button
@@ -3139,6 +3208,64 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                 </div>
               )}
 
+              {/* TAB: ASESMEN SUMATIF (SAS / SAT) MURNI GOOGLE FORM & SPREADSHEET */}
+              {activeTab === 'SUMATIF_ASSESSMENTS' && (
+                <GuruSumatifAssessmentsSection
+                  dbService={dbService}
+                  currentUser={currentUser}
+                  packages={teacherSumatifPackages}
+                  classes={classes}
+                  subjects={subjects}
+                  onNavigateToAnalytics={(pkgId) => {
+                    setSelectedSumatifPackageId(pkgId);
+                    handleTabChange('SUMATIF_ANALYTICS');
+                  }}
+                  onSyncSubjectSheet={async (pkg, subjectId) => {
+                    const allTo = dbService.getTryouts();
+                    const matchTo = allTo.find(t => t.packageId === pkg.id && t.subjectId === subjectId);
+                    if (matchTo && matchTo.googleSheetUrl) {
+                      await syncTryoutFromSheet(matchTo, true);
+                    } else {
+                      const subItem = pkg.subjects?.find(s => s.subjectId === subjectId);
+                      if (subItem?.googleSheetUrl) {
+                        const targetClassIds = pkg.targetClassIds || [];
+                        const fullSub = subjects.find(s => s.id === subjectId);
+                        const newTo: Tryout = {
+                          id: `to-sum-${Date.now()}-${subjectId}`,
+                          code: `${pkg.code}-${subjectId.slice(-4).toUpperCase()}`,
+                          title: `${pkg.title} - ${fullSub?.name || 'Mapel'}`,
+                          academicYearId: pkg.academicYearId,
+                          packageId: pkg.id,
+                          assessmentType: pkg.assessmentType,
+                          subjectId: subjectId,
+                          targetClassIds: targetClassIds.length > 0 ? targetClassIds : undefined,
+                          startDate: pkg.startDate,
+                          endDate: pkg.endDate,
+                          status: 'ACTIVE',
+                          googleSheetUrl: subItem.googleSheetUrl,
+                          googleFormUrl: subItem.googleFormUrl || undefined,
+                          scoringConfig: {
+                            scoringType: 'EQUAL_WEIGHT',
+                            maxScore: 100,
+                            correctScore: 1,
+                            wrongScore: 0,
+                            unansweredScore: 0,
+                            allowNegativeMarking: false,
+                            passingGrade: 75,
+                          },
+                        };
+                        dbService.saveTryout(newTo);
+                        setTryouts(dbService.getTryoutsForTeacher(currentUser));
+                        await syncTryoutFromSheet(newTo, true);
+                      } else {
+                        triggerToast('Harap tautkan Google Sheet terlebih dahulu.');
+                      }
+                    }
+                  }}
+                  onShowToast={(msg) => triggerToast(msg)}
+                />
+              )}
+
               {/* TAB 3: QUESTION BANK */}
               {activeTab === 'QUESTION_BANK' && (() => {
                 // Statistik ringkasan Bank Soal
@@ -3779,7 +3906,7 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                               className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-800 dark:text-slate-200 font-medium focus:ring-1 focus:ring-indigo-500"
                             >
                               <option value="ALL">Semua Tingkat</option>
-                              {Array.from(new Set(classes.map(c => c.gradeLevel))).sort((a, b) => {
+                              {Array.from(new Set(availableClassesForActiveTryout.map(c => c.gradeLevel))).sort((a, b) => {
                                 const n = (v: string) => parseInt(v, 10) || 0;
                                 return n(a) - n(b);
                               }).map(grade => (
@@ -3795,8 +3922,8 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                               onChange={e => setAnalyticsClassFilter(e.target.value)}
                               className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-800 dark:text-slate-200 font-medium focus:ring-1 focus:ring-indigo-500"
                             >
-                              <option value="ALL">Semua Kelas</option>
-                              {classes.map(c => (
+                              <option value="ALL">Semua Kelas ({availableClassesForActiveTryout.length} Kelas Target)</option>
+                              {availableClassesForActiveTryout.map(c => (
                                 <option key={c.id} value={c.id}>
                                   {c.name}
                                 </option>
@@ -4247,11 +4374,11 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                           <div className="flex items-center space-x-1.5">
                             <span className="text-slate-500 dark:text-slate-400 font-medium">Pilih Kelas:</span>
                             <select
-                              value={analyticsClassFilter === 'ALL' ? classes[0]?.id : analyticsClassFilter}
+                              value={analyticsClassFilter === 'ALL' ? availableClassesForActiveTryout[0]?.id : analyticsClassFilter}
                               onChange={e => setAnalyticsClassFilter(e.target.value)}
                               className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-slate-800 dark:text-slate-200 font-bold focus:ring-1 focus:ring-indigo-500 cursor-pointer"
                             >
-                              {classes.map(c => (
+                              {availableClassesForActiveTryout.map(c => (
                                 <option key={c.id} value={c.id}>
                                   {c.name}
                                 </option>
@@ -4626,8 +4753,8 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                               }}
                               className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-800 dark:text-slate-200 font-bold focus:ring-1 focus:ring-indigo-500"
                             >
-                              <option value="ALL">Semua Kelas</option>
-                              {classes.map(c => (
+                              <option value="ALL">Semua Kelas ({availableClassesForActiveTryout.length} Kelas)</option>
+                              {availableClassesForActiveTryout.map(c => (
                                 <option key={c.id} value={c.id}>
                                   {c.name}
                                 </option>
@@ -5028,8 +5155,8 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                             onChange={e => setPsychometricsClassFilter(e.target.value)}
                             className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 text-slate-800 dark:text-slate-200 font-semibold focus:outline-none"
                           >
-                            <option value="ALL">Semua Kelas (Angkatan)</option>
-                            {classes.map(c => (
+                            <option value="ALL">Semua Kelas ({availableClassesForActiveTryout.length} Kelas Target)</option>
+                            {availableClassesForActiveTryout.map(c => (
                               <option key={c.id} value={c.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
                                 {c.name}
                               </option>
@@ -5486,8 +5613,8 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                                 }}
                                 className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-semibold text-slate-800 dark:text-slate-200 rounded-xl px-2.5 py-1.5 cursor-pointer focus:ring-2 focus:ring-indigo-500"
                               >
-                                <option value="ALL">Semua Kelas</option>
-                                {classes.map(c => (
+                                <option value="ALL">Semua Kelas ({availableClassesForActiveTryout.length} Kelas Target)</option>
+                                {availableClassesForActiveTryout.map(c => (
                                   <option key={c.id} value={c.id}>{c.name}</option>
                                 ))}
                               </select>
@@ -8714,6 +8841,23 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                     )}
                   </div>
                 </div>
+              )}
+
+              {/* TAB: PUSAT ANALISIS ASESMEN SUMATIF (SAS / SAT) MULTI-WADAH */}
+              {activeTab === 'SUMATIF_ANALYTICS' && (
+                <GuruSumatifAnalyticsSection
+                  packages={teacherSumatifPackages}
+                  selectedPackageId={selectedSumatifPackageId}
+                  onSelectPackageId={(id) => setSelectedSumatifPackageId(id)}
+                  activeSubject={activeSubjectObj}
+                  classes={classes}
+                  students={students}
+                  scores={scores}
+                  questions={questions}
+                  answers={dbService.getAnswers()}
+                  subjects={subjects}
+                  onShowToast={(msg) => triggerToast(msg)}
+                />
               )}
 
               {/* TAB 13: SCORING ENGINE & VERIFICATION (PHASE 8 SPECIFICATION) */}

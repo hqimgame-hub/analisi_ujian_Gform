@@ -80,10 +80,27 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
   // Group classes by gradeLevel (e.g. 7, 8, 9 or X, XI, XII)
   const availableGrades = Array.from(new Set(classes.map(c => c.gradeLevel))).sort();
 
+  const generateSmartCode = (type: AssessmentType, targetClassIdsList: string[]) => {
+    const grades = Array.from(
+      new Set(
+        classes
+          .filter(c => targetClassIdsList.includes(c.id))
+          .map(c => c.gradeLevel)
+      )
+    ).sort();
+    const gradeStr = grades.length > 0 ? grades.join('') : '';
+    const prefix = type === 'SAT' ? 'SAT' : type === 'SAS' ? 'SAS' : 'TO';
+    const rand = Date.now().toString().slice(-4);
+    if (gradeStr) {
+      return `${prefix}-KLS${gradeStr}-${rand}`;
+    }
+    return `${prefix}-${rand}`;
+  };
+
   const handleOpenCreateModal = () => {
     setEditingPackageId(null);
     setFormTitle('');
-    setFormCode(`PKT-${Date.now().toString().slice(-4)}`);
+    setFormCode(`TO-${Date.now().toString().slice(-4)}`);
     setFormType('TRYOUT');
     setFormAcademicYearId(academicYears.find(a => a.isActive)?.id || academicYears[0]?.id || '');
     setFormStartDate(new Date().toISOString().slice(0, 10));
@@ -154,8 +171,16 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
       alert('Nama Paket Ujian wajib diisi.');
       return;
     }
-    if (!formCode.trim()) {
+    const cleanCode = formCode.trim().toUpperCase();
+    if (!cleanCode) {
       alert('Kode Paket Ujian wajib diisi.');
+      return;
+    }
+    const duplicatePkg = packages.find(
+      p => p.code.toUpperCase() === cleanCode && p.id !== editingPackageId
+    );
+    if (duplicatePkg) {
+      alert(`Kode Paket '${cleanCode}' sudah digunakan oleh paket '${duplicatePkg.title}'. Harap gunakan kode unik agar tidak terjadi bentrok data antar jenjang.`);
       return;
     }
     if (formTargetClassIds.length === 0) {
@@ -812,15 +837,26 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-700 dark:text-slate-300">
-                    Kode Paket *
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="font-semibold text-slate-700 dark:text-slate-300">
+                      Kode Paket *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setFormCode(generateSmartCode(formType, formTargetClassIds))}
+                      className="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                      title="Generate kode unik otomatis sesuai tipe asesmen dan jenjang kelas"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>Buat Kode Cerdas</span>
+                    </button>
+                  </div>
                   <input
                     type="text"
                     required
                     value={formCode}
-                    onChange={e => setFormCode(e.target.value)}
-                    placeholder="TO-9-01"
+                    onChange={e => setFormCode(e.target.value.toUpperCase())}
+                    placeholder="Contoh: SAT-KLS9 atau TO-KLS8"
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl uppercase font-mono"
                   />
                 </div>
@@ -834,7 +870,19 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
                   </label>
                   <select
                     value={formType}
-                    onChange={e => setFormType(e.target.value as any)}
+                    onChange={e => {
+                      const nextType = e.target.value as AssessmentType;
+                      setFormType(nextType);
+                      if (
+                        !formCode ||
+                        formCode.startsWith('TO-') ||
+                        formCode.startsWith('SAS-') ||
+                        formCode.startsWith('SAT-') ||
+                        formCode.startsWith('PKT-')
+                      ) {
+                        setFormCode(generateSmartCode(nextType, formTargetClassIds));
+                      }
+                    }}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl"
                   >
                     <option value="TRYOUT">Try Out (TO)</option>

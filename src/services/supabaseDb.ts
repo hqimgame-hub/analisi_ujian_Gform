@@ -1306,11 +1306,25 @@ class SupabaseDbService {
     if (!this.isAvailable() || !supabase) return;
     try {
       const ayId = supabaseAcademicYearId || pkg.academicYearId;
-      const { data: existing } = await supabase
-        .from('exam_packages')
-        .select('id')
-        .eq('code', pkg.code)
-        .maybeSingle();
+      let existing: { id: string } | null = null;
+
+      if (isValidUuid(pkg.id)) {
+        const { data: byId } = await supabase
+          .from('exam_packages')
+          .select('id')
+          .eq('id', pkg.id)
+          .maybeSingle();
+        if (byId?.id) existing = byId as any;
+      }
+
+      if (!existing && pkg.code) {
+        const { data: byCode } = await supabase
+          .from('exam_packages')
+          .select('id')
+          .eq('code', pkg.code)
+          .maybeSingle();
+        if (byCode?.id) existing = byCode as any;
+      }
 
       const payload = toSupabaseExamPackage(pkg, ayId);
       let pkgId: string | null = null;
