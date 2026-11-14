@@ -3,7 +3,7 @@ import {
   FolderKanban, Plus, Search, Filter, CheckCircle2, AlertCircle,
   Calendar, School, BookOpen, Link as LinkIcon, ExternalLink,
   Edit2, Trash2, Check, X, ChevronRight, ChevronDown, Sparkles,
-  Clock, FileSpreadsheet, Layers, ShieldCheck, UserCheck
+  Clock, FileSpreadsheet, Layers, ShieldCheck, UserCheck, Copy
 } from 'lucide-react';
 import {
   ExamPackage, ExamPackageSubject, ClassRoom, Subject,
@@ -34,6 +34,7 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | TryoutStatus>('ALL');
   const [selectedPackage, setSelectedPackage] = useState<ExamPackage | null>(null);
+  const [adminSubFilter, setAdminSubFilter] = useState<'ALL' | 'FILLED' | 'UNFILLED'>('ALL');
 
   // Modal State for Create/Edit Package
   const [showPackageModal, setShowPackageModal] = useState(false);
@@ -517,6 +518,40 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
                       }}
                     />
                   </div>
+
+                  {/* Ringkasan status mapel yang belum mengisi link */}
+                  {(() => {
+                    const unfilledSubs = (pkg.subjects || [])
+                      .filter(item => !item.googleSheetUrl?.trim())
+                      .map(item => subjects.find(s => s.id === item.subjectId)?.name || item.subjectId);
+
+                    if (totalSubjects > 0 && unfilledSubs.length === 0) {
+                      return (
+                        <div className="mt-2.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800/60 flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>Semua link mapel lengkap ({totalSubjects}/{totalSubjects})</span>
+                        </div>
+                      );
+                    }
+
+                    if (unfilledSubs.length > 0) {
+                      return (
+                        <div className="mt-2.5 p-2.5 rounded-xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200/70 dark:border-amber-800/70 text-[11px] text-amber-800 dark:text-amber-300 space-y-1">
+                          <div className="flex items-center justify-between font-bold">
+                            <span className="flex items-center gap-1">
+                              <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                              Belum Ada Link ({unfilledSubs.length} Mapel):
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-amber-700/90 dark:text-amber-400 line-clamp-1 font-medium">
+                            {unfilledSubs.slice(0, 3).join(', ')}
+                            {unfilledSubs.length > 3 ? ` +${unfilledSubs.length - 3} lainnya` : ''}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               </div>
 
@@ -701,128 +736,218 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
           </div>
 
           {/* ── SECTION B: DAFTAR MAPEL & STATUS INTEGRASI ── */}
-          <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-800">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                <span>Status Mata Pelajaran &amp; Sumber Nilai ({selectedPackage.subjects.length} Mapel)</span>
-              </h4>
-            </div>
+          {(() => {
+            const unfilledList = selectedPackage.subjects.filter(item => !item.googleSheetUrl?.trim());
+            const filledList = selectedPackage.subjects.filter(item => Boolean(item.googleSheetUrl?.trim()));
 
-            <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase text-[10px]">
-                  <th className="py-2.5 px-3">Mata Pelajaran</th>
-                  <th className="py-2.5 px-3">Status Link</th>
-                  <th className="py-2.5 px-3">Terakhir Diperbarui</th>
-                  <th className="py-2.5 px-3">Google Spreadsheet</th>
-                  <th className="py-2.5 px-3 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {selectedPackage.subjects.map(item => {
-                  const subj = subjects.find(s => s.id === item.subjectId);
-                  const hasSheet = Boolean(item.googleSheetUrl?.trim());
-                  const extToForSubj = pkgTryouts.find(t =>
-                    t.isExternal && (
-                      (t.externalSubjectIds && t.externalSubjectIds.includes(item.subjectId)) ||
-                      (t.externalSubjects && subj && t.externalSubjects.includes(subj.name))
-                    )
-                  );
-                  const isSyncedViaExternal = Boolean(!hasSheet && extToForSubj && !isSelectedSatSas);
+            const handleCopyWaReminder = () => {
+              const missingNames = unfilledList.map(item => subjects.find(s => s.id === item.subjectId)?.name || item.subjectId);
+              if (missingNames.length === 0) {
+                onShowToast('Seluruh mata pelajaran sudah memiliki tautan spreadsheet.');
+                return;
+              }
 
-                  return (
-                    <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="py-3 px-3">
-                        <div className="font-bold text-slate-900 dark:text-slate-100">
-                          {subj?.name || item.subjectId}
-                        </div>
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          {subj?.code || 'MAPEL'} • {subj?.category || 'WAJIB'}
-                        </span>
-                      </td>
+              const text = `🔔 *Pengingat Asesmen ${selectedPackage.assessmentType} - ${selectedPackage.title}*\n\n` +
+                `Kepada Bapak/Ibu Guru pengampu mata pelajaran berikut, dimohon untuk segera menginputkan tautan Google Form dan Spreadsheet respons ke sistem:\n\n` +
+                missingNames.map((s, idx) => `${idx + 1}. ${s}`).join('\n') +
+                `\n\nTerima kasih atas kerja samanya. 🙏`;
 
-                      <td className="py-3 px-3">
-                        {hasSheet ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
-                            <CheckCircle2 className="w-3 h-3" />
-                            <span>Terhubung (GSheet)</span>
-                          </span>
-                        ) : isSyncedViaExternal ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                            <CheckCircle2 className="w-3 h-3" />
-                            <span>TO Eksternal ({extToForSubj?.code})</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300">
-                            <AlertCircle className="w-3 h-3" />
-                            <span>Belum Ada Link</span>
-                          </span>
-                        )}
-                      </td>
+              navigator.clipboard.writeText(text);
+              onShowToast(`Pesan pengingat untuk ${missingNames.length} mapel berhasil disalin ke clipboard!`);
+            };
 
-                      <td className="py-3 px-3 text-slate-500">
-                        {item.lastUpdatedBy ? (
-                          <div>
-                            <span className="font-medium text-slate-700 dark:text-slate-300 block">
-                              {item.lastUpdatedBy}
-                            </span>
-                            <span className="text-[10px] text-slate-400">
-                              {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('id-ID') : '-'}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 italic">Belum diinput</span>
-                        )}
-                      </td>
+            const displayedSubjects = selectedPackage.subjects.filter(item => {
+              const hasSheet = Boolean(item.googleSheetUrl?.trim());
+              if (adminSubFilter === 'FILLED') return hasSheet;
+              if (adminSubFilter === 'UNFILLED') return !hasSheet;
+              return true;
+            });
 
-                      <td className="py-3 px-3 max-w-xs truncate text-slate-600 dark:text-slate-400">
-                        {hasSheet ? (
-                          <a
-                            href={item.googleSheetUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline"
-                          >
-                            <ExternalLink className="w-3 h-3 shrink-0" />
-                            <span className="truncate">{item.googleSheetUrl}</span>
-                          </a>
-                        ) : isSyncedViaExternal ? (
-                          <span className="text-purple-700 dark:text-purple-300 text-[11px] font-medium flex items-center gap-1">
-                            <FileSpreadsheet className="w-3.5 h-3.5" />
-                            <span>Rekap Nilai Eksternal ({extToForSubj?.title || extToForSubj?.code})</span>
-                          </span>
-                        ) : (
-                          <span className="text-slate-400 text-[11px] italic">
-                            Belum ada link spreadsheet
-                          </span>
-                        )}
-                      </td>
+            return (
+              <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                    <span>Status Mata Pelajaran &amp; Sumber Nilai ({selectedPackage.subjects.length} Mapel)</span>
+                  </h4>
 
-                      <td className="py-3 px-3 text-right">
-                        <button
-                          onClick={() =>
-                            setEditingSubjectItem({
-                              pkgId: selectedPackage.id,
-                              subjectId: item.subjectId,
-                              subjectName: subj?.name || item.subjectId,
-                              sheetUrl: item.googleSheetUrl || '',
-                              formUrl: item.googleFormUrl || ''
-                            })
-                          }
-                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold cursor-pointer shadow-2xs transition-colors"
-                        >
-                          {hasSheet ? 'Ganti Link' : 'Input Link (Bantu Guru)'}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            </div>
-          </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Filter Tabs: Semua / Lengkap / Belum */}
+                    <div className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 text-xs font-semibold">
+                      <button
+                        type="button"
+                        onClick={() => setAdminSubFilter('ALL')}
+                        className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                          adminSubFilter === 'ALL'
+                            ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs font-bold'
+                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                        }`}
+                      >
+                        Semua ({selectedPackage.subjects.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAdminSubFilter('FILLED')}
+                        className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                          adminSubFilter === 'FILLED'
+                            ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-2xs font-bold'
+                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                        }`}
+                      >
+                        Sudah Lengkap ({filledList.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAdminSubFilter('UNFILLED')}
+                        className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                          adminSubFilter === 'UNFILLED'
+                            ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-2xs font-bold'
+                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                        }`}
+                      >
+                        Belum Isi ({unfilledList.length})
+                      </button>
+                    </div>
+
+                    {/* Tombol Salin Pengingat WA */}
+                    {unfilledList.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleCopyWaReminder}
+                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                        title="Salin pesan pengingat ke clipboard untuk dibagikan ke WhatsApp"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Salin Pengingat WA ({unfilledList.length})</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase text-[10px]">
+                        <th className="py-2.5 px-3">Mata Pelajaran</th>
+                        <th className="py-2.5 px-3">Status Link</th>
+                        <th className="py-2.5 px-3">Terakhir Diperbarui</th>
+                        <th className="py-2.5 px-3">Google Spreadsheet</th>
+                        <th className="py-2.5 px-3 text-right">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {displayedSubjects.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-6 text-center text-xs text-slate-400 italic">
+                            Tidak ada mata pelajaran dengan filter ini.
+                          </td>
+                        </tr>
+                      ) : (
+                        displayedSubjects.map(item => {
+                          const subj = subjects.find(s => s.id === item.subjectId);
+                          const hasSheet = Boolean(item.googleSheetUrl?.trim());
+                          const extToForSubj = pkgTryouts.find(t =>
+                            t.isExternal && (
+                              (t.externalSubjectIds && t.externalSubjectIds.includes(item.subjectId)) ||
+                              (t.externalSubjects && subj && t.externalSubjects.includes(subj.name))
+                            )
+                          );
+                          const isSyncedViaExternal = Boolean(!hasSheet && extToForSubj && !isSelectedSatSas);
+
+                          return (
+                            <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                              <td className="py-3 px-3">
+                                <div className="font-bold text-slate-900 dark:text-slate-100">
+                                  {subj?.name || item.subjectId}
+                                </div>
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  {subj?.code || 'MAPEL'} • {subj?.category || 'WAJIB'}
+                                </span>
+                              </td>
+
+                              <td className="py-3 px-3">
+                                {hasSheet ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    <span>Terhubung (GSheet)</span>
+                                  </span>
+                                ) : isSyncedViaExternal ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    <span>TO Eksternal ({extToForSubj?.code})</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300">
+                                    <AlertCircle className="w-3 h-3" />
+                                    <span>Belum Ada Link</span>
+                                  </span>
+                                )}
+                              </td>
+
+                              <td className="py-3 px-3 text-slate-500">
+                                {item.lastUpdatedBy ? (
+                                  <div>
+                                    <span className="font-medium text-slate-700 dark:text-slate-300 block">
+                                      {item.lastUpdatedBy}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400">
+                                      {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('id-ID') : '-'}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400 italic">Belum diinput</span>
+                                )}
+                              </td>
+
+                              <td className="py-3 px-3 max-w-xs truncate text-slate-600 dark:text-slate-400">
+                                {hasSheet ? (
+                                  <a
+                                    href={item.googleSheetUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline"
+                                  >
+                                    <ExternalLink className="w-3 h-3 shrink-0" />
+                                    <span className="truncate">{item.googleSheetUrl}</span>
+                                  </a>
+                                ) : isSyncedViaExternal ? (
+                                  <span className="text-purple-700 dark:text-purple-300 text-[11px] font-medium flex items-center gap-1">
+                                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                                    <span>Rekap Nilai Eksternal ({extToForSubj?.title || extToForSubj?.code})</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 text-[11px] italic">
+                                    Belum ada link spreadsheet
+                                  </span>
+                                )}
+                              </td>
+
+                              <td className="py-3 px-3 text-right">
+                                <button
+                                  onClick={() =>
+                                    setEditingSubjectItem({
+                                      pkgId: selectedPackage.id,
+                                      subjectId: item.subjectId,
+                                      subjectName: subj?.name || item.subjectId,
+                                      sheetUrl: item.googleSheetUrl || '',
+                                      formUrl: item.googleFormUrl || ''
+                                    })
+                                  }
+                                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold cursor-pointer shadow-2xs transition-colors"
+                                >
+                                  {hasSheet ? 'Ganti Link' : 'Input Link (Bantu Guru)'}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
         </div>
         );
       })()}

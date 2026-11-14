@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   FolderKanban, FileSpreadsheet, ExternalLink, RefreshCw,
   CheckCircle2, AlertCircle, Calendar, School, BookOpen,
@@ -35,11 +35,64 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
   // Mode Tampilan: FOCUSED (Satu Wadah Terpilih per Waktu) vs ALL (Tampilkan Semua Vertikal)
   const [viewMode, setViewMode] = useState<'FOCUSED' | 'ALL'>('FOCUSED');
 
+  // Ambil ID mapel yang diizinkan untuk guru yang sedang login
+  const allowedSubjectIds = useMemo(() => {
+    return dbService.getTeacherAllowedSubjectIds(currentUser);
+  }, [dbService, currentUser]);
+
+  // Statistik kelengkapan tautan mapel guru per wadah
+  const packagesWithStats = useMemo(() => {
+    return packages
+      .map(pkg => {
+        // Filter mapel hanya yang diampu oleh guru yang sedang login (atau semua jika role ADMIN)
+        const relevantPkgSubjects = (pkg.subjects || []).filter(pkgSub => {
+          if (currentUser.role === 'ADMIN') return true;
+          return allowedSubjectIds.includes(pkgSub.subjectId);
+        });
+
+        const allTo = dbService.getTryouts() || [];
+        const userSubjects = relevantPkgSubjects.map(pkgSub => {
+          const fullSub = subjects.find(s => s.id === pkgSub.subjectId);
+          const matchTo = allTo.find(t => t.packageId === pkg.id && t.subjectId === pkgSub.subjectId);
+          const responseCount = matchTo ? (dbService.getScoresByTryout(matchTo.id) || []).length : 0;
+
+          return {
+            ...pkgSub,
+            subjectName: fullSub?.name || 'Mata Pelajaran',
+            subjectCode: fullSub?.code || 'MAPEL',
+            hasSheet: Boolean(pkgSub.googleSheetUrl?.trim()),
+            hasForm: Boolean(pkgSub.googleFormUrl?.trim()),
+            responseCount,
+            tryoutId: matchTo?.id,
+          };
+        });
+
+        const totalSubjects = userSubjects.length;
+        const filledSubjects = userSubjects.filter(s => s.hasSheet).length;
+        const isComplete = totalSubjects > 0 && filledSubjects === totalSubjects;
+
+        return {
+          pkg,
+          userSubjects,
+          totalSubjects,
+          filledSubjects,
+          isComplete,
+        };
+      })
+      // Untuk guru: hanya tampilkan wadah yang memuat mata pelajaran yang diampunya
+      .filter(item => currentUser.role === 'ADMIN' || item.totalSubjects > 0);
+  }, [packages, subjects, allowedSubjectIds, currentUser, dbService]);
+
   // ID Wadah yang Sedang Dipilih
-  const [selectedPkgId, setSelectedPkgId] = useState<string>(() => {
-    if (packages.length > 0) return packages[0].id;
-    return '';
-  });
+  const [selectedPkgId, setSelectedPkgId] = useState<string>('');
+
+  useEffect(() => {
+    if (packagesWithStats.length > 0) {
+      if (!selectedPkgId || !packagesWithStats.some(p => p.pkg.id === selectedPkgId)) {
+        setSelectedPkgId(packagesWithStats[0].pkg.id);
+      }
+    }
+  }, [packagesWithStats, selectedPkgId]);
 
   // Modal State for Editing Google Form & Google Sheet Links
   const [editingItem, setEditingItem] = useState<{
@@ -50,34 +103,6 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
     sheetUrl: string;
     formUrl: string;
   } | null>(null);
-
-  // Statistik kelengkapan tautan mapel guru per wadah
-  const packagesWithStats = useMemo(() => {
-    return packages.map(pkg => {
-      const userSubjects = (pkg.subjects || []).map(pkgSub => {
-        const fullSub = subjects.find(s => s.id === pkgSub.subjectId);
-        return {
-          ...pkgSub,
-          subjectName: fullSub?.name || 'Mata Pelajaran',
-          subjectCode: fullSub?.code || 'MAPEL',
-          hasSheet: Boolean(pkgSub.googleSheetUrl?.trim()),
-          hasForm: Boolean(pkgSub.googleFormUrl?.trim()),
-        };
-      });
-
-      const totalSubjects = userSubjects.length;
-      const filledSubjects = userSubjects.filter(s => s.hasSheet).length;
-      const isComplete = totalSubjects > 0 && filledSubjects === totalSubjects;
-
-      return {
-        pkg,
-        userSubjects,
-        totalSubjects,
-        filledSubjects,
-        isComplete,
-      };
-    });
-  }, [packages, subjects]);
 
   const totalAllPackages = packages.length;
   const completedPackagesCount = packagesWithStats.filter(p => p.isComplete).length;
@@ -257,6 +282,237 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
     );
   }
 
+  // EMPTY STATE: Jika guru belum memiliki mapel terdaftar di wadah manapun
+  if (packagesWithStats.length === 0) {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+              <FolderKanban className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                Manajemen Asesmen Sumatif (SAS &amp; SAT)
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Kelola tautan Google Form soal &amp; Google Sheet respons siswa untuk evaluasi resmi rapor semesteran.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-slate-50/70 dark:bg-slate-900/40 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-12 text-center max-w-2xl mx-auto space-y-4">
+          <div className="w-16 h-16 mx-auto rounded-3xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 shadow-inner">
+            <BookOpen className="w-8 h-8" />
+          </div>
+          <div className="space-y-1.5">
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+              Belum Ada Jadwal Asesmen untuk Mata Pelajaran Anda
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-md mx-auto">
+              Wadah asesmen SAT/SAS telah dibuat oleh admin sekolah, namun mata pelajaran yang Anda ampu belum terdaftar di dalamnya. Hubungi Administrator atau Tim Kurikulum jika Anda ditugaskan mengampu mata pelajaran pada jadwal asesmen ini.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Komponen Kartu Spotlight / Hero Mata Pelajaran
+  const renderSubjectCard = (
+    pkg: ExamPackage,
+    subItem: (typeof packagesWithStats)[0]['userSubjects'][0]
+  ) => {
+    const hasSheet = subItem.hasSheet;
+    const hasForm = subItem.hasForm;
+    const isSyncingThis = syncingKey === `${pkg.id}-${subItem.subjectId}`;
+
+    return (
+      <div
+        key={subItem.subjectId}
+        className="bg-white dark:bg-slate-900 border-2 border-slate-200/90 dark:border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4 shadow-2xs hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+      >
+        {/* Header Spotlight Mapel */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/50 dark:border-indigo-800/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold shrink-0">
+              <BookOpen className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                  {subItem.subjectName}
+                </h4>
+                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
+                  {subItem.subjectCode}
+                </span>
+              </div>
+              <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 block">
+                Kriteria Ketuntasan (KKTP): <strong>{subItem.passingGrade || 75}</strong>
+              </span>
+            </div>
+          </div>
+
+          {/* Status Badges di Pojok Kanan Atas */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {subItem.responseCount > 0 ? (
+              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5" />
+                <span>{subItem.responseCount} Siswa Terdata</span>
+              </span>
+            ) : (
+              <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                0 Siswa Terdata
+              </span>
+            )}
+
+            <span
+              className={`text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 ${
+                hasSheet
+                  ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                  : 'bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+              }`}
+            >
+              {hasSheet ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Sheet Tertaut</span>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Belum Ada Sheet</span>
+                </>
+              )}
+            </span>
+          </div>
+        </div>
+
+        {/* Dual Workspace Panel: Google Form & Google Sheet */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* Panel 1: Google Form Soal */}
+          <div className="p-3.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 space-y-2 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                  <ExternalLink className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Google Form Soal Ujian</span>
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium">Link Siswa</span>
+              </div>
+              {hasForm ? (
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate font-mono bg-white dark:bg-slate-900 px-2 py-1.5 rounded-lg border border-slate-200/70 dark:border-slate-800">
+                  {subItem.googleFormUrl}
+                </p>
+              ) : (
+                <p className="text-xs text-slate-400 italic">Belum ada link form soal (opsional)</p>
+              )}
+            </div>
+
+            <div className="pt-2 flex items-center justify-end">
+              {hasForm ? (
+                <a
+                  href={subItem.googleFormUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 rounded-lg border border-indigo-200 dark:border-indigo-800 flex items-center gap-1.5 transition-colors"
+                >
+                  <span>Buka Form Soal</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              ) : (
+                <span className="text-[11px] text-slate-400">Dapat ditautkan melalui tombol Tautkan</span>
+              )}
+            </div>
+          </div>
+
+          {/* Panel 2: Google Spreadsheet Respon */}
+          <div className="p-3.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 space-y-2 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Google Spreadsheet Respons</span>
+                </span>
+                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">Sumber Nilai</span>
+              </div>
+              {hasSheet ? (
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate font-mono bg-white dark:bg-slate-900 px-2 py-1.5 rounded-lg border border-slate-200/70 dark:border-slate-800">
+                  {subItem.googleSheetUrl}
+                </p>
+              ) : (
+                <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                  Wajib ditautkan agar respons jawaban siswa dapat ditarik.
+                </p>
+              )}
+            </div>
+
+            <div className="pt-2 flex items-center justify-end">
+              {hasSheet ? (
+                <a
+                  href={subItem.googleSheetUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 rounded-lg border border-emerald-200 dark:border-emerald-800 flex items-center gap-1.5 transition-colors"
+                >
+                  <span>Buka Spreadsheet</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              ) : (
+                <span className="text-[11px] text-amber-500">Belum ada tautan spreadsheet</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons: Tautkan, Tarik Respons, Buka Analisis */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                setEditingItem({
+                  pkgId: pkg.id,
+                  pkgTitle: pkg.title,
+                  subjectId: subItem.subjectId,
+                  subjectName: subItem.subjectName,
+                  sheetUrl: subItem.googleSheetUrl || '',
+                  formUrl: subItem.googleFormUrl || '',
+                })
+              }
+              className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+            >
+              <LinkIcon className="w-3.5 h-3.5 text-indigo-600" />
+              <span>{hasSheet ? 'Ganti Tautan' : 'Tautkan Sheet / Form'}</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={!hasSheet || isSyncingThis}
+              onClick={() => handleTriggerSync(pkg, subItem.subjectId, subItem.subjectName)}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+              title="Tarik data respons siswa terbaru dari Google Sheet"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingThis ? 'animate-spin' : ''}`} />
+              <span>{isSyncingThis ? 'Menyinkronkan...' : 'Tarik Respons Siswa'}</span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => onNavigateToAnalytics(pkg.id)}
+            className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+          >
+            <Award className="w-3.5 h-3.5" />
+            <span>Buka Analisis Butir Soal</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* ── HEADER & SEARCH BAR ── */}
@@ -271,7 +527,7 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
                 Manajemen Asesmen Sumatif (SAS &amp; SAT)
               </h2>
               <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800">
-                {packages.length} Wadah Aktif
+                {filteredPackagesWithStats.length} Wadah Ditugaskan
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -292,7 +548,7 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
       </div>
 
       {/* ── QUICK PROGRESS & PILL TAB SELECTOR ── */}
-      {packages.length > 1 && (
+      {filteredPackagesWithStats.length > 1 && (
         <div className="space-y-3">
           {/* Progress Tracker Bar */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
@@ -329,7 +585,7 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
                   title="Tampilkan semua wadah sekaligus"
                 >
                   <LayoutGrid className="w-3.5 h-3.5" />
-                  <span>Tampilkan Semua ({packages.length})</span>
+                  <span>Tampilkan Semua ({filteredPackagesWithStats.length})</span>
                 </button>
               </div>
             </div>
@@ -505,137 +761,20 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
                       <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Slot Mata Pelajaran Anda ({item.userSubjects.length} Mapel):</span>
+                      <span>Mata Pelajaran yang Anda Ampu ({item.userSubjects.length} Mapel):</span>
                     </span>
                     <span className="text-[11px] text-slate-400">
-                      Silakan isi tautan Google Spreadsheet respons untuk menarik nilai siswa
+                      Tautkan spreadsheet respon untuk menarik data jawaban siswa
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {item.userSubjects.map(subItem => {
-                      const hasSheet = subItem.hasSheet;
-                      const hasForm = subItem.hasForm;
-                      const isSyncingThis = syncingKey === `${pkg.id}-${subItem.subjectId}`;
-
-                      return (
-                        <div
-                          key={subItem.subjectId}
-                          className="bg-slate-50/90 dark:bg-slate-800/70 border border-slate-200/90 dark:border-slate-700/80 rounded-2xl p-4 space-y-3"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
-                                  {subItem.subjectCode}
-                                </span>
-                                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                                  {subItem.subjectName}
-                                </h4>
-                              </div>
-                              <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
-                                KKTP Ketuntasan: <strong>{subItem.passingGrade || 75}</strong>
-                              </span>
-                            </div>
-
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                                hasSheet
-                                  ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
-                                  : 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
-                              }`}
-                            >
-                              {hasSheet ? (
-                                <>
-                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                  <span>Sheet Tertaut</span>
-                                </>
-                              ) : (
-                                <>
-                                  <AlertCircle className="w-3 h-3 text-amber-600" />
-                                  <span>Belum Ada Sheet</span>
-                                </>
-                              )}
-                            </span>
-                          </div>
-
-                          {/* Status Tautan Link Google Form & Sheet */}
-                          <div className="space-y-1.5 text-xs">
-                            <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
-                              <span className="text-[11px] font-semibold text-slate-500">Google Sheet Respons:</span>
-                              {hasSheet ? (
-                                <a
-                                  href={subItem.googleSheetUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline flex items-center gap-1 text-[11px]"
-                                >
-                                  <FileSpreadsheet className="w-3 h-3" />
-                                  <span>Buka Spreadsheet</span>
-                                  <ExternalLink className="w-2.5 h-2.5" />
-                                </a>
-                              ) : (
-                                <span className="text-slate-400 text-[11px] italic">Belum diinput</span>
-                              )}
-                            </div>
-
-                            <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
-                              <span className="text-[11px] font-semibold text-slate-500">Google Form Soal:</span>
-                              {hasForm ? (
-                                <a
-                                  href={subItem.googleFormUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline flex items-center gap-1 text-[11px]"
-                                >
-                                  <ExternalLink className="w-3 h-3" />
-                                  <span>Buka Form</span>
-                                </a>
-                              ) : (
-                                <span className="text-slate-400 text-[11px] italic">Opsional</span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Action Buttons: Input Link & Sync Respon */}
-                          <div className="flex items-center gap-2 pt-1">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setEditingItem({
-                                  pkgId: pkg.id,
-                                  pkgTitle: pkg.title,
-                                  subjectId: subItem.subjectId,
-                                  subjectName: subItem.subjectName,
-                                  sheetUrl: subItem.googleSheetUrl || '',
-                                  formUrl: subItem.googleFormUrl || '',
-                                })
-                              }
-                              className="flex-1 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
-                            >
-                              <LinkIcon className="w-3 h-3 text-indigo-600" />
-                              <span>{hasSheet ? 'Ganti Tautan' : 'Tautkan Sheet'}</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              disabled={!hasSheet || isSyncingThis}
-                              onClick={() => handleTriggerSync(pkg, subItem.subjectId, subItem.subjectName)}
-                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
-                              title="Tarik data respons siswa terbaru dari Google Sheet"
-                            >
-                              <RefreshCw className={`w-3 h-3 ${isSyncingThis ? 'animate-spin' : ''}`} />
-                              <span>{isSyncingThis ? 'Menyinkronkan...' : 'Tarik Respons'}</span>
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className={`grid grid-cols-1 ${item.userSubjects.length > 1 ? 'xl:grid-cols-2' : ''} gap-4`}>
+                    {item.userSubjects.map(subItem => renderSubjectCard(pkg, subItem))}
                   </div>
                 </div>
 
                 {/* Step-through Sequential Navigation Bar */}
-                {packages.length > 1 && (
+                {filteredPackagesWithStats.length > 1 && (
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
                     {prevPkg ? (
                       <button
@@ -651,7 +790,7 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
                     )}
 
                     <span className="text-xs font-semibold text-slate-400 text-center">
-                      Wadah {activePkgIndex + 1} dari {packages.length}
+                      Wadah {activePkgIndex + 1} dari {filteredPackagesWithStats.length}
                     </span>
 
                     {nextPkg ? (
@@ -765,132 +904,15 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
                       <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Slot Mata Pelajaran Anda:</span>
+                      <span>Mata Pelajaran yang Anda Ampu ({item.userSubjects.length} Mapel):</span>
                     </span>
                     <span className="text-[11px] text-slate-400">
-                      {item.userSubjects.length} Mata Pelajaran Terdaftar
+                      Tautkan spreadsheet respon untuk menarik data jawaban siswa
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {item.userSubjects.map(subItem => {
-                      const hasSheet = subItem.hasSheet;
-                      const hasForm = subItem.hasForm;
-                      const isSyncingThis = syncingKey === `${pkg.id}-${subItem.subjectId}`;
-
-                      return (
-                        <div
-                          key={subItem.subjectId}
-                          className="bg-slate-50/90 dark:bg-slate-800/70 border border-slate-200/90 dark:border-slate-700/80 rounded-2xl p-4 space-y-3"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
-                                  {subItem.subjectCode}
-                                </span>
-                                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                                  {subItem.subjectName}
-                                </h4>
-                              </div>
-                              <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
-                                KKTP Ketuntasan: <strong>{subItem.passingGrade || 75}</strong>
-                              </span>
-                            </div>
-
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                                hasSheet
-                                  ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
-                                  : 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
-                              }`}
-                            >
-                              {hasSheet ? (
-                                <>
-                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                  <span>Sheet Tertaut</span>
-                                </>
-                              ) : (
-                                <>
-                                  <AlertCircle className="w-3 h-3 text-amber-600" />
-                                  <span>Belum Ada Sheet</span>
-                                </>
-                              )}
-                            </span>
-                          </div>
-
-                          {/* Status Tautan Link Google Form & Sheet */}
-                          <div className="space-y-1.5 text-xs">
-                            <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
-                              <span className="text-[11px] font-semibold text-slate-500">Google Sheet Respons:</span>
-                              {hasSheet ? (
-                                <a
-                                  href={subItem.googleSheetUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline flex items-center gap-1 text-[11px]"
-                                >
-                                  <FileSpreadsheet className="w-3 h-3" />
-                                  <span>Buka Spreadsheet</span>
-                                  <ExternalLink className="w-2.5 h-2.5" />
-                                </a>
-                              ) : (
-                                <span className="text-slate-400 text-[11px] italic">Belum diinput</span>
-                              )}
-                            </div>
-
-                            <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
-                              <span className="text-[11px] font-semibold text-slate-500">Google Form Soal:</span>
-                              {hasForm ? (
-                                <a
-                                  href={subItem.googleFormUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline flex items-center gap-1 text-[11px]"
-                                >
-                                  <ExternalLink className="w-3 h-3" />
-                                  <span>Buka Form</span>
-                                </a>
-                              ) : (
-                                <span className="text-slate-400 text-[11px] italic">Opsional</span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Action Buttons: Input Link & Sync Respon */}
-                          <div className="flex items-center gap-2 pt-1">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setEditingItem({
-                                  pkgId: pkg.id,
-                                  pkgTitle: pkg.title,
-                                  subjectId: subItem.subjectId,
-                                  subjectName: subItem.subjectName,
-                                  sheetUrl: subItem.googleSheetUrl || '',
-                                  formUrl: subItem.googleFormUrl || '',
-                                })
-                              }
-                              className="flex-1 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
-                            >
-                              <LinkIcon className="w-3 h-3 text-indigo-600" />
-                              <span>{hasSheet ? 'Ganti Tautan' : 'Tautkan Sheet'}</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              disabled={!hasSheet || isSyncingThis}
-                              onClick={() => handleTriggerSync(pkg, subItem.subjectId, subItem.subjectName)}
-                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
-                              title="Tarik data respons siswa terbaru dari Google Sheet"
-                            >
-                              <RefreshCw className={`w-3 h-3 ${isSyncingThis ? 'animate-spin' : ''}`} />
-                              <span>{isSyncingThis ? 'Menyinkronkan...' : 'Tarik Respons'}</span>
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className={`grid grid-cols-1 ${item.userSubjects.length > 1 ? 'xl:grid-cols-2' : ''} gap-4`}>
+                    {item.userSubjects.map(subItem => renderSubjectCard(pkg, subItem))}
                   </div>
                 </div>
               </div>

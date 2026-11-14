@@ -1234,10 +1234,16 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
     return matched.length > 0 ? matched : classes;
   }, [activeTryout, classes]);
 
-  // Wadah Sumatif (SAS & SAT) untuk Guru
+  // Wadah Sumatif (SAS & SAT) untuk Guru: hanya wadah yang memuat mapel yang diampu oleh guru (atau semua jika ADMIN)
   const teacherSumatifPackages = useMemo(() => {
-    return dbService.getExamPackages().filter(p => p.assessmentType === 'SAS' || p.assessmentType === 'SAT');
-  }, [tryouts]);
+    const rawPackages = dbService.getExamPackages().filter(p => p.assessmentType === 'SAS' || p.assessmentType === 'SAT');
+    if (!currentUser || currentUser.role === 'ADMIN') return rawPackages;
+
+    const teacherAllowedSubjIds = dbService.getTeacherAllowedSubjectIds(currentUser);
+    return rawPackages.filter(pkg =>
+      (pkg.subjects || []).some(sub => teacherAllowedSubjIds.includes(sub.subjectId))
+    );
+  }, [tryouts, currentUser, dbService]);
 
   const activeSumatifPackage = useMemo(() => {
     if (selectedSumatifPackageId) {
