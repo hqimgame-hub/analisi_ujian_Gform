@@ -5,7 +5,7 @@ import {
   TrendingUp, CheckSquare, Sparkles, ChevronRight, Info, RefreshCw
 } from 'lucide-react';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell, Legend
 } from 'recharts';
 import { ExamPackage, ClassRoom, Subject, Student, Score, Question, Answer, Material, Competency, Tryout, User } from '../../types/database';
 import { SumatifAnalyticsService, TeacherSumatifAnalytics } from '../../services/sumatifAnalytics';
@@ -61,6 +61,7 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
   const [psychometricsClassFilter, setPsychometricsClassFilter] = useState('ALL');
   const [searchStudent, setSearchStudent] = useState('');
   const [kktpStatusFilter, setKktpStatusFilter] = useState<'ALL' | 'TUNTAS' | 'REMEDIAL'>('ALL');
+  const [classChartMode, setClassChartMode] = useState<'COUNT' | 'AVERAGE'>('COUNT');
   const [isSyncingDirect, setIsSyncingDirect] = useState(false);
 
   // Wadah aktif terpilih
@@ -213,6 +214,112 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
       };
     });
   }, [analytics, targetClassesForPackage, summaryClassFilter]);
+
+  // Rekap seluruh rombel target (independen dari filter kelas, untuk grafik perbandingan antar-kelas)
+  const allClassBreakdowns = useMemo(() => {
+    if (!analytics) return [];
+    return targetClassesForPackage.map(cls => {
+      const classStudents = analytics.studentRankings.filter(s => s.className === cls.name);
+      const studentCount = classStudents.length;
+      const scoresList = classStudents.map(s => s.score);
+      const sum = scoresList.reduce((a, b) => a + b, 0);
+      const avg = studentCount > 0 ? Math.round((sum / studentCount) * 10) / 10 : 0;
+      const highest = studentCount > 0 ? Math.max(...scoresList) : 0;
+      const lowest = studentCount > 0 ? Math.min(...scoresList) : 0;
+      const passed = classStudents.filter(s => s.isPassed).length;
+      const remedial = studentCount - passed;
+      const passRate = studentCount > 0 ? Math.round((passed / studentCount) * 100) : 0;
+      return {
+        classId: cls.id,
+        className: cls.name,
+        studentCount,
+        averageScore: avg,
+        highestScore: highest,
+        lowestScore: lowest,
+        passingCount: passed,
+        remedialCount: remedial,
+        passingRatePct: passRate,
+      };
+    });
+  }, [analytics, targetClassesForPackage]);
+
+  // Distribusi rentang nilai siswa berdasarkan KKM (KKTP)
+  const scoreDistributionData = useMemo(() => {
+    if (!analytics) return [];
+    const targetStudents = summaryClassFilter === 'ALL'
+      ? analytics.studentRankings
+      : analytics.studentRankings.filter(s => {
+          const selClass = targetClassesForPackage.find(c => c.id === summaryClassFilter);
+          return selClass ? s.className === selClass.name : true;
+        });
+
+    const kkm = analytics.passingGrade || 75;
+    const total = targetStudents.length;
+
+    // Menyiapkan 5 interval capaian kompetensi adaptif terhadap KKTP
+    const rangeDefs = [
+      {
+        key: 'UNDER_60',
+        range: '< 60',
+        label: '< 60 (Perlu Intervensi)',
+        filterFn: (score: number) => score < 60,
+        color: '#f43f5e', // Rose / Merah
+        isPassed: false,
+      },
+      {
+        key: 'APPROACHING_KKM',
+        range: `60 - ${Math.max(60, kkm - 1)}`,
+        label: `60 - ${Math.max(60, kkm - 1)} (Belum Tuntas)`,
+        filterFn: (score: number) => score >= 60 && score < kkm,
+        color: '#f59e0b', // Oranye / Amber
+        isPassed: false,
+      },
+      {
+        key: 'AT_KKM',
+        range: `${kkm} - 84`,
+        label: `${kkm} - 84 (Tuntas Baik)`,
+        filterFn: (score: number) => score >= kkm && score < 85,
+        color: '#10b981', // Emerald / Hijau
+        isPassed: true,
+      },
+      {
+        key: 'ABOVE_KKM',
+        range: '85 - 92',
+        label: '85 - 92 (Mahir / Sangat Baik)',
+        filterFn: (score: number) => score >= 85 && score < 93,
+        color: '#0284c7', // Sky Blue
+        isPassed: true,
+      },
+      {
+        key: 'EXEMPLARY',
+        range: '93 - 100',
+        label: '93 - 100 (Istimewa / Optimal)',
+        filterFn: (score: number) => score >= 93,
+        color: '#6366f1', // Indigo
+        isPassed: true,
+      },
+    ];
+
+    return rangeDefs
+      .filter(d => {
+        if (d.key === 'APPROACHING_KKM' && kkm <= 60) return false;
+        if (d.key === 'AT_KKM' && kkm >= 85) return false;
+        return true;
+      })
+      .map(d => {
+        const matchingStudents = targetStudents.filter(s => d.filterFn(s.score));
+        const count = matchingStudents.length;
+        const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+        return {
+          range: d.range,
+          label: d.label,
+          count,
+          percentage: pct,
+          color: d.color,
+          isPassed: d.isPassed,
+        };
+      });
+  }, [analytics, summaryClassFilter, targetClassesForPackage]);
 
   // Saring data siswa untuk Tab Rekap Rapor
   const filteredStudentRankings = useMemo(() => {
@@ -762,6 +869,322 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
                   <span className="text-[10px] text-slate-400 mt-1 block">
                     Tertinggi / Terendah
                   </span>
+                </div>
+              </div>
+
+              {/* ── GRAFIK ANALISIS KETUNTASAN & DISTRIBUSI NILAI (2 KOLOM RESPONSIVE) ── */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* GRAFIK 1: REKAP KETUNTASAN SISWA PER KELAS */}
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-4 flex flex-col justify-between">
+                  <div>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                          <BarChart3 className="w-4 h-4 text-emerald-600" />
+                          <span>Komposisi Ketuntasan per Rombel</span>
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {classChartMode === 'COUNT'
+                            ? 'Jumlah siswa Tuntas (≥ KKTP) vs Remedial (< KKTP) tiap kelas.'
+                            : `Rata-rata capaian nilai per rombel terhadap batas KKTP (${analytics.passingGrade}).`}
+                        </p>
+                      </div>
+
+                      {/* Mode Toggle Button */}
+                      <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl self-start sm:self-auto">
+                        <button
+                          type="button"
+                          onClick={() => setClassChartMode('COUNT')}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                            classChartMode === 'COUNT'
+                              ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-2xs'
+                              : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                          }`}
+                        >
+                          Jumlah Siswa
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setClassChartMode('AVERAGE')}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                            classChartMode === 'AVERAGE'
+                              ? 'bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-400 shadow-2xs'
+                              : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                          }`}
+                        >
+                          Rata-rata Skor
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Body Chart 1 */}
+                  <div className="h-[280px] w-full pt-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      {classChartMode === 'COUNT' ? (
+                        <BarChart
+                          data={classBreakdowns}
+                          margin={{ top: 15, right: 10, left: -15, bottom: 5 }}
+                        >
+                          <XAxis
+                            dataKey="className"
+                            tick={{ fontSize: 11, fontWeight: 700 }}
+                            interval={0}
+                          />
+                          <YAxis
+                            tick={{ fontSize: 11 }}
+                            allowDecimals={false}
+                          />
+                          <Tooltip
+                            content={({ active, payload }) => {
+                              if (!active || !payload || !payload.length) return null;
+                              const d = payload[0]?.payload;
+                              if (!d) return null;
+                              return (
+                                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 shadow-xl text-xs space-y-2">
+                                  <div className="font-bold text-slate-900 dark:text-slate-100 border-b border-slate-100 dark:border-slate-800 pb-1.5 flex items-center justify-between gap-4">
+                                    <span>Kelas {d.className}</span>
+                                    <span className="text-[10px] text-slate-400 font-mono">
+                                      KKTP: {analytics.passingGrade}
+                                    </span>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <div className="flex items-center justify-between gap-4 text-emerald-600 dark:text-emerald-400 font-semibold">
+                                      <span className="flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                        Tuntas:
+                                      </span>
+                                      <span className="font-mono font-bold">
+                                        {d.passingCount} siswa ({d.passingRatePct}%)
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-4 text-rose-500 dark:text-rose-400 font-semibold">
+                                      <span className="flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-rose-500" />
+                                        Remedial:
+                                      </span>
+                                      <span className="font-mono font-bold">
+                                        {d.remedialCount} siswa ({100 - d.passingRatePct}%)
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="border-t border-slate-100 dark:border-slate-800 pt-1.5 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                                    <span>Total: <strong>{d.studentCount} Siswa</strong></span>
+                                    <span>Rata-rata: <strong className="text-indigo-600 dark:text-indigo-400">{d.averageScore}</strong></span>
+                                  </div>
+                                </div>
+                              );
+                            }}
+                          />
+                          <Legend
+                            verticalAlign="top"
+                            align="right"
+                            iconType="circle"
+                            iconSize={8}
+                            wrapperStyle={{ fontSize: '11px', paddingBottom: '8px' }}
+                          />
+                          <Bar
+                            dataKey="passingCount"
+                            name="Siswa Tuntas"
+                            fill="#10b981"
+                            radius={[4, 4, 0, 0]}
+                          />
+                          <Bar
+                            dataKey="remedialCount"
+                            name="Perlu Remedial"
+                            fill="#f43f5e"
+                            radius={[4, 4, 0, 0]}
+                          />
+                        </BarChart>
+                      ) : (
+                        <BarChart
+                          data={classBreakdowns}
+                          margin={{ top: 15, right: 10, left: -15, bottom: 5 }}
+                        >
+                          <XAxis
+                            dataKey="className"
+                            tick={{ fontSize: 11, fontWeight: 700 }}
+                            interval={0}
+                          />
+                          <YAxis
+                            domain={[0, 100]}
+                            tick={{ fontSize: 11 }}
+                          />
+                          <Tooltip
+                            content={({ active, payload }) => {
+                              if (!active || !payload || !payload.length) return null;
+                              const d = payload[0]?.payload;
+                              if (!d) return null;
+                              const isAbove = d.averageScore >= analytics.passingGrade;
+                              const diff = Math.round((d.averageScore - analytics.passingGrade) * 10) / 10;
+                              return (
+                                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 shadow-xl text-xs space-y-2">
+                                  <div className="font-bold text-slate-900 dark:text-slate-100 border-b border-slate-100 dark:border-slate-800 pb-1.5 flex items-center justify-between gap-4">
+                                    <span>Kelas {d.className}</span>
+                                    <span
+                                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                        isAbove
+                                          ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                                          : 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300'
+                                      }`}
+                                    >
+                                      {isAbove ? `+${diff} Poin vs KKTP` : `${diff} Poin vs KKTP`}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-4">
+                                    <span className="text-slate-600 dark:text-slate-400">Rata-rata Skor:</span>
+                                    <span className="font-mono font-bold text-base text-indigo-600 dark:text-indigo-400">
+                                      {d.averageScore}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-4 text-[11px] text-slate-500 dark:text-slate-400">
+                                    <span>Nilai Tertinggi: <strong className="text-emerald-600">{d.highestScore}</strong></span>
+                                    <span>Terendah: <strong className="text-rose-500">{d.lowestScore}</strong></span>
+                                  </div>
+                                </div>
+                              );
+                            }}
+                          />
+                          <ReferenceLine
+                            y={analytics.passingGrade}
+                            stroke="#6366f1"
+                            strokeDasharray="4 4"
+                            label={{
+                              value: `Batas KKTP (${analytics.passingGrade})`,
+                              position: 'top',
+                              fill: '#6366f1',
+                              fontSize: 10,
+                              fontWeight: 700,
+                            }}
+                          />
+                          <Bar
+                            dataKey="averageScore"
+                            name="Rata-rata Kelas"
+                            radius={[6, 6, 0, 0]}
+                          >
+                            {classBreakdowns.map((cb, idx) => (
+                              <Cell
+                                key={`cell-avg-${idx}`}
+                                fill={cb.averageScore >= analytics.passingGrade ? '#10b981' : '#f59e0b'}
+                              />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      )}
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Footer Keterangan Chart 1 */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
+                    <div className="flex items-center gap-3">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                        Tuntas (≥ {analytics.passingGrade})
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                        Remedial (&lt; {analytics.passingGrade})
+                      </span>
+                    </div>
+                    <span className="font-semibold text-slate-600 dark:text-slate-300">
+                      Total {classBreakdowns.length} Rombel
+                    </span>
+                  </div>
+                </div>
+
+                {/* GRAFIK 2: DISTRIBUSI SEBARAN RENTANG NILAI SISWA */}
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-4 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                          <TrendingUp className="w-4 h-4 text-indigo-600" />
+                          <span>Distribusi Sebaran Nilai Siswa</span>
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Frekuensi persebaran nilai murni siswa per interval capaian kompetensi.
+                        </p>
+                      </div>
+                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                        KKTP: {analytics.passingGrade}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Body Chart 2 */}
+                  <div className="h-[280px] w-full pt-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={scoreDistributionData}
+                        margin={{ top: 15, right: 10, left: -15, bottom: 5 }}
+                      >
+                        <XAxis
+                          dataKey="range"
+                          tick={{ fontSize: 11, fontWeight: 700 }}
+                        />
+                        <YAxis
+                          tick={{ fontSize: 11 }}
+                          allowDecimals={false}
+                        />
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (!active || !payload || !payload.length) return null;
+                            const item = payload[0]?.payload;
+                            if (!item) return null;
+                            return (
+                              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 shadow-xl text-xs space-y-2">
+                                <div className="font-bold text-slate-900 dark:text-slate-100 border-b border-slate-100 dark:border-slate-800 pb-1.5 flex items-center justify-between gap-3">
+                                  <span>Rentang Skor: {item.range}</span>
+                                  <span
+                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                      item.isPassed
+                                        ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                                        : 'bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300'
+                                    }`}
+                                  >
+                                    {item.isPassed ? 'Tuntas KKTP' : 'Belum Tuntas'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="text-slate-600 dark:text-slate-400">Jumlah Siswa:</span>
+                                  <span className="font-mono font-bold text-sm text-slate-900 dark:text-slate-100">
+                                    {item.count} Siswa ({item.percentage}%)
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                                  Kategori: <strong>{item.label}</strong>
+                                </div>
+                              </div>
+                            );
+                          }}
+                        />
+                        <Bar
+                          dataKey="count"
+                          name="Jumlah Siswa"
+                          radius={[6, 6, 0, 0]}
+                        >
+                          {scoreDistributionData.map((entry, index) => (
+                            <Cell key={`cell-dist-${index}`} fill={entry.color} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Footer Legend Bar Chart 2 */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-500 dark:text-slate-400">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {scoreDistributionData.map((d, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 font-medium">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+                          <span>{d.range}</span>
+                        </span>
+                      ))}
+                    </div>
+                    <span className="font-semibold text-slate-600 dark:text-slate-300">
+                      Basis: {summaryMetrics.totalStudents} Siswa
+                    </span>
+                  </div>
                 </div>
               </div>
 
