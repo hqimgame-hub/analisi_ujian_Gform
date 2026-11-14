@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Award, BarChart3, CheckCircle2, AlertTriangle, FileSpreadsheet,
   Download, Filter, Search, School, BookOpen, Users, HelpCircle,
-  TrendingUp, CheckSquare, Sparkles, ChevronRight, Info
+  TrendingUp, CheckSquare, Sparkles, ChevronRight, Info, RefreshCw
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell
@@ -18,6 +18,8 @@ interface GuruSumatifAnalyticsSectionProps {
   selectedPackageId: string;
   onSelectPackageId: (id: string) => void;
   activeSubject: Subject | null;
+  onSelectSubjectId?: (id: string) => void;
+  onSyncSubjectSheet?: (pkg: ExamPackage, subjectId: string) => Promise<void>;
   classes: ClassRoom[];
   students: Student[];
   scores: Score[];
@@ -37,6 +39,8 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
   selectedPackageId,
   onSelectPackageId,
   activeSubject,
+  onSelectSubjectId,
+  onSyncSubjectSheet,
   classes,
   students,
   scores,
@@ -57,6 +61,7 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
   const [psychometricsClassFilter, setPsychometricsClassFilter] = useState('ALL');
   const [searchStudent, setSearchStudent] = useState('');
   const [kktpStatusFilter, setKktpStatusFilter] = useState<'ALL' | 'TUNTAS' | 'REMEDIAL'>('ALL');
+  const [isSyncingDirect, setIsSyncingDirect] = useState(false);
 
   // Wadah aktif terpilih
   const activePackage = useMemo(() => {
@@ -65,6 +70,29 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
     }
     return packages[0] || null;
   }, [packages, selectedPackageId]);
+
+  // Mapel aktif terpilih (mendukung perpindahan mapel langsung di halaman analisis)
+  const [selectedSubjId, setSelectedSubjId] = useState<string>(activeSubject?.id || '');
+  useEffect(() => {
+    if (activeSubject?.id) {
+      setSelectedSubjId(activeSubject.id);
+    }
+  }, [activeSubject?.id]);
+
+  const effectiveSubject = useMemo(() => {
+    if (selectedSubjId) {
+      return subjects.find(s => s.id === selectedSubjId) || activeSubject;
+    }
+    return activeSubject || subjects[0] || null;
+  }, [selectedSubjId, subjects, activeSubject]);
+
+  // Daftar mapel yang diujikan dalam paket ini
+  const availablePackageSubjects = useMemo(() => {
+    if (!activePackage) return subjects;
+    const pkgSubjIds = (activePackage.subjects || []).map(s => s.subjectId);
+    const inPkg = subjects.filter(s => pkgSubjIds.includes(s.id));
+    return inPkg.length > 0 ? inPkg : subjects;
+  }, [activePackage, subjects]);
 
   // Target classes for this package (Cascading Class Filter)
   const targetClassesForPackage = useMemo(() => {
@@ -75,11 +103,19 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
     return filtered.length > 0 ? filtered : classes;
   }, [activePackage, classes]);
 
+  // Tryouts gabungan (mengambil tryout terbaru dari dbService agar realtime)
+  const effectiveTryouts = useMemo(() => {
+    if (dbService) {
+      return dbService.getTryouts() || tryouts || [];
+    }
+    return tryouts || [];
+  }, [dbService, tryouts]);
+
   // Hitung Analytics Sumatif menggunakan SumatifAnalyticsService (scoping ketat ke wadah paket ini)
   const analytics: TeacherSumatifAnalytics | null = useMemo(() => {
-    if (!activePackage || !activeSubject) return null;
+    if (!activePackage || !effectiveSubject) return null;
     return SumatifAnalyticsService.calculateTeacherAnalytics(
-      activeSubject.id,
+      effectiveSubject.id,
       activePackage,
       scores,
       students,
@@ -87,9 +123,9 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
       questions,
       answers,
       subjects,
-      tryouts
+      effectiveTryouts
     );
-  }, [activePackage, activeSubject, scores, students, targetClassesForPackage, questions, answers, subjects, tryouts]);
+  }, [activePackage, effectiveSubject, scores, students, targetClassesForPackage, questions, answers, subjects, effectiveTryouts]);
 
   // Perhitungan metrik ringkasan untuk Tab 1 responsif terhadap filter rombel/kelas
   const summaryMetrics = useMemo(() => {
@@ -223,28 +259,28 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Rekap_Nilai_${activePackage?.code || 'SUMATIF'}_${activeSubject?.code || 'MAPEL'}.csv`;
+    link.download = `Rekap_Nilai_${activePackage?.code || 'SUMATIF'}_${effectiveSubject?.code || 'MAPEL'}.csv`;
     link.click();
     URL.revokeObjectURL(url);
-    onShowToast(`File CSV nilai ${activeSubject?.name || 'Mapel'} berhasil diunduh.`);
+    onShowToast(`File CSV nilai ${effectiveSubject?.name || 'Mapel'} berhasil diunduh.`);
   };
 
   // ── KALKULASI ANALISIS BUTIR SOAL MURNI & PSIKOMETRI (SEPERTI TRY OUT) ──
   const matchedSumatifTryout = useMemo(() => {
-    if (!activePackage || !activeSubject) return null;
-    return tryouts.find(t => t.packageId === activePackage.id && t.subjectId === activeSubject.id) || null;
-  }, [tryouts, activePackage, activeSubject]);
+    if (!activePackage || !effectiveSubject) return null;
+    return effectiveTryouts.find(t => t.packageId === activePackage.id && t.subjectId === effectiveSubject.id) || null;
+  }, [effectiveTryouts, activePackage, effectiveSubject]);
 
   const relevantSubjectQuestions = useMemo(() => {
-    if (!activeSubject) return [];
+    if (!effectiveSubject) return [];
     if (matchedSumatifTryout && dbService) {
-      const qFromTryout = dbService.getQuestionsForTryout(matchedSumatifTryout.id, activeSubject.id);
+      const qFromTryout = dbService.getQuestionsForTryout(matchedSumatifTryout.id, effectiveSubject.id);
       if (qFromTryout.length > 0) return qFromTryout;
     }
     return questions
-      .filter(q => q.subjectId === activeSubject.id)
+      .filter(q => q.subjectId === effectiveSubject.id)
       .sort((a, b) => (a.questionNumber || 0) - (b.questionNumber || 0));
-  }, [questions, activeSubject, matchedSumatifTryout, dbService]);
+  }, [questions, effectiveSubject, matchedSumatifTryout, dbService]);
 
   const targetClassStudentsForPsychometrics = useMemo(() => {
     let list = students;
@@ -263,13 +299,13 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
   );
 
   const questionAnalysisResults: QuestionAnalysisResult[] = useMemo(() => {
-    if (!activeSubject) return [];
+    if (!effectiveSubject) return [];
 
     // Prioritas 1: Jika tryout ID terhubung di database dan dbService tersedia, gunakan getQuestionAnalysis
     if (matchedSumatifTryout && dbService) {
       const dbCalc = dbService.getQuestionAnalysis(
         matchedSumatifTryout.id,
-        activeSubject.id,
+        effectiveSubject.id,
         psychometricsClassFilter === 'ALL' ? undefined : psychometricsClassFilter,
         currentUser
       );
@@ -379,7 +415,7 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
           pedagogicalNote: isReview
             ? 'Butir soal perlu ditelaah kembali konstruksi distraktor atau kejelasan teks sebelum digunakan kembali.'
             : 'Butir soal memiliki mutu baik dan daya pembeda yang memadai untuk bank soal.',
-          subjectId: activeSubject.id,
+          subjectId: effectiveSubject.id,
           materialId: matchingQ?.materialId || '',
           competencyId: matchingQ?.competencyId || '',
         };
@@ -388,7 +424,7 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
 
     return [];
   }, [
-    activeSubject,
+    effectiveSubject,
     matchedSumatifTryout,
     dbService,
     psychometricsClassFilter,
@@ -409,7 +445,7 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
       return;
     }
     const pkgTitle = activePackage ? `${activePackage.code}_${activePackage.title}` : 'Asesmen_Sumatif';
-    const subName = activeSubject?.name || 'Mata_Pelajaran';
+    const subName = effectiveSubject?.name || 'Mata_Pelajaran';
     const activeCls = classes.find(c => c.id === psychometricsClassFilter);
     const classSuffix = activeCls ? `_${activeCls.name.replace(/\s+/g, '_')}` : '_Semua_Kelas';
 
@@ -455,72 +491,121 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
               </h2>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Evaluasi ketercapaian KKTP per kelas dan psikometri butir soal untuk mata pelajaran <strong>{activeSubject?.name || 'Mata Pelajaran'}</strong>.
+              Evaluasi ketercapaian KKM (KKTP) per kelas dan psikometri butir soal untuk mata pelajaran <strong>{effectiveSubject?.name || 'Mata Pelajaran'}</strong>.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500 hidden sm:inline">Pilih Wadah:</span>
-            {/* Context Selector: Pill buttons jika <= 3, select jika > 3 */}
-            {packages.length <= 4 ? (
-              <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl">
-                {packages.map(pkg => {
-                  const isSelected = pkg.id === activePackage?.id;
-                  const isSAT = pkg.assessmentType === 'SAT';
-                  return (
-                    <button
-                      key={pkg.id}
-                      type="button"
-                      onClick={() => onSelectPackageId(pkg.id)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                        isSelected
-                          ? 'bg-emerald-600 text-white shadow-xs'
-                          : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                    >
-                      <span className="text-[10px] opacity-80">{isSAT ? 'SAT' : 'SAS'}</span>
-                      <span className="truncate max-w-[140px]">{pkg.title}</span>
-                    </button>
-                  );
-                })}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500 hidden sm:inline">Pilih Wadah:</span>
+              {/* Context Selector: Pill buttons jika <= 3, select jika > 3 */}
+              {packages.length <= 4 ? (
+                <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl">
+                  {packages.map(pkg => {
+                    const isSelected = pkg.id === activePackage?.id;
+                    const isSAT = pkg.assessmentType === 'SAT';
+                    return (
+                      <button
+                        key={pkg.id}
+                        type="button"
+                        onClick={() => onSelectPackageId(pkg.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                          isSelected
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        <span className="text-[10px] opacity-80">{isSAT ? 'SAT' : 'SAS'}</span>
+                        <span className="truncate max-w-[140px]">{pkg.title}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <select
+                  value={activePackage?.id || ''}
+                  onChange={e => onSelectPackageId(e.target.value)}
+                  className="px-3.5 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer"
+                >
+                  {packages.map(pkg => (
+                    <option key={pkg.id} value={pkg.id}>
+                      [{pkg.assessmentType}] {pkg.title}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* Pilihan Mata Pelajaran Langsung di Halaman Analisis */}
+            {availablePackageSubjects.length > 1 && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-slate-500 hidden sm:inline">Mapel:</span>
+                <select
+                  value={effectiveSubject?.id || ''}
+                  onChange={e => {
+                    setSelectedSubjId(e.target.value);
+                    if (onSelectSubjectId) onSelectSubjectId(e.target.value);
+                  }}
+                  className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer"
+                >
+                  {availablePackageSubjects.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.code})
+                    </option>
+                  ))}
+                </select>
               </div>
-            ) : (
-              <select
-                value={activePackage?.id || ''}
-                onChange={e => onSelectPackageId(e.target.value)}
-                className="px-3.5 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer"
-              >
-                {packages.map(pkg => (
-                  <option key={pkg.id} value={pkg.id}>
-                    [{pkg.assessmentType}] {pkg.title}
-                  </option>
-                ))}
-              </select>
             )}
           </div>
         </div>
 
         {/* Ringkasan Konteks Wadah Terpilih */}
         {activePackage && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/60 rounded-2xl text-xs">
-            <div className="flex items-center gap-2 text-emerald-900 dark:text-emerald-200">
-              <School className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>
-                Target Rombel: <strong>{targetClassesForPackage.map(c => c.name).join(', ') || 'Semua Kelas'}</strong>
-              </span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/60 rounded-2xl text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1">
+              <div className="flex items-center gap-2 text-emerald-900 dark:text-emerald-200">
+                <School className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>
+                  Target: <strong>{targetClassesForPackage.map(c => c.name).join(', ') || 'Semua Kelas'}</strong>
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-emerald-900 dark:text-emerald-200">
+                <BookOpen className="w-4 h-4 text-indigo-600 shrink-0" />
+                <span>
+                  Mapel: <strong>{effectiveSubject?.name}</strong> · KKM (KKTP): <strong>{analytics?.passingGrade || effectiveSubject?.passingGrade || 75}</strong>
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-emerald-900 dark:text-emerald-200">
+                <Users className="w-4 h-4 text-teal-600 shrink-0" />
+                <span>
+                  Respon: <strong>{analytics?.studentCount || 0} Siswa</strong> ({analytics?.passingRatePct || 0}% Tuntas)
+                </span>
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-emerald-900 dark:text-emerald-200">
-              <BookOpen className="w-4 h-4 text-indigo-600 shrink-0" />
-              <span>
-                Mapel: <strong>{activeSubject?.name}</strong> · KKTP: <strong>{analytics?.passingGrade || 75}</strong>
-              </span>
-            </div>
-            <div className="flex items-center gap-2 text-emerald-900 dark:text-emerald-200">
-              <Users className="w-4 h-4 text-teal-600 shrink-0" />
-              <span>
-                Total Siswa Terdata: <strong>{analytics?.studentCount || 0} Siswa</strong> ({analytics?.passingRatePct || 0}% Tuntas)
-              </span>
-            </div>
+
+            {/* Tombol Sinkronkan Google Sheet */}
+            {onSyncSubjectSheet && activePackage && effectiveSubject && (
+              <button
+                type="button"
+                disabled={isSyncingDirect}
+                onClick={async () => {
+                  setIsSyncingDirect(true);
+                  try {
+                    await onSyncSubjectSheet(activePackage, effectiveSubject.id);
+                    onShowToast('Sinkronisasi respons siswa berhasil.');
+                  } catch (err: any) {
+                    onShowToast(`Sinkronisasi gagal: ${err.message}`);
+                  } finally {
+                    setIsSyncingDirect(false);
+                  }
+                }}
+                className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-60 shadow-2xs"
+                title="Tarik atau perbarui respons terbaru dari Google Sheet"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncingDirect ? 'animate-spin' : ''}`} />
+                <span>{isSyncingDirect ? 'Menyinkronkan...' : 'Sinkronkan Sheet'}</span>
+              </button>
+            )}
           </div>
         )}
 
@@ -609,7 +694,7 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
                     <span className="text-xs text-slate-400">/ 100</span>
                   </div>
                   <span className="text-[10px] text-slate-400 mt-1 block">
-                    Batas KKTP: {analytics.passingGrade}
+                    Batas KKM (KKTP): {analytics.passingGrade}
                   </span>
                 </div>
 
@@ -624,7 +709,7 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
                     <span className="text-xs text-slate-400">({summaryMetrics.passingCount} siswa)</span>
                   </div>
                   <span className="text-[10px] text-emerald-600 font-semibold mt-1 block">
-                    Nilai ≥ Batas KKTP
+                    Nilai ≥ Batas KKM
                   </span>
                 </div>
 
@@ -643,7 +728,7 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
                     <span className="text-xs text-slate-400">siswa</span>
                   </div>
                   <span className="text-[10px] text-rose-500 font-semibold mt-1 block">
-                    Nilai &lt; KKTP ({analytics.passingGrade})
+                    Nilai &lt; KKM ({analytics.passingGrade})
                   </span>
                 </div>
 
@@ -675,7 +760,7 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
                       <span>Capaian Ketuntasan per Rombel Target</span>
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Perbandingan performa dan persentase tuntas KKTP per kelas yang ditargetkan pada wadah ini.
+                      Perbandingan performa dan persentase tuntas KKM (KKTP) per kelas yang ditargetkan pada wadah ini.
                     </p>
                   </div>
                 </div>
@@ -736,17 +821,52 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
             </>
           ) : (
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-12 text-center text-slate-400 text-xs">
-              <div className="max-w-md mx-auto flex flex-col items-center justify-center space-y-2">
-                <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 flex items-center justify-center">
-                  <Info className="w-5 h-5 text-emerald-500 dark:text-emerald-400" />
+              <div className="max-w-md mx-auto flex flex-col items-center justify-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 flex items-center justify-center">
+                  <Info className="w-6 h-6 text-emerald-500 dark:text-emerald-400" />
                 </div>
                 <div className="font-bold text-slate-800 dark:text-slate-200 text-sm">
                   Belum Ada Data Respon Nilai Terhubung
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                  Belum ada data nilai respons siswa yang disinkronkan untuk mata pelajaran <strong>{activeSubject?.name || 'ini'}</strong> pada wadah <strong>{activePackage?.title || 'ini'}</strong>.
-                  Guru mata pelajaran dapat menautkan link Google Form atau Spreadsheet pada tab <strong>Wadah &amp; Bank Soal SAT/SAS</strong> untuk menampilkan analisis secara realtime.
+                  Belum ada data nilai respons siswa yang disinkronkan untuk mata pelajaran <strong>{effectiveSubject?.name || 'ini'}</strong> pada wadah <strong>{activePackage?.title || 'ini'}</strong>.
                 </p>
+                {(() => {
+                  const subItem = activePackage?.subjects?.find(s => s.subjectId === effectiveSubject?.id);
+                  const matchedTo = effectiveTryouts.find(t => t.packageId === activePackage?.id && t.subjectId === effectiveSubject?.id);
+                  const hasSheet = !!(subItem?.googleSheetUrl || matchedTo?.googleSheetUrl);
+
+                  if (hasSheet && onSyncSubjectSheet && activePackage && effectiveSubject) {
+                    return (
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          disabled={isSyncingDirect}
+                          onClick={async () => {
+                            setIsSyncingDirect(true);
+                            try {
+                              await onSyncSubjectSheet(activePackage, effectiveSubject.id);
+                              onShowToast('Sinkronisasi respons siswa berhasil diproses.');
+                            } catch (err: any) {
+                              onShowToast(`Gagal sinkronisasi: ${err.message}`);
+                            } finally {
+                              setIsSyncingDirect(false);
+                            }
+                          }}
+                          className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs inline-flex items-center gap-2 transition-all cursor-pointer disabled:opacity-60 shadow-sm"
+                        >
+                          <RefreshCw className={`w-4 h-4 ${isSyncingDirect ? 'animate-spin' : ''}`} />
+                          <span>{isSyncingDirect ? 'Sedang Menarik Data...' : 'Tarik Respons Google Sheet Sekarang'}</span>
+                        </button>
+                      </div>
+                    );
+                  }
+                  return (
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                      Guru mata pelajaran dapat menautkan link Google Form atau Spreadsheet pada tab <strong>Wadah &amp; Bank Soal SAT/SAS</strong> untuk menampilkan analisis secara realtime.
+                    </p>
+                  );
+                })()}
               </div>
             </div>
           )}
@@ -797,7 +917,7 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
 
               <div className="flex items-center space-x-1.5 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-lg px-2.5 py-1 text-emerald-900 dark:text-emerald-200 font-bold ml-1">
                 <BookOpen className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>{activeSubject?.name || 'Mata Pelajaran'}</span>
+                <span>{effectiveSubject?.name || 'Mata Pelajaran'}</span>
               </div>
 
               <span className="text-slate-500 dark:text-slate-400 font-medium ml-2">Kelas / Rombel:</span>
@@ -1147,7 +1267,7 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
                 <span>Rekapitulasi Nilai Asesmen Siap Rapor</span>
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Daftar nilai murni 0–100 siswa per rombel lengkap dengan status ketuntasan KKTP siap ekspor.
+                Daftar nilai murni 0–100 siswa per rombel lengkap dengan status ketuntasan KKM (KKTP) siap ekspor.
               </p>
             </div>
 
@@ -1180,15 +1300,15 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
             </div>
 
             <div>
-              <label className="text-slate-500 font-semibold block mb-1">Status Ketuntasan KKTP:</label>
+              <label className="text-slate-500 font-semibold block mb-1">Status Ketuntasan KKM (KKTP):</label>
               <select
                 value={kktpStatusFilter}
                 onChange={e => setKktpStatusFilter(e.target.value as any)}
                 className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-800 dark:text-slate-200 cursor-pointer"
               >
                 <option value="ALL">Semua Status (Tuntas &amp; Remedial)</option>
-                <option value="TUNTAS">Hanya Tuntas (≥ {analytics?.passingGrade || 75})</option>
-                <option value="REMEDIAL">Hanya Perlu Remedial (&lt; {analytics?.passingGrade || 75})</option>
+                <option value="TUNTAS">Hanya Tuntas (≥ {analytics?.passingGrade || effectiveSubject?.passingGrade || 75})</option>
+                <option value="REMEDIAL">Hanya Perlu Remedial (&lt; {analytics?.passingGrade || effectiveSubject?.passingGrade || 75})</option>
               </select>
             </div>
 
@@ -1237,7 +1357,7 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
                   <th className="px-4 py-3">Nama Lengkap Siswa</th>
                   <th className="px-4 py-3">Kelas</th>
                   <th className="px-4 py-3">Nilai Murni (0–100)</th>
-                  <th className="px-4 py-3 rounded-r-xl">Status KKTP</th>
+                  <th className="px-4 py-3 rounded-r-xl">Status KKM (KKTP)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">

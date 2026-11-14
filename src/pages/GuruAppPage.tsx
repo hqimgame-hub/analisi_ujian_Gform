@@ -26,7 +26,8 @@ import { ProductionValidationSuiteResult } from '../services/productionValidatio
 import {
   User, Question, Tryout, SheetImportPreviewItem, Explanation, Subject,
   Material, Competency, ClassRoom, Student, QuestionStatus,
-  ColumnMappingConfig, SheetImportSummary, Score, AcademicYear, TryoutStatus
+  ColumnMappingConfig, SheetImportSummary, Score, AcademicYear, TryoutStatus,
+  ExamPackage, ExamPackageSubject
 } from '../types/database';
 import { generateUuid } from '../utils/idUtils';
 import { ResourceCard } from '../components/ResourceCard';
@@ -1186,6 +1187,52 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
     };
   }, []); // Run on mount only! Mencegah infinite re-polling saat tryouts berubah
 
+  const handleSyncSumatifSheet = async (pkg: ExamPackage, subjectId: string) => {
+    const allTo = dbService.getTryouts();
+    let matchTo = allTo.find(t => t.packageId === pkg.id && t.subjectId === subjectId);
+    if (!matchTo) {
+      matchTo = allTo.find(t => (t.packageId === pkg.id || t.id.includes(pkg.id)) && (t.subjectId === subjectId || t.id.includes(subjectId)));
+    }
+    if (matchTo && matchTo.googleSheetUrl) {
+      await syncTryoutFromSheet(matchTo, true);
+    } else {
+      const subItem = pkg.subjects?.find((s: ExamPackageSubject) => s.subjectId === subjectId);
+      if (subItem?.googleSheetUrl) {
+        const targetClassIds = pkg.targetClassIds || [];
+        const fullSub = subjects.find(s => s.id === subjectId);
+        const newTo: Tryout = {
+          id: `to-sum-${Date.now()}-${subjectId}`,
+          code: `${pkg.code}-${subjectId.slice(-4).toUpperCase()}`,
+          title: `${pkg.title} - ${fullSub?.name || 'Mapel'}`,
+          academicYearId: pkg.academicYearId,
+          packageId: pkg.id,
+          assessmentType: pkg.assessmentType,
+          subjectId: subjectId,
+          targetClassIds: targetClassIds.length > 0 ? targetClassIds : undefined,
+          startDate: pkg.startDate,
+          endDate: pkg.endDate,
+          status: 'ACTIVE',
+          googleSheetUrl: subItem.googleSheetUrl,
+          googleFormUrl: subItem.googleFormUrl || undefined,
+          scoringConfig: {
+            scoringType: 'EQUAL_WEIGHT',
+            maxScore: 100,
+            correctScore: 1,
+            wrongScore: 0,
+            unansweredScore: 0,
+            allowNegativeMarking: false,
+            passingGrade: fullSub?.passingGrade || 75,
+          },
+        };
+        dbService.saveTryout(newTo);
+        setTryouts(dbService.getTryoutsForTeacher(currentUser));
+        await syncTryoutFromSheet(newTo, true);
+      } else {
+        triggerToast('Harap tautkan Google Sheet terlebih dahulu.');
+      }
+    }
+  };
+
   const handleTabChange = (tab: GuruTab) => {
     setIsLoading(true);
     if (tab === 'PROGRESS_TRACKING') {
@@ -1213,7 +1260,8 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
   const activeTryout = tryouts.find(t => t.id === selectedTryoutId) || tryouts.find(t => t.id === smartDefaultTryoutId) || tryouts[0];
   const activeSubject = subjects.find(s => s.id === selectedSubjectId);
   const permittedSubjects = subjects.filter(s => allowedSubjectIds.includes(s.id));
-  const activeSubjectObj = permittedSubjects[0] || subjects[0];
+  const activeSubjectObj = (selectedSubjectId ? subjects.find(s => s.id === selectedSubjectId) : null)
+    || (permittedSubjects.length > 0 ? permittedSubjects[0] : subjects[0]);
   const currentSubjectKKM = activeSubjectObj?.passingGrade ?? 75.0;
 
   // Cascading Class Filter: Hanya tampilkan kelas target sesuai konfigurasi Tryout / Wadah aktif
@@ -3224,52 +3272,14 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                   packages={teacherSumatifPackages}
                   classes={classes}
                   subjects={subjects}
-                  onNavigateToAnalytics={(pkgId) => {
+                  onNavigateToAnalytics={(pkgId, subjectId) => {
                     setSelectedSumatifPackageId(pkgId);
+                    if (subjectId) {
+                      setSelectedSubjectId(subjectId);
+                    }
                     handleTabChange('SUMATIF_ANALYTICS');
                   }}
-                  onSyncSubjectSheet={async (pkg, subjectId) => {
-                    const allTo = dbService.getTryouts();
-                    const matchTo = allTo.find(t => t.packageId === pkg.id && t.subjectId === subjectId);
-                    if (matchTo && matchTo.googleSheetUrl) {
-                      await syncTryoutFromSheet(matchTo, true);
-                    } else {
-                      const subItem = pkg.subjects?.find(s => s.subjectId === subjectId);
-                      if (subItem?.googleSheetUrl) {
-                        const targetClassIds = pkg.targetClassIds || [];
-                        const fullSub = subjects.find(s => s.id === subjectId);
-                        const newTo: Tryout = {
-                          id: `to-sum-${Date.now()}-${subjectId}`,
-                          code: `${pkg.code}-${subjectId.slice(-4).toUpperCase()}`,
-                          title: `${pkg.title} - ${fullSub?.name || 'Mapel'}`,
-                          academicYearId: pkg.academicYearId,
-                          packageId: pkg.id,
-                          assessmentType: pkg.assessmentType,
-                          subjectId: subjectId,
-                          targetClassIds: targetClassIds.length > 0 ? targetClassIds : undefined,
-                          startDate: pkg.startDate,
-                          endDate: pkg.endDate,
-                          status: 'ACTIVE',
-                          googleSheetUrl: subItem.googleSheetUrl,
-                          googleFormUrl: subItem.googleFormUrl || undefined,
-                          scoringConfig: {
-                            scoringType: 'EQUAL_WEIGHT',
-                            maxScore: 100,
-                            correctScore: 1,
-                            wrongScore: 0,
-                            unansweredScore: 0,
-                            allowNegativeMarking: false,
-                            passingGrade: 75,
-                          },
-                        };
-                        dbService.saveTryout(newTo);
-                        setTryouts(dbService.getTryoutsForTeacher(currentUser));
-                        await syncTryoutFromSheet(newTo, true);
-                      } else {
-                        triggerToast('Harap tautkan Google Sheet terlebih dahulu.');
-                      }
-                    }
-                  }}
+                  onSyncSubjectSheet={handleSyncSumatifSheet}
                   onShowToast={(msg) => triggerToast(msg)}
                 />
               )}
@@ -8869,6 +8879,8 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                   selectedPackageId={selectedSumatifPackageId}
                   onSelectPackageId={(id) => setSelectedSumatifPackageId(id)}
                   activeSubject={activeSubjectObj}
+                  onSelectSubjectId={(id) => setSelectedSubjectId(id)}
+                  onSyncSubjectSheet={handleSyncSumatifSheet}
                   classes={classes}
                   students={students}
                   scores={scores}

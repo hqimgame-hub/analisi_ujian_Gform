@@ -14,7 +14,7 @@ interface GuruSumatifAssessmentsSectionProps {
   packages: ExamPackage[];
   classes: ClassRoom[];
   subjects: Subject[];
-  onNavigateToAnalytics: (pkgId: string) => void;
+  onNavigateToAnalytics: (pkgId: string, subjectId?: string) => void;
   onSyncSubjectSheet?: (pkg: ExamPackage, subjectId: string) => Promise<void>;
   onShowToast: (msg: string) => void;
 }
@@ -169,6 +169,9 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
       const targetClassIds = pkg.targetClassIds || [];
       const targetGrades = pkg.targetGrades || [];
 
+      const subjMaster = subjects.find(s => s.id === editingItem.subjectId);
+      const adminKKM = subjMaster?.passingGrade || 75;
+
       if (matchTryout) {
         dbService.updateTryout(
           matchTryout.id,
@@ -178,6 +181,17 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
             title: `${pkg.title} - ${editingItem.subjectName}`,
             assessmentType: pkg.assessmentType,
             targetClassIds: targetClassIds.length > 0 ? targetClassIds : undefined,
+            scoringConfig: {
+              ...(matchTryout.scoringConfig || {
+                scoringType: 'EQUAL_WEIGHT',
+                maxScore: 100,
+                correctScore: 1,
+                wrongScore: 0,
+                unansweredScore: 0,
+                allowNegativeMarking: false,
+              }),
+              passingGrade: adminKKM,
+            },
           },
           currentUser
         );
@@ -203,14 +217,22 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
             wrongScore: 0,
             unansweredScore: 0,
             allowNegativeMarking: false,
-            passingGrade: 75,
+            passingGrade: adminKKM,
           },
         };
         dbService.saveTryout(newTo);
       }
 
-      onShowToast(`Tautan Spreadsheet respons untuk ${editingItem.subjectName} berhasil disimpan.`);
+      const targetSubjId = editingItem.subjectId;
+      const targetSubjName = editingItem.subjectName;
       setEditingItem(null);
+
+      if (cleanSheet && onSyncSubjectSheet) {
+        onShowToast(`Tautan disimpan. Memulai sinkronisasi respons Google Sheet untuk ${targetSubjName}...`);
+        handleTriggerSync(pkg, targetSubjId, targetSubjName);
+      } else {
+        onShowToast(`Tautan untuk ${targetSubjName} berhasil disimpan.`);
+      }
     } catch (err: any) {
       alert(`Gagal menyimpan tautan: ${err.message}`);
     }
@@ -501,7 +523,7 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
 
           <button
             type="button"
-            onClick={() => onNavigateToAnalytics(pkg.id)}
+            onClick={() => onNavigateToAnalytics(pkg.id, subItem.subjectId)}
             className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
           >
             <Award className="w-3.5 h-3.5" />

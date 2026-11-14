@@ -165,7 +165,8 @@ export class SumatifAnalyticsService {
       const subInfo = allSubjects.find(s => s.id === pkgSub.subjectId);
       const subCode = subInfo?.code || 'MAPEL';
       const subName = subInfo?.name || 'Mata Pelajaran';
-      const passingGrade = pkgSub.passingGrade || subInfo?.passingGrade || 75;
+      // Prioritaskan KKM master dari Admin (subInfo.passingGrade)
+      const passingGrade = subInfo?.passingGrade || pkgSub.passingGrade || 75;
 
       const matchingTryoutIds = new Set(
         allTryouts
@@ -259,11 +260,14 @@ export class SumatifAnalyticsService {
   ): TeacherSumatifAnalytics {
     const subInfo = allSubjects.find(s => s.id === subjectId);
     const pkgSub = pkg.subjects?.find(s => s.subjectId === subjectId);
-    const passingGrade = pkgSub?.passingGrade || subInfo?.passingGrade || 75;
+    // Prioritaskan KKM yang diinput Admin pada master data Mata Pelajaran
+    const passingGrade = subInfo?.passingGrade || pkgSub?.passingGrade || 75;
 
     // 1. Tentukan Tryout yang terhubung dengan paket dan mapel ini
     const matchingTryouts = allTryouts.filter(t =>
-      t.packageId === pkg.id && (!t.subjectId || t.subjectId === subjectId)
+      (t.packageId === pkg.id && (!t.subjectId || t.subjectId === subjectId)) ||
+      (t.id && t.packageId === pkg.id) ||
+      (t.id && t.id.includes(subjectId) && t.packageId === pkg.id)
     );
     const matchingTryoutIds = new Set(matchingTryouts.map(t => t.id));
     // Wadah ID itu sendiri juga bisa tersimpan di tryoutId
@@ -454,7 +458,8 @@ export class SumatifAnalyticsService {
         id: pkgSub.subjectId,
         code: sub?.code || 'MAPEL',
         name: sub?.name || 'Mata Pelajaran',
-        passingGrade: pkgSub.passingGrade || sub?.passingGrade || 75,
+        // Prioritaskan KKM yang diinput Admin
+        passingGrade: sub?.passingGrade || pkgSub.passingGrade || 75,
       };
     });
 

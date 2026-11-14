@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import {
   ExamPackage, ExamPackageSubject, ClassRoom, Subject,
-  AcademicYear, TryoutStatus, AssessmentType, Teacher, User
+  AcademicYear, TryoutStatus, AssessmentType, Teacher, User, Tryout
 } from '../../types/database';
 import { DatabaseService } from '../../services/database';
 import { authService } from '../../services/auth';
@@ -235,14 +235,21 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
 
       // Preserve existing subject links if subject is still selected
       const updatedSubjects: ExamPackageSubject[] = formSubjectIds.map(subId => {
+        const subj = subjects.find(s => s.id === subId);
+        const adminKKM = subj?.passingGrade || 75;
         const found = existing.subjects.find(s => s.subjectId === subId);
-        if (found) return found;
+        if (found) {
+          return {
+            ...found,
+            passingGrade: adminKKM,
+          };
+        }
         return {
           id: generateUuid(),
           packageId: existing.id,
           subjectId: subId,
           totalQuestions: 40,
-          passingGrade: 75,
+          passingGrade: adminKKM,
           syncStatus: 'PENDING',
           updatedAt: now
         };
@@ -267,15 +274,19 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
       onShowToast(`Paket Ujian '${updatedPkg.title}' berhasil diperbarui.`);
     } else {
       const newPkgId = generateUuid();
-      const newSubjects: ExamPackageSubject[] = formSubjectIds.map((subId) => ({
-        id: generateUuid(),
-        packageId: newPkgId,
-        subjectId: subId,
-        totalQuestions: 40,
-        passingGrade: 75,
-        syncStatus: 'PENDING',
-        updatedAt: now
-      }));
+      const newSubjects: ExamPackageSubject[] = formSubjectIds.map((subId) => {
+        const subj = subjects.find(s => s.id === subId);
+        const adminKKM = subj?.passingGrade || 75;
+        return {
+          id: generateUuid(),
+          packageId: newPkgId,
+          subjectId: subId,
+          totalQuestions: 40,
+          passingGrade: adminKKM,
+          syncStatus: 'PENDING',
+          updatedAt: now
+        };
+      });
 
       const newPkg: ExamPackage = {
         id: newPkgId,
@@ -325,16 +336,70 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
     e.preventDefault();
     if (!editingSubjectItem) return;
 
+    const cleanSheet = editingSubjectItem.sheetUrl.trim();
+    const cleanForm = editingSubjectItem.formUrl.trim();
+
     dbService.updateExamPackageSubject(
       editingSubjectItem.pkgId,
       editingSubjectItem.subjectId,
       {
-        googleSheetUrl: editingSubjectItem.sheetUrl.trim(),
-        googleFormUrl: editingSubjectItem.formUrl.trim(),
-        syncStatus: editingSubjectItem.sheetUrl.trim() ? 'SYNCED' : 'PENDING'
+        googleSheetUrl: cleanSheet,
+        googleFormUrl: cleanForm,
+        syncStatus: cleanSheet ? 'SYNCED' : 'PENDING'
       },
       currentUser
     );
+
+    // Sinkronkan atau buat Tryout pendukung dengan packageId terkait agar tersambung ke Analisis SAT/SAS
+    const pkg = packages.find(p => p.id === editingSubjectItem.pkgId);
+    if (pkg && cleanSheet) {
+      const existingTryouts = dbService.getTryouts() || [];
+      const matchTryout = existingTryouts.find(
+        t => t.packageId === pkg.id && t.subjectId === editingSubjectItem.subjectId
+      );
+      const targetClassIds = pkg.targetClassIds || [];
+      const subj = subjects.find(s => s.id === editingSubjectItem.subjectId);
+
+      if (matchTryout) {
+        dbService.updateTryout(
+          matchTryout.id,
+          {
+            googleSheetUrl: cleanSheet || undefined,
+            googleFormUrl: cleanForm || undefined,
+            title: `${pkg.title} - ${editingSubjectItem.subjectName}`,
+            assessmentType: pkg.assessmentType,
+            targetClassIds: targetClassIds.length > 0 ? targetClassIds : undefined,
+          },
+          currentUser
+        );
+      } else {
+        const newTo: Tryout = {
+          id: `to-sum-${Date.now()}-${editingSubjectItem.subjectId}`,
+          code: `${pkg.code}-${editingSubjectItem.subjectId.slice(-4).toUpperCase()}`,
+          title: `${pkg.title} - ${editingSubjectItem.subjectName}`,
+          academicYearId: pkg.academicYearId,
+          packageId: pkg.id,
+          assessmentType: pkg.assessmentType,
+          subjectId: editingSubjectItem.subjectId,
+          targetClassIds: targetClassIds.length > 0 ? targetClassIds : undefined,
+          startDate: pkg.startDate,
+          endDate: pkg.endDate,
+          status: 'ACTIVE',
+          googleSheetUrl: cleanSheet,
+          googleFormUrl: cleanForm || undefined,
+          scoringConfig: {
+            scoringType: 'EQUAL_WEIGHT',
+            maxScore: 100,
+            correctScore: 1,
+            wrongScore: 0,
+            unansweredScore: 0,
+            allowNegativeMarking: false,
+            passingGrade: subj?.passingGrade || 75,
+          },
+        };
+        dbService.saveTryout(newTo);
+      }
+    }
 
     onShowToast(`Link spreadsheet untuk ${editingSubjectItem.subjectName} berhasil disimpan.`);
     setEditingSubjectItem(null);
