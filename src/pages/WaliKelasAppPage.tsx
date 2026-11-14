@@ -4,7 +4,7 @@ import {
   BookOpen, Search, ArrowRight, Award, FileSpreadsheet, Key, ChevronRight,
   ShieldCheck, RefreshCw, Phone, Mail, UserCheck, Calendar, Filter, HelpCircle,
   ArrowUp, ArrowDown, Activity, Save, BarChart3, Info, GraduationCap, SlidersHorizontal, Eye, X,
-  ShieldAlert
+  ShieldAlert, Lightbulb, Package
 } from 'lucide-react';
 import { dbService } from '../services/database';
 import { ExportService } from '../services/export';
@@ -1014,7 +1014,10 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
 
                           {/* Petunjuk Geser Layar HP */}
                           <div className="flex sm:hidden items-center justify-between text-[11px] font-medium text-slate-500 bg-slate-50 dark:bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-800/80">
-                            <span>💡 Geser grafik ke samping jika ada banyak tahapan TO</span>
+                            <span className="flex items-center gap-1.5">
+                              <Lightbulb className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              <span>Geser grafik ke samping jika ada banyak tahapan TO</span>
+                            </span>
                             <span className="font-mono font-bold text-emerald-600">↔ Geser</span>
                           </div>
 
@@ -1985,8 +1988,9 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
                               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                           }`}
                         >
-                          <span>{pkg.assessmentType === 'SAT' ? '📦 SAT' : '📦 SAS'}</span>
-                          <span>{pkg.code || pkg.title}</span>
+                          <Package className="w-3.5 h-3.5" />
+                          <span>{pkg.assessmentType}</span>
+                          <span className="font-mono">({pkg.code || pkg.title})</span>
                         </button>
                       );
                     })}

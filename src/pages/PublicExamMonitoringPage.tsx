@@ -3,7 +3,7 @@ import {
   GraduationCap, RefreshCw, Search, Filter, CheckCircle2,
   Clock, AlertCircle, ArrowUpDown, ChevronDown, Lock,
   Sparkles, Users, Award, BookOpen, ArrowLeft, EyeOff,
-  Check, School, ShieldAlert, BarChart3, Calendar
+  Check, School, ShieldAlert, BarChart3, Calendar, X
 } from 'lucide-react';
 import { dbService } from '../services/database';
 import { LiveMonitoringPayload, StudentMonitoringItem } from '../types/database';
@@ -403,10 +403,12 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
               />
               {searchQuery && (
                 <button
+                  type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 rounded cursor-pointer"
+                  title="Hapus pencarian"
                 >
-                  ✕
+                  <X className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
@@ -460,8 +462,8 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
                 <option value="TIME_DESC">Urut: Waktu Submit Terbaru</option>
                 {!payload.config.hideScores && (
                   <>
-                    <option value="SCORE_DESC">Urut: Nilai Tertinggi ➔ Terendah</option>
-                    <option value="SCORE_ASC">Urut: Nilai Terendah ➔ Tertinggi</option>
+                    <option value="SCORE_DESC">Urut: Nilai Tertinggi ke Terendah</option>
+                    <option value="SCORE_ASC">Urut: Nilai Terendah ke Tertinggi</option>
                   </>
                 )}
               </select>

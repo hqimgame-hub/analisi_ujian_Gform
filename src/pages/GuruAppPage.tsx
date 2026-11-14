@@ -9,7 +9,7 @@ import {
   Calculator, Scale, Play, CheckCheck, Sliders, PieChart, TrendingUp,
   Gauge, Zap, Target, Cpu, Clock, ArrowUp, ArrowDown, Activity, Info,
   Youtube, Copy, LayoutGrid, Cloud, CheckSquare, Minus, RotateCcw,
-  FolderKanban
+  FolderKanban, Lightbulb
 } from 'lucide-react';
 import { dbService } from '../services/database';
 import { GoogleIntegrationService } from '../services/googleIntegration';
@@ -2803,7 +2803,7 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                                             : `${subj.name}: Belum ada jadwal di ${gKey}`
                                         }
                                       >
-                                        {subj.code}: {isDup ? `${filled?.tryouts.length}x (Konflik)` : filled ? '✓' : 'Belum'}
+                                        {subj.code}: {isDup ? `${filled?.tryouts.length}x (Konflik)` : filled ? 'Terisi' : 'Belum'}
                                       </span>
                                     );
                                   })}
@@ -2919,7 +2919,7 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                                 );
                               })}
                               <option value={ADD_NEW_TO_STAGE_VALUE}>
-                                ➕ Tambah Siklus TO Baru (TO {getMaxTryoutStage(allGlobalTo, allPkgs, customMaxToStage) + 1})...
+                                + Tambah Siklus TO Baru (TO {getMaxTryoutStage(allGlobalTo, allPkgs, customMaxToStage) + 1})...
                               </option>
                               <option value={TRYOUT_GROUP_NONE}>Non-TO (Tidak Masuk Grafik)</option>
                             </select>
@@ -5725,7 +5725,10 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
 
                               {/* Mobile Swipe Hint */}
                               <div className="flex sm:hidden items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950/60 px-2.5 py-1.5 rounded-lg border border-slate-200/70 dark:border-slate-800/70">
-                                <span>💡 Geser grafik ke samping untuk melihat detail tiap TO</span>
+                                <span className="flex items-center gap-1.5">
+                                  <Lightbulb className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  <span>Geser grafik ke samping untuk melihat detail tiap TO</span>
+                                </span>
                                 <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">↔ Geser</span>
                               </div>
 
@@ -6151,7 +6154,10 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
 
                               {/* Mobile Swipe Hint */}
                               <div className="flex sm:hidden items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950/60 px-2.5 py-1.5 rounded-lg border border-slate-200/70 dark:border-slate-800/70">
-                                <span>💡 Geser grafik ke samping untuk melihat detail tiap TO</span>
+                                <span className="flex items-center gap-1.5">
+                                  <Lightbulb className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  <span>Geser grafik ke samping untuk melihat detail tiap TO</span>
+                                </span>
                                 <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">↔ Geser</span>
                               </div>
 
@@ -6472,7 +6478,10 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
 
                               {/* Mobile Swipe Hint */}
                               <div className="flex sm:hidden items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950/60 px-2.5 py-1.5 rounded-lg border border-slate-200/70 dark:border-slate-800/70">
-                                <span>💡 Geser grafik ke samping untuk melihat detail tiap TO</span>
+                                <span className="flex items-center gap-1.5">
+                                  <Lightbulb className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  <span>Geser grafik ke samping untuk melihat detail tiap TO</span>
+                                </span>
                                 <span className="font-mono font-bold text-teal-600 dark:text-teal-400">↔ Geser</span>
                               </div>
 
@@ -6642,7 +6651,10 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
 
                               {/* Mobile Hint */}
                               <div className="flex sm:hidden items-center justify-between text-[11px] font-medium text-slate-500 bg-slate-50 dark:bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-800/80">
-                                <span>💡 Geser ke samping jika tahapan TO panjang</span>
+                                <span className="flex items-center gap-1.5">
+                                  <Lightbulb className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  <span>Geser ke samping jika tahapan TO panjang</span>
+                                </span>
                                 <span className="font-mono font-bold text-teal-600">↔ Geser</span>
                               </div>
 
@@ -10217,7 +10229,10 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                                   <span>{num}</span>
                                 </span>
                               ) : isSelected ? (
-                                `✓ ${num}`
+                                <span className="flex items-center justify-center gap-0.5">
+                                  <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                  <span>{num}</span>
+                                </span>
                               ) : (
                                 num
                               )}
@@ -10234,7 +10249,7 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                                 className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 hover:bg-rose-600 text-white rounded-full text-[9px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-xs cursor-pointer z-10"
                                 title={`Hapus nomor soal #${num}`}
                               >
-                                ✕
+                                <X className="w-2.5 h-2.5" />
                               </button>
                             )}
                           </div>
@@ -10252,8 +10267,9 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                           </strong>
                         </span>
                       ) : (
-                        <span className="text-amber-600 dark:text-amber-400 italic font-medium">
-                          ⚠ Belum ada nomor yang dicentang. Silakan klik kotak nomor di atas.
+                        <span className="text-amber-600 dark:text-amber-400 italic font-medium flex items-center gap-1">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0 inline" />
+                          <span>Belum ada nomor yang dicentang. Silakan klik kotak nomor di atas.</span>
                         </span>
                       )}
                     </div>
@@ -10598,7 +10614,7 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                     );
                   })}
                   <option value={ADD_NEW_TO_STAGE_VALUE}>
-                    ➕ Tambah Siklus TO Baru (TO {getMaxTryoutStage(dbService.getTryouts(), dbService.getExamPackages(), Math.max(customMaxToStage, parseInt((newToGroup || '').replace(/\D/g, ''), 10) || 3)) + 1})...
+                    + Tambah Siklus TO Baru (TO {getMaxTryoutStage(dbService.getTryouts(), dbService.getExamPackages(), Math.max(customMaxToStage, parseInt((newToGroup || '').replace(/\D/g, ''), 10) || 3)) + 1})...
                   </option>
                   <option value={TRYOUT_GROUP_NONE}>Non-TO (Latihan Mandiri / Tidak Masuk Grafik Siklus TO)</option>
                 </select>
@@ -10864,8 +10880,9 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                     </div>
 
                     {newToExternalSubjectIds.length === 0 && (
-                      <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1.5 font-medium">
-                        ⚠️ Pilihlah minimal 1 mata pelajaran agar template Excel memiliki kolom nilai.
+                      <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1.5 font-medium flex items-center gap-1.5">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>Pilihlah minimal 1 mata pelajaran agar template Excel memiliki kolom nilai.</span>
                       </p>
                     )}
                   </div>

@@ -29,10 +29,10 @@ if (isSupabaseConfigured()) {
       detectSessionInUrl: true,
     },
   });
-  console.info('[Supabase] ✅ Connected to:', supabaseUrl);
+  console.info('[Supabase] Connected to:', supabaseUrl);
 } else {
   console.warn(
-    '[Supabase] ⚠️ Belum dikonfigurasi. Aplikasi berjalan dalam mode DEMO (localStorage).\n' +
+    '[Supabase] Belum dikonfigurasi. Aplikasi berjalan dalam mode DEMO (localStorage).\n' +
     'Untuk produksi: isi VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY di file .env.local'
   );
 }

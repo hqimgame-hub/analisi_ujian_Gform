@@ -147,7 +147,7 @@ class AuthService {
    * DEMO MODE: Verifikasi terhadap mockData — password field dari DB
    *            diverifikasi tanpa disimpan kembali ke localStorage.
    *
-   * ⚠️ CATATAN DEVELOPER: Dalam demo mode, password disimpan di mockData.ts
+   * CATATAN DEVELOPER: Dalam demo mode, password disimpan di mockData.ts
    * BUKAN di localStorage. Untuk produksi, password harus di-hash di Supabase Auth.
    * Tidak ada master password atau backdoor.
    */

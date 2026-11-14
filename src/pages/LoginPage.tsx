@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   LogIn, Lock, ShieldAlert, GraduationCap,
   CheckCircle2, RefreshCw, Award, Search, Calendar, UserCheck,
-  Eye, EyeOff, X
+  Eye, EyeOff, X, ArrowRight
 } from 'lucide-react';
 import { authService } from '../services/auth';
 import { dbService } from '../services/database';
@@ -231,8 +231,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     </p>
                   </div>
                 </div>
-                <span className="text-xs font-bold text-rose-600 dark:text-rose-400 group-hover:translate-x-0.5 transition-transform">
-                  Buka ➔
+                <span className="text-xs font-bold text-rose-600 dark:text-rose-400 group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+                  <span>Buka</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </span>
               </button>
             </div>

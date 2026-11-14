@@ -2365,7 +2365,7 @@ export const AdminAppPage: React.FC<AdminAppPageProps> = ({ currentUser, onNavig
                       Akses Halaman Publik Tanpa Login
                     </h4>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                      Bila diaktifkan, tombol <strong>"🔴 Pantau Live Ujian"</strong> akan muncul di halaman Login portal siswa.
+                      Bila diaktifkan, tombol pintas <strong>"Pantau Live Ujian"</strong> akan muncul di halaman Login portal siswa.
                     </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer shrink-0">
@@ -2496,11 +2496,19 @@ export const AdminAppPage: React.FC<AdminAppPageProps> = ({ currentUser, onNavig
                         Mode Sensor Nilai Siswa (Sembunyikan Angka Nilai)
                       </h4>
                     </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      {monitoringConfig.hideScores
-                        ? '✅ AKTIF: Hanya menampilkan status pengerjaan (Sudah Selesai / Belum Mengerjakan). Angka nilai dirahasiakan.'
-                        : '⚠️ TERBUKA: Angka nilai siswa (0–100) dapat dilihat oleh siapa saja di halaman publik.'}
-                    </p>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                      {monitoringConfig.hideScores ? (
+                        <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
+                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                          <span><strong>AKTIF:</strong> Hanya menampilkan status pengerjaan (Sudah Selesai / Belum Mengerjakan). Angka nilai dirahasiakan.</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-medium">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                          <span><strong>TERBUKA:</strong> Angka nilai siswa (0–100) dapat dilihat oleh siapa saja di halaman publik.</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer shrink-0">
                     <input
@@ -3338,8 +3346,9 @@ export const AdminAppPage: React.FC<AdminAppPageProps> = ({ currentUser, onNavig
                       <span>Sistem otomatis membuat kelas penampung <strong>'Kunci Jawaban'</strong> saat disimpan.</span>
                     </div>
                   ) : (
-                    <div className="w-full px-3 py-2.5 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/60 rounded-xl text-rose-700 dark:text-rose-300 text-[11px] leading-relaxed">
-                      ⚠️ Belum ada kelas yang terdaftar. Tambahkan kelas terlebih dahulu di tab <strong>Kelas</strong>.
+                    <div className="w-full px-3 py-2.5 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/60 rounded-xl text-rose-700 dark:text-rose-300 text-[11px] leading-relaxed flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                      <span>Belum ada kelas yang terdaftar. Tambahkan kelas terlebih dahulu di tab <strong>Kelas</strong>.</span>
                     </div>
                   )
                 ) : (
