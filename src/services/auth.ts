@@ -4,6 +4,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const AUTH_USER_KEY = 'school_analytics_auth_user';
 const AUTH_SESSION_KEY = 'school_analytics_auth_session_id';
+const AUTH_IMPERSONATOR_KEY = 'school_analytics_impersonator_admin';
 
 export interface AuthSession {
   user: User;
@@ -32,6 +33,7 @@ export type AccessStatus =
 class AuthService {
   private currentUser: User | null = null;
   private sessionId: string | null = null;
+  private impersonatorAdmin: User | null = null;
   private listeners: Array<(user: User | null) => void> = [];
 
   constructor() {
@@ -43,6 +45,16 @@ class AuthService {
     try {
       const storedUser = localStorage.getItem(AUTH_USER_KEY);
       const storedSessionId = localStorage.getItem(AUTH_SESSION_KEY);
+      const storedImpersonator = sessionStorage.getItem(AUTH_IMPERSONATOR_KEY);
+
+      if (storedImpersonator) {
+        try {
+          this.impersonatorAdmin = this.sanitizeUser(JSON.parse(storedImpersonator));
+        } catch {
+          sessionStorage.removeItem(AUTH_IMPERSONATOR_KEY);
+          this.impersonatorAdmin = null;
+        }
+      }
 
       if (storedUser && storedSessionId) {
         const parsedUser: User = JSON.parse(storedUser);
@@ -92,9 +104,84 @@ class AuthService {
   private clearSession() {
     localStorage.removeItem(AUTH_USER_KEY);
     localStorage.removeItem(AUTH_SESSION_KEY);
+    sessionStorage.removeItem(AUTH_IMPERSONATOR_KEY);
+    this.impersonatorAdmin = null;
     this.currentUser = null;
     this.sessionId = null;
     this.notifyListeners();
+  }
+
+  /**
+   * Masuk sebagai akun Guru atau Walas (Admin Impersonation Mode)
+   * Sesi asli Admin disimpan di sessionStorage sehingga Admin tidak perlu login ulang saat kembali.
+   */
+  public impersonateUser(targetUser: User): void {
+    if (!this.currentUser) return;
+
+    // Jika belum dalam mode impersonasi, simpan sesi Admin saat ini
+    if (!this.impersonatorAdmin) {
+      const adminCopy = this.sanitizeUser(this.currentUser);
+      this.impersonatorAdmin = adminCopy;
+      sessionStorage.setItem(AUTH_IMPERSONATOR_KEY, JSON.stringify(adminCopy));
+    }
+
+    const safeTarget = this.sanitizeUser(targetUser);
+    this.currentUser = safeTarget;
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(safeTarget));
+
+    dbService.logAudit(
+      this.impersonatorAdmin || safeTarget,
+      'LOGIN',
+      'AUTH',
+      `Admin ${this.impersonatorAdmin?.name || 'Administrator'} memasuki akun ${safeTarget.name} (${safeTarget.role}) via Mode Bantuan Impersonasi.`
+    );
+
+    this.notifyListeners();
+  }
+
+  /**
+   * Berhenti dari mode bantuan dan pulihkan sesi Admin asli secara instan
+   */
+  public stopImpersonation(): User | null {
+    const originalAdmin = this.impersonatorAdmin || (() => {
+      try {
+        const raw = sessionStorage.getItem(AUTH_IMPERSONATOR_KEY);
+        return raw ? this.sanitizeUser(JSON.parse(raw)) : null;
+      } catch {
+        return null;
+      }
+    })();
+
+    if (!originalAdmin) return null;
+
+    sessionStorage.removeItem(AUTH_IMPERSONATOR_KEY);
+    this.impersonatorAdmin = null;
+    this.currentUser = originalAdmin;
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(originalAdmin));
+
+    dbService.logAudit(
+      originalAdmin,
+      'LOGIN',
+      'AUTH',
+      `Admin ${originalAdmin.name} kembali ke dashboard Administrator dari sesi bantuan impersonasi.`
+    );
+
+    this.notifyListeners();
+    return originalAdmin;
+  }
+
+  public isImpersonating(): boolean {
+    return Boolean(this.impersonatorAdmin || sessionStorage.getItem(AUTH_IMPERSONATOR_KEY));
+  }
+
+  public getOriginalAdmin(): User | null {
+    if (this.impersonatorAdmin) return this.impersonatorAdmin;
+    try {
+      const raw = sessionStorage.getItem(AUTH_IMPERSONATOR_KEY);
+      return raw ? this.sanitizeUser(JSON.parse(raw)) : null;
+    } catch {
+      return null;
+    }
   }
 
   public subscribe(listener: (user: User | null) => void): () => void {

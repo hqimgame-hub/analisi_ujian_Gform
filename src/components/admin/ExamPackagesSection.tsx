@@ -3,13 +3,14 @@ import {
   FolderKanban, Plus, Search, Filter, CheckCircle2, AlertCircle,
   Calendar, School, BookOpen, Link as LinkIcon, ExternalLink,
   Edit2, Trash2, Check, X, ChevronRight, ChevronDown, Sparkles,
-  Clock, FileSpreadsheet, Layers, ShieldCheck, UserCheck, Copy
+  Clock, FileSpreadsheet, Layers, ShieldCheck, UserCheck, Copy, LogIn
 } from 'lucide-react';
 import {
   ExamPackage, ExamPackageSubject, ClassRoom, Subject,
-  AcademicYear, TryoutStatus, AssessmentType
+  AcademicYear, TryoutStatus, AssessmentType, Teacher, User
 } from '../../types/database';
 import { DatabaseService } from '../../services/database';
+import { authService } from '../../services/auth';
 import { generateUuid } from '../../utils/idUtils';
 
 interface ExamPackagesSectionProps {
@@ -18,6 +19,7 @@ interface ExamPackagesSectionProps {
   subjects: Subject[];
   academicYears: AcademicYear[];
   currentUser: any;
+  onNavigate?: (path: string) => void;
   onShowToast: (msg: string) => void;
 }
 
@@ -27,6 +29,7 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
   subjects,
   academicYears,
   currentUser,
+  onNavigate,
   onShowToast
 }) => {
   const [packages, setPackages] = useState<ExamPackage[]>(() => dbService.getExamPackages());
@@ -63,6 +66,27 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
     sheetUrl: string;
     formUrl: string;
   } | null>(null);
+
+  const handleImpersonateTeacherForSubj = (teacher: Teacher) => {
+    const allUsers = dbService.getState().users || [];
+    const userObj = allUsers.find(u => u.id === teacher.userId || (teacher.email && u.email.toLowerCase() === teacher.email.toLowerCase()));
+    const isWali = teacher.isWaliKelas || classes.some(c => c.homeRoomTeacherId === teacher.id || c.id === teacher.homeRoomClassId);
+    const targetUser: User = userObj || {
+      id: teacher.userId || `u-${teacher.id}`,
+      email: teacher.email || `${teacher.nip}@sekolah.id`,
+      role: isWali ? 'WALI_KELAS' : 'GURU',
+      name: teacher.name,
+      createdAt: new Date().toISOString(),
+    };
+
+    authService.impersonateUser(targetUser);
+    onShowToast(`Beralih ke dashboard ${teacher.name} (${teacher.nip}).`);
+    if (onNavigate) {
+      onNavigate(isWali ? '/wali-kelas' : '/guru');
+    } else {
+      window.location.href = isWali ? '/wali-kelas' : '/guru';
+    }
+  };
 
   const refreshData = () => {
     const pkgs = dbService.getExamPackages();
@@ -846,6 +870,8 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
                         displayedSubjects.map(item => {
                           const subj = subjects.find(s => s.id === item.subjectId);
                           const hasSheet = Boolean(item.googleSheetUrl?.trim());
+                          const allTeachers = dbService.getTeachers() || [];
+                          const teacherForSubj = allTeachers.find(t => (t.subjectPermissions || []).includes(item.subjectId));
                           const extToForSubj = pkgTryouts.find(t =>
                             t.isExternal && (
                               (t.externalSubjectIds && t.externalSubjectIds.includes(item.subjectId)) ||
@@ -923,20 +949,33 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
                               </td>
 
                               <td className="py-3 px-3 text-right">
-                                <button
-                                  onClick={() =>
-                                    setEditingSubjectItem({
-                                      pkgId: selectedPackage.id,
-                                      subjectId: item.subjectId,
-                                      subjectName: subj?.name || item.subjectId,
-                                      sheetUrl: item.googleSheetUrl || '',
-                                      formUrl: item.googleFormUrl || ''
-                                    })
-                                  }
-                                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold cursor-pointer shadow-2xs transition-colors"
-                                >
-                                  {hasSheet ? 'Ganti Link' : 'Input Link (Bantu Guru)'}
-                                </button>
+                                <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                  {teacherForSubj && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleImpersonateTeacherForSubj(teacherForSubj)}
+                                      className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1"
+                                      title={`Masuk ke akun ${teacherForSubj.name} untuk membantu input link`}
+                                    >
+                                      <LogIn className="w-3 h-3" />
+                                      <span>Akun Guru</span>
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() =>
+                                      setEditingSubjectItem({
+                                        pkgId: selectedPackage.id,
+                                        subjectId: item.subjectId,
+                                        subjectName: subj?.name || item.subjectId,
+                                        sheetUrl: item.googleSheetUrl || '',
+                                        formUrl: item.googleFormUrl || ''
+                                      })
+                                    }
+                                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold cursor-pointer shadow-2xs transition-colors"
+                                  >
+                                    {hasSheet ? 'Ganti Link' : 'Input Link (Bantu Guru)'}
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );

@@ -12,6 +12,7 @@ import { GuruAppPage } from './pages/GuruAppPage';
 import { WaliKelasAppPage } from './pages/WaliKelasAppPage';
 import { AdminAppPage } from './pages/AdminAppPage';
 import { PublicExamMonitoringPage } from './pages/PublicExamMonitoringPage';
+import { ImpersonationBanner } from './components/common/ImpersonationBanner';
 import { authService } from './services/auth';
 import { dbService } from './services/database';
 import { User } from './types/database';
@@ -116,6 +117,15 @@ function AppContent() {
     navigateTo('/login');
   };
 
+  const isImpersonating = authService.isImpersonating();
+
+  const handleExitImpersonation = () => {
+    const admin = authService.stopImpersonation();
+    if (admin) {
+      navigateTo('/admin');
+    }
+  };
+
   const urlParams = new URLSearchParams(window.location.search);
   const returnToQuery = urlParams.get('returnTo') || undefined;
   const isDashboardRoute = activeRoute === '/admin' || activeRoute === '/guru' || activeRoute === '/wali-kelas';
@@ -124,6 +134,10 @@ function AppContent() {
     <div className={`flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-indigo-500 selection:text-white transition-colors duration-200 ${
       isDashboardRoute ? 'h-screen overflow-hidden' : 'min-h-screen'
     }`}>
+      {isImpersonating && currentUser && (
+        <ImpersonationBanner currentUser={currentUser} onExit={handleExitImpersonation} />
+      )}
+
       <Navbar
         currentUser={currentUser}
         currentPath={activeRoute}
