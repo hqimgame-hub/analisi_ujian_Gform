@@ -3244,9 +3244,19 @@ export class DatabaseService {
   public getExamPackagesForWaliKelas(homeRoomClassId: string): ExamPackage[] {
     if (!homeRoomClassId) return [];
     const all = this.getExamPackages();
+    const targetClass = (this.state.classes || []).find(c => c.id === homeRoomClassId);
     return all.filter(pkg => {
+      // 1. Direct class ID match
       if (pkg.targetClassIds && pkg.targetClassIds.length > 0) {
-        return pkg.targetClassIds.includes(homeRoomClassId);
+        if (pkg.targetClassIds.includes(homeRoomClassId)) return true;
+      }
+      // 2. Grade level match
+      if (targetClass && targetClass.gradeLevel && pkg.targetGrades && pkg.targetGrades.length > 0) {
+        if (pkg.targetGrades.includes(targetClass.gradeLevel)) return true;
+      }
+      // 3. If neither targetClassIds nor targetGrades is set, treat as open to all classes
+      if ((!pkg.targetClassIds || pkg.targetClassIds.length === 0) && (!pkg.targetGrades || pkg.targetGrades.length === 0)) {
+        return true;
       }
       return false;
     });

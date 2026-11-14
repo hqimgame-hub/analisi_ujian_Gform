@@ -65,6 +65,7 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
   const [waliNotes, setWaliNotes] = useState<Record<string, string>>({});
   const [selectedTryoutId, setSelectedTryoutId] = useState<string>('');
   const [selectedPackageId, setSelectedPackageId] = useState<string>('');
+  const [selectedClassId, setSelectedClassId] = useState<string>('');
 
   // Local Reactive Database States
   const [teachers, setTeachers] = useState(dbService.getTeachers());
@@ -94,17 +95,28 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
     (t.nip && (currentUser as any).nip && t.nip === (currentUser as any).nip)
   );
 
-  // Resolve assigned class properly without hardcoding
-  const assignedClass = classes.find(c =>
-    (teacherObj?.homeRoomClassId && c.id === teacherObj.homeRoomClassId) ||
-    (teacherObj?.id && c.homeRoomTeacherId === teacherObj.id)
-  ) || classes[0] || {
-    id: '',
-    name: 'Belum Ditetapkan',
-    gradeLevel: '-',
-    academicYearId: '',
-    homeRoomTeacherId: '',
-  };
+  // Default assigned class based on teacher assignments
+  const defaultAssignedClass = useMemo(() => {
+    return classes.find(c =>
+      (teacherObj?.homeRoomClassId && c.id === teacherObj.homeRoomClassId) ||
+      (teacherObj?.id && c.homeRoomTeacherId === teacherObj.id)
+    ) || classes[0] || {
+      id: '',
+      name: 'Belum Ditetapkan',
+      gradeLevel: '-',
+      academicYearId: '',
+      homeRoomTeacherId: '',
+    };
+  }, [classes, teacherObj]);
+
+  // Resolve assigned class properly without hardcoding, allowing dynamic class switching
+  const assignedClass = useMemo(() => {
+    if (selectedClassId) {
+      const match = classes.find(c => c.id === selectedClassId);
+      if (match) return match;
+    }
+    return defaultAssignedClass;
+  }, [selectedClassId, classes, defaultAssignedClass]);
 
   const assignedClassId = assignedClass.id;
 
@@ -190,9 +202,16 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
     });
   }, [assignedClassId, assignedClass.gradeLevel, rawTryouts]);
 
+  // Seluruh paket SAT/SAS di sekolah (agar wali kelas/admin dapat mengevaluasi seluruh asesmen sumatif)
+  const allSumatifPackages = useMemo(() => {
+    return dbService.getExamPackages().filter(pkg => pkg.assessmentType === 'SAS' || pkg.assessmentType === 'SAT');
+  }, [rawTryouts]);
+
   const sumatifPackagesForWalas = useMemo(() => {
-    return packagesForWalas.filter(pkg => pkg.assessmentType === 'SAS' || pkg.assessmentType === 'SAT');
-  }, [packagesForWalas]);
+    const scoped = packagesForWalas.filter(pkg => pkg.assessmentType === 'SAS' || pkg.assessmentType === 'SAT');
+    // Jika tidak ada paket yang secara khusus menargetkan kelas saat ini, tampilkan seluruh paket SAT/SAS sekolah
+    return scoped.length > 0 ? scoped : allSumatifPackages;
+  }, [packagesForWalas, allSumatifPackages]);
 
   useEffect(() => {
     if (sumatifPackagesForWalas.length > 0) {
@@ -204,10 +223,37 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
 
   const activePackage = useMemo(() => {
     if (selectedPackageId) {
-      return sumatifPackagesForWalas.find(p => p.id === selectedPackageId) || packagesForWalas.find(p => p.id === selectedPackageId);
+      return allSumatifPackages.find(p => p.id === selectedPackageId) ||
+        sumatifPackagesForWalas.find(p => p.id === selectedPackageId) ||
+        packagesForWalas.find(p => p.id === selectedPackageId);
     }
-    return sumatifPackagesForWalas[0] || undefined;
-  }, [selectedPackageId, sumatifPackagesForWalas, packagesForWalas]);
+    return sumatifPackagesForWalas[0] || allSumatifPackages[0] || undefined;
+  }, [selectedPackageId, sumatifPackagesForWalas, allSumatifPackages, packagesForWalas]);
+
+  // Target kelas untuk activePackage yang sedang dibuka
+  const targetClassesForActivePackage = useMemo(() => {
+    if (!activePackage) return classes;
+    const targeted = classes.filter(c => {
+      if (activePackage.targetClassIds && activePackage.targetClassIds.length > 0) {
+        if (activePackage.targetClassIds.includes(c.id)) return true;
+      }
+      if (activePackage.targetGrades && activePackage.targetGrades.length > 0 && c.gradeLevel) {
+        if (activePackage.targetGrades.includes(c.gradeLevel)) return true;
+      }
+      return false;
+    });
+    return targeted.length > 0 ? targeted : classes;
+  }, [activePackage, classes]);
+
+  // Otomatis sinkronkan kelas ke kelas target paket SAT/SAS saat berada di tab Evaluasi SAT/SAS
+  useEffect(() => {
+    if (activeTab === 'SUMATIF_LEGER' && activePackage && targetClassesForActivePackage.length > 0) {
+      const isCurrentClassTargeted = targetClassesForActivePackage.some(c => c.id === assignedClassId);
+      if (!isCurrentClassTargeted) {
+        setSelectedClassId(targetClassesForActivePackage[0].id);
+      }
+    }
+  }, [activeTab, activePackage, targetClassesForActivePackage, assignedClassId]);
 
   const isSumatifActive = activePackage?.assessmentType === 'SAS' || activePackage?.assessmentType === 'SAT';
 
@@ -370,8 +416,27 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
               </p>
             </div>
 
-            {/* Quick Action */}
+            {/* Quick Action & Class Selector */}
             <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+              {/* Selector Rombel / Kelas Binaan */}
+              {classes.length > 0 && (
+                <div className="flex items-center gap-2 bg-white/10 hover:bg-white/15 backdrop-blur-xs px-3.5 py-2 rounded-xl border border-white/20 transition-colors">
+                  <School className="w-4 h-4 text-emerald-300 shrink-0" />
+                  <span className="text-xs text-slate-200 font-medium hidden sm:inline">Rombel:</span>
+                  <select
+                    value={assignedClassId}
+                    onChange={e => setSelectedClassId(e.target.value)}
+                    className="bg-transparent text-white font-bold text-xs focus:outline-none cursor-pointer pr-1"
+                  >
+                    {classes.map(c => (
+                      <option key={c.id} value={c.id} className="text-slate-900 bg-white dark:bg-slate-900 dark:text-white">
+                        Kelas {c.name} {c.gradeLevel ? `(Tingkat ${c.gradeLevel})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Excel Export Leger */}
               <button
                 type="button"
@@ -2054,30 +2119,57 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
                   </p>
                 </div>
 
-                {/* Switcher Button Group */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-bold text-slate-500">Pilih Wadah:</span>
-                  <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800">
-                    {sumatifPackagesForWalas.map(pkg => {
-                      const isSelected = (activePackage?.id === pkg.id);
-                      return (
-                        <button
-                          key={pkg.id}
-                          type="button"
-                          onClick={() => setSelectedPackageId(pkg.id)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                            isSelected
-                              ? 'bg-indigo-600 text-white shadow-xs'
-                              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                          }`}
-                        >
-                          <Package className="w-3.5 h-3.5" />
-                          <span>{pkg.assessmentType}</span>
-                          <span className="font-mono">({pkg.code || pkg.title})</span>
-                        </button>
-                      );
-                    })}
+                {/* Switcher Button Group: Wadah & Rombel */}
+                <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold text-slate-500">Pilih Wadah:</span>
+                    <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800">
+                      {sumatifPackagesForWalas.map(pkg => {
+                        const isSelected = (activePackage?.id === pkg.id);
+                        return (
+                          <button
+                            key={pkg.id}
+                            type="button"
+                            onClick={() => setSelectedPackageId(pkg.id)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                              isSelected
+                                ? 'bg-indigo-600 text-white shadow-xs'
+                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                            }`}
+                          >
+                            <Package className="w-3.5 h-3.5" />
+                            <span>{pkg.assessmentType}</span>
+                            <span className="font-mono">({pkg.code || pkg.title})</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
+
+                  {targetClassesForActivePackage.length > 1 && (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-xs font-bold text-slate-500">Pilih Rombel:</span>
+                      <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800">
+                        {targetClassesForActivePackage.map(c => {
+                          const isClassSelected = (assignedClassId === c.id);
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => setSelectedClassId(c.id)}
+                              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                isClassSelected
+                                  ? 'bg-emerald-600 text-white shadow-xs'
+                                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                              }`}
+                            >
+                              Kelas {c.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

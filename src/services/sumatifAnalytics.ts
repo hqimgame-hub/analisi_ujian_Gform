@@ -132,12 +132,27 @@ export class SumatifAnalyticsService {
     if (validTryoutIds && validTryoutIds.size > 0 && !validTryoutIds.has(scoreRecord.tryoutId)) {
       return null;
     }
-    if (scoreRecord.subjectScores && typeof scoreRecord.subjectScores[subjectId] === 'number') {
-      return scoreRecord.subjectScores[subjectId];
+    // 1. Cek subjectScores dengan exact match atau case-insensitive match
+    if (scoreRecord.subjectScores) {
+      if (typeof scoreRecord.subjectScores[subjectId] === 'number') {
+        return scoreRecord.subjectScores[subjectId];
+      }
+      const lowerSubjId = subjectId.toLowerCase().trim();
+      for (const [k, v] of Object.entries(scoreRecord.subjectScores)) {
+        if (k.toLowerCase().trim() === lowerSubjId && typeof v === 'number') {
+          return v;
+        }
+      }
     }
-    // Jika tryoutId cocok dengan tryout wadah/mapel ini, ambil calculatedScore/googleFormScore
+    // 2. Jika tryoutId cocok dengan tryout wadah/mapel ini, ambil skor aktual
     if (validTryoutIds && validTryoutIds.has(scoreRecord.tryoutId)) {
-      return scoreRecord.calculatedScore ?? scoreRecord.googleFormScore ?? 0;
+      const calc = scoreRecord.calculatedScore;
+      const gForm = scoreRecord.googleFormScore;
+      if (typeof calc === 'number' && calc > 0) return calc;
+      if (typeof gForm === 'number' && gForm > 0) return gForm;
+      if (typeof calc === 'number') return calc;
+      if (typeof gForm === 'number') return gForm;
+      return 0;
     }
     return null;
   }
@@ -170,14 +185,22 @@ export class SumatifAnalyticsService {
 
       const pkgCode = (pkg.code || '').toLowerCase().trim();
       const pkgId = (pkg.id || '').toLowerCase().trim();
+      const subIdNorm = pkgSub.subjectId.toLowerCase().trim();
+      const pkgSubSheet = (pkgSub.googleSheetUrl || '').trim();
+
       const matchingTryoutIds = new Set(
         allTryouts
           .filter(t => {
             const tPkgId = (t.packageId || '').toLowerCase().trim();
             const tCode = (t.code || '').toLowerCase().trim();
-            const isPkgMatch = tPkgId === pkgId || (pkgCode && tCode.startsWith(pkgCode)) || t.id === pkgId;
-            const isSubMatch = !t.subjectId || t.subjectId === pkgSub.subjectId || (t.id && t.id.includes(pkgSub.subjectId));
-            return isPkgMatch && isSubMatch;
+            const tSubId = (t.subjectId || '').toLowerCase().trim();
+            const isPkgMatch = tPkgId === pkgId || (pkgCode && tCode.startsWith(pkgCode)) || t.id.toLowerCase() === pkgId;
+            const isSubMatch = tSubId === subIdNorm ||
+              (t.id && t.id.toLowerCase().includes(subIdNorm)) ||
+              (t.title && subName && t.title.toLowerCase().includes(subName.toLowerCase().trim())) ||
+              (t.code && subCode && t.code.toLowerCase().includes(subCode.toLowerCase().trim()));
+            const isUrlMatch = !!(pkgSubSheet && t.googleSheetUrl && pkgSubSheet === t.googleSheetUrl.trim());
+            return (isPkgMatch && isSubMatch) || isUrlMatch;
           })
           .map(t => t.id)
       );
@@ -274,23 +297,39 @@ export class SumatifAnalyticsService {
     // 1. Tentukan Tryout yang terhubung dengan paket dan mapel ini
     const pkgCode = (pkg.code || '').toLowerCase().trim();
     const pkgId = (pkg.id || '').toLowerCase().trim();
+    const subIdNorm = subjectId.toLowerCase().trim();
+    const pkgSubSheet = (pkgSub?.googleSheetUrl || '').trim();
+
     const matchingTryouts = allTryouts.filter(t => {
       const tPkgId = (t.packageId || '').toLowerCase().trim();
       const tCode = (t.code || '').toLowerCase().trim();
-      const isPkgMatch = tPkgId === pkgId || (pkgCode && tCode.startsWith(pkgCode)) || t.id === pkgId;
-      const isSubMatch = !t.subjectId || t.subjectId === subjectId || (t.id && t.id.includes(subjectId));
-      return isPkgMatch && isSubMatch;
+      const tSubId = (t.subjectId || '').toLowerCase().trim();
+      const isPkgMatch = tPkgId === pkgId || (pkgCode && tCode.startsWith(pkgCode)) || t.id.toLowerCase() === pkgId;
+      const isSubMatch = tSubId === subIdNorm ||
+        (t.id && t.id.toLowerCase().includes(subIdNorm)) ||
+        (t.title && subInfo?.name && t.title.toLowerCase().includes(subInfo.name.toLowerCase().trim())) ||
+        (t.code && subInfo?.code && t.code.toLowerCase().includes(subInfo.code.toLowerCase().trim()));
+      const isUrlMatch = !!(pkgSubSheet && t.googleSheetUrl && pkgSubSheet === t.googleSheetUrl.trim());
+      return (isPkgMatch && isSubMatch) || isUrlMatch;
     });
     const matchingTryoutIds = new Set(matchingTryouts.map(t => t.id));
     // Wadah ID itu sendiri juga bisa tersimpan di tryoutId
     matchingTryoutIds.add(pkg.id);
 
-    // 2. Tentukan target siswa berdasarkan targetClassIds paket ujian
-    const targetClassIds = new Set(
-      pkg.targetClassIds && pkg.targetClassIds.length > 0
-        ? pkg.targetClassIds
-        : allClasses.map(c => c.id)
-    );
+    // 2. Tentukan target siswa berdasarkan targetClassIds / targetGrades paket ujian
+    const targetClasses = allClasses.filter(c => {
+      if (pkg.targetClassIds && pkg.targetClassIds.length > 0) {
+        if (pkg.targetClassIds.includes(c.id)) return true;
+      }
+      if (pkg.targetGrades && pkg.targetGrades.length > 0 && c.gradeLevel) {
+        if (pkg.targetGrades.includes(c.gradeLevel)) return true;
+      }
+      if ((!pkg.targetClassIds || pkg.targetClassIds.length === 0) && (!pkg.targetGrades || pkg.targetGrades.length === 0)) {
+        return true;
+      }
+      return false;
+    });
+    const targetClassIds = new Set(targetClasses.map(c => c.id));
     const targetStudents = allStudents.filter(s =>
       targetClassIds.has(s.classId) && !s.isAnswerKeyAccount
     );
@@ -464,30 +503,66 @@ export class SumatifAnalyticsService {
     const targetClass = allClasses.find(c => c.id === classId);
     const classStudents = allStudents.filter(s => s.classId === classId && !s.isAnswerKeyAccount);
 
-    const subjects = (pkg.subjects || []).map(pkgSub => {
+    const pkgCode = (pkg.code || '').toLowerCase().trim();
+    const pkgId = (pkg.id || '').toLowerCase().trim();
+
+    // Kumpulkan seluruh mapel yang terdaftar dalam wadah paket ujian
+    const subjects: { id: string; code: string; name: string; passingGrade: number }[] = [];
+    const seenSubjIds = new Set<string>();
+
+    (pkg.subjects || []).forEach(pkgSub => {
       const sub = allSubjects.find(s => s.id === pkgSub.subjectId);
-      return {
+      subjects.push({
         id: pkgSub.subjectId,
         code: sub?.code || 'MAPEL',
         name: sub?.name || 'Mata Pelajaran',
-        // Prioritaskan KKM yang diinput Admin
         passingGrade: sub?.passingGrade || pkgSub.passingGrade || 75,
-      };
+      });
+      seenSubjIds.add(pkgSub.subjectId.toLowerCase().trim());
+    });
+
+    // Periksa apakah ada tryout milik wadah ini yang memiliki subjectId yang belum tercakup di pkg.subjects
+    allTryouts.forEach(t => {
+      const tPkgId = (t.packageId || '').toLowerCase().trim();
+      const tCode = (t.code || '').toLowerCase().trim();
+      const isPkgMatch = tPkgId === pkgId || (pkgCode && tCode.startsWith(pkgCode)) || t.id.toLowerCase() === pkgId;
+      if (isPkgMatch && t.subjectId) {
+        const normSubId = t.subjectId.toLowerCase().trim();
+        if (!seenSubjIds.has(normSubId)) {
+          const sub = allSubjects.find(s => s.id.toLowerCase().trim() === normSubId);
+          if (sub) {
+            subjects.push({
+              id: sub.id,
+              code: sub.code,
+              name: sub.name,
+              passingGrade: sub.passingGrade || 75,
+            });
+            seenSubjIds.add(normSubId);
+          }
+        }
+      }
     });
 
     // Map tryouts per mapel untuk paket ini
-    const pkgCode = (pkg.code || '').toLowerCase().trim();
-    const pkgId = (pkg.id || '').toLowerCase().trim();
     const subjectTryoutMap = new Map<string, Set<string>>();
     subjects.forEach(sub => {
+      const subIdNorm = sub.id.toLowerCase().trim();
+      const pkgSub = pkg.subjects?.find(ps => ps.subjectId.toLowerCase().trim() === subIdNorm);
+      const pkgSubSheet = (pkgSub?.googleSheetUrl || '').trim();
+
       const tIds = new Set(
         allTryouts
           .filter(t => {
             const tPkgId = (t.packageId || '').toLowerCase().trim();
             const tCode = (t.code || '').toLowerCase().trim();
-            const isPkgMatch = tPkgId === pkgId || (pkgCode && tCode.startsWith(pkgCode)) || t.id === pkgId;
-            const isSubMatch = !t.subjectId || t.subjectId === sub.id || (t.id && t.id.includes(sub.id));
-            return isPkgMatch && isSubMatch;
+            const tSubId = (t.subjectId || '').toLowerCase().trim();
+            const isPkgMatch = tPkgId === pkgId || (pkgCode && tCode.startsWith(pkgCode)) || t.id.toLowerCase() === pkgId;
+            const isSubMatch = tSubId === subIdNorm ||
+              (t.id && t.id.toLowerCase().includes(subIdNorm)) ||
+              (t.title && sub.name && t.title.toLowerCase().includes(sub.name.toLowerCase().trim())) ||
+              (t.code && sub.code && t.code.toLowerCase().includes(sub.code.toLowerCase().trim()));
+            const isUrlMatch = !!(pkgSubSheet && t.googleSheetUrl && pkgSubSheet === t.googleSheetUrl.trim());
+            return (isPkgMatch && isSubMatch) || isUrlMatch;
           })
           .map(t => t.id)
       );
