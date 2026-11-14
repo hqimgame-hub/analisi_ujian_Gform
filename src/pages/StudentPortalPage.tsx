@@ -149,17 +149,17 @@ export const StudentPortalPage: React.FC = () => {
       if (hasScore) return true;
 
       // 2. If linked to an ExamPackage (wadah), verify target classes
-      if (t.packageId) {
-        const pkg = dbService.getExamPackageById(t.packageId);
-        if (pkg) {
-          if (pkg.targetClassIds && pkg.targetClassIds.length > 0) {
-            return pkg.targetClassIds.includes(verifiedStudent.classId);
-          }
-          if (studentClass && pkg.targetGrades && pkg.targetGrades.length > 0) {
-            return pkg.targetGrades.includes(studentClass.gradeLevel);
-          }
-          return false;
+      const pkg = t.packageId
+        ? dbService.getExamPackageById(t.packageId)
+        : (t.code ? dbService.getExamPackages().find(p => p.code && t.code.toLowerCase().startsWith(p.code.toLowerCase())) : null);
+      if (pkg) {
+        if (pkg.targetClassIds && pkg.targetClassIds.length > 0) {
+          return pkg.targetClassIds.includes(verifiedStudent.classId);
         }
+        if (studentClass && pkg.targetGrades && pkg.targetGrades.length > 0) {
+          return pkg.targetGrades.includes(studentClass.gradeLevel);
+        }
+        return false;
       }
 
       // 3. Direct targetClassIds on tryout
@@ -457,7 +457,12 @@ export const StudentPortalPage: React.FC = () => {
         .filter(s => s.studentId === verifiedStudent.id)
         .map(s => {
           const t = allTryouts.find(tr => tr.id === s.tryoutId);
-          return t?.packageId;
+          if (t?.packageId) return t.packageId;
+          if (t?.code) {
+            const matchPkg = dbService.getExamPackages().find(p => p.code && t.code.toLowerCase().startsWith(p.code.toLowerCase()));
+            return matchPkg?.id;
+          }
+          return undefined;
         })
         .filter(Boolean) as string[]
     );
@@ -475,19 +480,38 @@ export const StudentPortalPage: React.FC = () => {
     if (selectedPackageId === 'ALL') {
       return tryouts;
     }
-    const filtered = tryouts.filter(t => t.packageId === selectedPackageId);
+    const currentPkg = studentPackages.find(p => p.id === selectedPackageId);
+    const pkgCode = (currentPkg?.code || '').toLowerCase().trim();
+    const filtered = tryouts.filter(t => t.packageId === selectedPackageId || (pkgCode && t.code.toLowerCase().startsWith(pkgCode)));
     return filtered.length > 0 ? filtered : tryouts;
-  }, [tryouts, selectedPackageId]);
+  }, [tryouts, selectedPackageId, studentPackages]);
+
+  // Auto-pilih wadah yang paling relevan untuk kelas siswa ini
+  useEffect(() => {
+    if (studentPackages.length > 0) {
+      const isValid = studentPackages.some(p => p.id === selectedPackageId);
+      if (!isValid || selectedPackageId === 'ALL') {
+        const pkgWithScore = studentPackages.find(p =>
+          allScores.some(s => s.studentId === verifiedStudent?.id && tryouts.some(t => (t.packageId === p.id || (p.code && t.code.toLowerCase().startsWith(p.code.toLowerCase()))) && t.id === s.tryoutId))
+        );
+        const activeSumatif = studentPackages.find(p => p.status === 'ACTIVE' && (p.assessmentType === 'SAT' || p.assessmentType === 'SAS'));
+        const firstActive = studentPackages.find(p => p.status === 'ACTIVE');
+        setSelectedPackageId(pkgWithScore?.id || activeSumatif?.id || firstActive?.id || studentPackages[0].id);
+      }
+    }
+  }, [studentPackages, verifiedStudent?.id, allScores, tryouts]);
 
   // Sinkronisasi otomatis selectedTryoutId saat memilih wadah
   useEffect(() => {
     if (selectedPackageId !== 'ALL') {
-      const inPkg = tryouts.filter(t => t.packageId === selectedPackageId);
+      const currentPkg = studentPackages.find(p => p.id === selectedPackageId);
+      const pkgCode = (currentPkg?.code || '').toLowerCase().trim();
+      const inPkg = tryouts.filter(t => t.packageId === selectedPackageId || (pkgCode && t.code.toLowerCase().startsWith(pkgCode)));
       if (inPkg.length > 0 && !inPkg.some(t => t.id === selectedTryoutId)) {
         setSelectedTryoutId(inPkg[0].id);
       }
     }
-  }, [selectedPackageId, tryouts]);
+  }, [selectedPackageId, tryouts, studentPackages]);
 
   // Deteksi Mode Wadah: Try Out vs SAS vs SAT (Container-Driven Modality)
   const activePackage = useMemo(() => {
@@ -764,13 +788,51 @@ export const StudentPortalPage: React.FC = () => {
 
   // PDF Export
   const handleDownloadPDF = () => {
-    if (!verifiedStudent || !activeScore || !activeTryout) return;
+    if (!verifiedStudent) return;
+    const effectiveScore: Score | null = activeScore || (isSumatifPackage && sumatifProfile ? {
+      id: `sc-sum-${verifiedStudent.id}`,
+      studentId: verifiedStudent.id,
+      tryoutId: activeTryout?.id || (activePackage?.id || ''),
+      calculatedScore: sumatifProfile.averageScore,
+      googleFormScore: sumatifProfile.averageScore,
+      totalCorrect: sumatifProfile.passedCount,
+      totalIncorrect: sumatifProfile.remedialCount,
+      totalUnanswered: 0,
+      subjectScores: Object.fromEntries(sumatifProfile.subjectScores.map(s => [s.subjectId, s.score])),
+      scoringStatus: 'MATCH',
+      createdAt: new Date().toISOString(),
+    } : null);
+
+    const effectiveTryout: Tryout | null = activeTryout || (isSumatifPackage && activePackage ? {
+      id: activePackage.id,
+      code: activePackage.code,
+      title: activePackage.title,
+      assessmentType: activePackage.assessmentType,
+      academicYearId: activePackage.academicYearId,
+      startDate: activePackage.startDate || new Date().toISOString(),
+      endDate: activePackage.endDate || new Date().toISOString(),
+      status: 'ACTIVE',
+      scoringConfig: { scoringType: 'EQUAL_WEIGHT', maxScore: 100, correctScore: 1, wrongScore: 0, unansweredScore: 0, allowNegativeMarking: false, passingGrade: 75 },
+    } : null);
+
+    if (!effectiveScore || !effectiveTryout) return;
+
     const studentClass = allClasses.find(c => c.id === verifiedStudent.classId) || allClasses.find(c => c.name.toLowerCase() === verifiedStudent.classId?.toLowerCase());
     const walas = studentClass ? dbService.getHomeroomTeacherForClass(studentClass.id) : dbService.getHomeroomTeacherForClass(verifiedStudent.classId);
+
+    const sumatifCards = (isSumatifPackage && sumatifProfile)
+      ? sumatifProfile.subjectScores.map(s => ({
+          subject: { code: s.subjectCode, name: s.subjectName, passingGrade: s.passingGrade },
+          score: s.score,
+          passingGrade: s.passingGrade,
+          isPassing: s.isPassed,
+        }))
+      : activeTryoutSubjectCards;
+
     ExportService.exportStudentPDF(
       verifiedStudent,
-      activeScore,
-      activeTryout,
+      effectiveScore,
+      effectiveTryout,
       studentClass,
       studentAnalytics,
       publishedExplanations,
@@ -780,10 +842,10 @@ export const StudentPortalPage: React.FC = () => {
         classTotalStudents,
         overallRank,
         overallTotalStudents,
-        classAvgScore,
-        classMaxScore,
+        classAvgScore: isSumatifPackage && sumatifProfile ? sumatifProfile.averageScore : classAvgScore,
+        classMaxScore: isSumatifPackage && sumatifProfile ? sumatifProfile.highestScore : classMaxScore,
         academicPredicate,
-        activeSubjectCards: activeTryoutSubjectCards,
+        activeSubjectCards: sumatifCards,
         progressHistory,
         schoolProfile: dbService.getSchoolProfile(),
         waliKelasName: walas?.name,
@@ -828,13 +890,21 @@ export const StudentPortalPage: React.FC = () => {
           <div>
             <div className="flex items-center gap-2 text-indigo-700 dark:text-amber-400 text-xs font-bold uppercase tracking-wider mb-2 font-mono">
               <Award className="w-4 h-4 text-indigo-600 dark:text-amber-400" />
-              <span>Portal Pengumuman Hasil Try Out &amp; Analisis Siswa</span>
+              <span>
+                {isSumatifPackage
+                  ? `Portal Hasil ${activePackage?.assessmentType === 'SAT' ? 'Sumatif Akhir Tahun (SAT)' : 'Sumatif Akhir Semester (SAS)'}`
+                  : 'Portal Pengumuman Hasil Try Out & Analisis Siswa'}
+              </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white">
-              Pengumuman Hasil Try Out Mandiri
+              {isSumatifPackage
+                ? (activePackage?.title || (activePackage?.assessmentType === 'SAT' ? 'Hasil Asesmen Sumatif Akhir Tahun (SAT)' : 'Hasil Asesmen Sumatif Akhir Semester (SAS)'))
+                : 'Pengumuman Hasil Try Out Mandiri'}
             </h1>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1 max-w-2xl leading-relaxed">
-              Verifikasi identitas (Tanggal Lahir + NISN Siswa) untuk mengakses nilai semua mata pelajaran, grafik progres belajar, rekap butir soal, serta pembahasan resmi guru.
+              {isSumatifPackage
+                ? 'Akses nilai resmi seluruh mata pelajaran, ketuntasan KKM (KKTP), profil kompetensi semesteran, serta unduh rapor individual.'
+                : 'Verifikasi identitas (Tanggal Lahir + NISN Siswa) untuk mengakses nilai semua mata pelajaran, grafik progres belajar, rekap butir soal, serta pembahasan resmi guru.'}
             </p>
           </div>
 
@@ -1104,7 +1174,7 @@ export const StudentPortalPage: React.FC = () => {
             )}
 
             {/* TAB 1: RAPOR & SKOR TRY OUT TERPILIH */}
-            {portalTab === 'REPORT' && activeScore && tryouts.length > 0 && (
+            {portalTab === 'REPORT' && (activeScore || (isSumatifPackage && sumatifProfile)) && (tryouts.length > 0 || isSumatifPackage) && (
               <div className="space-y-6 animate-fade-in">
                 {/* Active Exam Context Banner */}
                 <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
@@ -1127,103 +1197,170 @@ export const StudentPortalPage: React.FC = () => {
                 </div>
 
                 {/* Score & Performance Stat Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Score Card */}
-                  <div className="bg-slate-900 dark:bg-slate-950 text-white p-6 rounded-3xl shadow-sm flex flex-col justify-between border border-slate-800">
-                    <div>
-                      <span className="text-xs text-slate-400 font-medium block mb-1">Skor Akhir Terhitung</span>
-                      <div className="text-4xl font-extrabold text-white font-mono tracking-tight">
-                        {activeScore.calculatedScore}
+                {isSumatifPackage && sumatifProfile ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-slate-900 dark:bg-slate-950 text-white p-6 rounded-3xl shadow-sm flex flex-col justify-between border border-slate-800">
+                      <div>
+                        <span className="text-xs text-slate-400 font-medium block mb-1">Rata-rata Nilai Semester</span>
+                        <div className="text-4xl font-extrabold text-white font-mono tracking-tight">
+                          {sumatifProfile.averageScore}
+                        </div>
+                        <span className="text-[10px] text-slate-400 block mt-1">Skala 0 - 100 Poin</span>
                       </div>
-                      <span className="text-[10px] text-slate-400 block mt-1">Skala 0 - 100 Poin</span>
-                    </div>
-
-                    <div className="pt-4 border-t border-slate-800 mt-4 text-xs">
-                      <div className="flex justify-between items-center text-slate-300">
+                      <div className="pt-4 border-t border-slate-800 mt-4 text-xs flex justify-between items-center text-slate-300">
                         <span>Predikat Capaian:</span>
                         <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${academicPredicate.badge}`}>
                           {academicPredicate.grade} — {academicPredicate.label}
                         </span>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Answers Stats */}
-                  <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center gap-4 transition-colors">
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                      <CheckCircle className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Jawaban Benar</div>
-                      <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
-                        {activeTryout?.isExternal && !activeScore.totalCorrect
-                          ? `${activeTryoutSubjectCards.filter(c => c.isPassing).length} Mapel`
-                          : `${activeScore.totalCorrect ?? 0} Soal`}
+                    <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center gap-4 transition-colors">
+                      <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                        <CheckCircle className="w-6 h-6" />
                       </div>
-                      <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-                        {activeTryout?.isExternal && !activeScore.totalCorrect ? 'Tuntas KKM' : 'Capaian Berhasil'}
+                      <div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Mapel Tuntas (≥ KKTP)</div>
+                        <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
+                          {sumatifProfile.passedCount} Mapel
+                        </div>
+                        <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                          Memenuhi Ambang Batas
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center gap-4 transition-colors">
-                    <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
-                      <XCircle className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Jawaban Salah</div>
-                      <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
-                        {activeTryout?.isExternal && !activeScore.totalIncorrect
-                          ? `${activeTryoutSubjectCards.filter(c => !c.isPassing).length} Mapel`
-                          : `${activeScore.totalIncorrect ?? 0} Soal`}
+                    <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center gap-4 transition-colors">
+                      <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                        <XCircle className="w-6 h-6" />
                       </div>
-                      <div className="text-[10px] text-rose-600 dark:text-rose-400 font-medium">
-                        {activeTryout?.isExternal && !activeScore.totalIncorrect ? 'Belum KKM' : 'Perlu Evaluasi'}
+                      <div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Perlu Remedial (&lt; KKTP)</div>
+                        <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
+                          {sumatifProfile.remedialCount} Mapel
+                        </div>
+                        <div className="text-[10px] text-rose-600 dark:text-rose-400 font-medium">
+                          {sumatifProfile.remedialCount > 0 ? 'Perlu Pendampingan' : 'Semua Mapel Tuntas'}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center gap-4 transition-colors">
-                    <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-                      <HelpCircle className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                        {activeTryout?.isExternal && !activeScore.totalUnanswered ? 'Total Bidang Studi' : 'Tidak Dijawab'}
+                    <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center gap-4 transition-colors">
+                      <div className="w-12 h-12 rounded-2xl bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
+                        <Award className="w-6 h-6" />
                       </div>
-                      <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
-                        {activeTryout?.isExternal && !activeScore.totalUnanswered
-                          ? `${activeTryoutSubjectCards.length} Mapel`
-                          : `${activeScore.totalUnanswered ?? 0} Soal`}
-                      </div>
-                      <div className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
-                        {activeTryout?.isExternal && !activeScore.totalUnanswered ? 'Diujikan Sekolah' : 'Opsi Kosong'}
+                      <div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Nilai Mapel Tertinggi</div>
+                        <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
+                          {sumatifProfile.highestScore}
+                        </div>
+                        <div className="text-[10px] text-teal-600 dark:text-teal-400 font-medium">
+                          Skor Maksimal Terdata
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                ) : activeScore ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Score Card */}
+                    <div className="bg-slate-900 dark:bg-slate-950 text-white p-6 rounded-3xl shadow-sm flex flex-col justify-between border border-slate-800">
+                      <div>
+                        <span className="text-xs text-slate-400 font-medium block mb-1">Skor Akhir Terhitung</span>
+                        <div className="text-4xl font-extrabold text-white font-mono tracking-tight">
+                          {activeScore.calculatedScore}
+                        </div>
+                        <span className="text-[10px] text-slate-400 block mt-1">Skala 0 - 100 Poin</span>
+                      </div>
+
+                      <div className="pt-4 border-t border-slate-800 mt-4 text-xs">
+                        <div className="flex justify-between items-center text-slate-300">
+                          <span>Predikat Capaian:</span>
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${academicPredicate.badge}`}>
+                            {academicPredicate.grade} — {academicPredicate.label}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Answers Stats */}
+                    <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center gap-4 transition-colors">
+                      <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                        <CheckCircle className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Jawaban Benar</div>
+                        <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
+                          {activeTryout?.isExternal && !activeScore.totalCorrect
+                            ? `${activeTryoutSubjectCards.filter(c => c.isPassing).length} Mapel`
+                            : `${activeScore.totalCorrect ?? 0} Soal`}
+                        </div>
+                        <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                          {activeTryout?.isExternal && !activeScore.totalCorrect ? 'Tuntas KKM' : 'Capaian Berhasil'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center gap-4 transition-colors">
+                      <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                        <XCircle className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Jawaban Salah</div>
+                        <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
+                          {activeTryout?.isExternal && !activeScore.totalIncorrect
+                            ? `${activeTryoutSubjectCards.filter(c => !c.isPassing).length} Mapel`
+                            : `${activeScore.totalIncorrect ?? 0} Soal`}
+                        </div>
+                        <div className="text-[10px] text-rose-600 dark:text-rose-400 font-medium">
+                          {activeTryout?.isExternal && !activeScore.totalIncorrect ? 'Belum KKM' : 'Perlu Evaluasi'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center gap-4 transition-colors">
+                      <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                        <HelpCircle className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                          {activeTryout?.isExternal && !activeScore.totalUnanswered ? 'Total Bidang Studi' : 'Tidak Dijawab'}
+                        </div>
+                        <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
+                          {activeTryout?.isExternal && !activeScore.totalUnanswered
+                            ? `${activeTryoutSubjectCards.length} Mapel`
+                            : `${activeScore.totalUnanswered ?? 0} Soal`}
+                        </div>
+                        <div className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                          {activeTryout?.isExternal && !activeScore.totalUnanswered ? 'Diujikan Sekolah' : 'Opsi Kosong'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
 
                 {/* Scoring Verification Transparency Banner */}
-                <div
-                  className={`p-4 rounded-2xl border text-xs flex items-center justify-between ${
-                    activeScore.scoringStatus === 'MATCH'
-                      ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800/80 text-emerald-900 dark:text-emerald-200'
-                      : 'bg-amber-50 dark:bg-amber-950/60 border-amber-200 dark:border-amber-800/80 text-amber-900 dark:text-amber-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-700 dark:text-emerald-400" />
-                    <span>
-                      <strong>Verifikasi Keselarasan Scoring:</strong>{' '}
-                      {activeScore.scoringStatus === 'MATCH'
-                        ? 'MATCH — Skor kalkulasi database terverifikasi selaras 100% dengan respons formulir ujian.'
-                        : `SCORING_MISMATCH — Skor formulir (${activeScore.googleFormScore}) memiliki selisih ${activeScore.scoreDifference} poin dari kalkulasi ulang sistem.`}
+                {activeScore && (
+                  <div
+                    className={`p-4 rounded-2xl border text-xs flex items-center justify-between ${
+                      activeScore.scoringStatus === 'MATCH'
+                        ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800/80 text-emerald-900 dark:text-emerald-200'
+                        : 'bg-amber-50 dark:bg-amber-950/60 border-amber-200 dark:border-amber-800/80 text-amber-900 dark:text-amber-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-700 dark:text-emerald-400" />
+                      <span>
+                        <strong>Verifikasi Keselarasan Scoring:</strong>{' '}
+                        {activeScore.scoringStatus === 'MATCH'
+                          ? 'MATCH — Skor kalkulasi database terverifikasi selaras 100% dengan respons formulir ujian.'
+                          : `SCORING_MISMATCH — Skor formulir (${activeScore.googleFormScore}) memiliki selisih ${activeScore.scoreDifference} poin dari kalkulasi ulang sistem.`}
+                      </span>
+                    </div>
+                    <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-white/70 dark:bg-slate-950/80 text-slate-900 dark:text-slate-100">
+                      {activeScore.scoringStatus}
                     </span>
                   </div>
-                  <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-white/70 dark:bg-slate-950/80 text-slate-900 dark:text-slate-100">
-                    {activeScore.scoringStatus}
-                  </span>
-                </div>
+                )}
 
                 {/* Section 1: Ranking Siswa (Kelas & Angkatan) + Tie-Breaker Rule */}
                 <div className="space-y-4">
@@ -1309,66 +1446,118 @@ export const StudentPortalPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Section 2: Rekap Nilai Seluruh Mata Pelajaran pada Try Out Aktif */}
+                {/* Section 2: Rekap Nilai Seluruh Mata Pelajaran pada Try Out / Wadah Aktif */}
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-5 transition-colors">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-4">
                     <div>
                       <h3 className="font-bold text-slate-900 dark:text-slate-100 text-base">
-                        Capaian Nilai Per Mata Pelajaran ({activeTryout ? getFriendlyTryoutStageLabel(activeTryout, displayTryouts) : 'Try Out'})
+                        {isSumatifPackage
+                          ? `Rapor Nilai Seluruh Mata Pelajaran (${activePackage?.title || 'SAT'})`
+                          : `Capaian Nilai Per Mata Pelajaran (${activeTryout ? getFriendlyTryoutStageLabel(activeTryout, displayTryouts) : 'Try Out'})`}
                       </h3>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        Rincian skor perolehan dan ketuntasan KKM siswa untuk masing-masing bidang studi pada try out ini.
+                        {isSumatifPackage
+                          ? 'Daftar nilai murni dan batas KKM (KKTP) resmi sekolah untuk masing-masing mata pelajaran semester ini.'
+                          : 'Rincian skor perolehan dan ketuntasan KKM siswa untuk masing-masing bidang studi pada try out ini.'}
                       </p>
                     </div>
                     <span className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950 px-2.5 py-1 rounded-lg self-start sm:self-auto">
-                      {activeTryoutSubjectCards.length} Mata Pelajaran
+                      {isSumatifPackage && sumatifProfile
+                        ? `${sumatifProfile.subjectScores.length} Mata Pelajaran`
+                        : `${activeTryoutSubjectCards.length} Mata Pelajaran`}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {activeTryoutSubjectCards.map(item => (
-                      <div
-                        key={item.subject.id}
-                        className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between space-y-3"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <span className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 block">
-                              {item.subject.code}
+                    {isSumatifPackage && sumatifProfile ? (
+                      sumatifProfile.subjectScores.map(item => (
+                        <div
+                          key={item.subjectId}
+                          className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between space-y-3"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 block">
+                                {item.subjectCode}
+                              </span>
+                              <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 line-clamp-1">
+                                {item.subjectName}
+                              </h4>
+                            </div>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                item.isPassed
+                                  ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
+                                  : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
+                              }`}
+                            >
+                              {item.isPassed ? 'Tuntas' : 'Remedial'}
                             </span>
-                            <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 line-clamp-1">
-                              {item.subject.name}
-                            </h4>
                           </div>
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                              item.isPassing
-                                ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
-                                : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
-                            }`}
-                          >
-                            {item.isPassing ? 'Tuntas' : 'Belum KKM'}
-                          </span>
-                        </div>
 
-                        <div>
-                          <div className="flex items-baseline justify-between mb-1">
-                            <span className="text-2xl font-black font-mono text-slate-900 dark:text-slate-100">
-                              {item.score}
-                            </span>
-                            <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                              KKM: {item.passingGrade}
-                            </span>
-                          </div>
-                          <div className="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full ${item.isPassing ? 'bg-emerald-500' : 'bg-rose-500'}`}
-                              style={{ width: `${Math.min(100, Math.max(0, item.score))}%` }}
-                            />
+                          <div>
+                            <div className="flex items-baseline justify-between mb-1">
+                              <span className="text-2xl font-black font-mono text-slate-900 dark:text-slate-100">
+                                {item.score}
+                              </span>
+                              <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                                KKM: {item.passingGrade}
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full ${item.isPassed ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                                style={{ width: `${Math.min(100, Math.max(0, item.score))}%` }}
+                              />
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      activeTryoutSubjectCards.map(item => (
+                        <div
+                          key={item.subject.id}
+                          className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between space-y-3"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 block">
+                                {item.subject.code}
+                              </span>
+                              <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 line-clamp-1">
+                                {item.subject.name}
+                              </h4>
+                            </div>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                item.isPassing
+                                  ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
+                                  : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
+                              }`}
+                            >
+                              {item.isPassing ? 'Tuntas' : 'Belum KKM'}
+                            </span>
+                          </div>
+
+                          <div>
+                            <div className="flex items-baseline justify-between mb-1">
+                              <span className="text-2xl font-black font-mono text-slate-900 dark:text-slate-100">
+                                {item.score}
+                              </span>
+                              <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                                KKM: {item.passingGrade}
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full ${item.isPassing ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                                style={{ width: `${Math.min(100, Math.max(0, item.score))}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
 
