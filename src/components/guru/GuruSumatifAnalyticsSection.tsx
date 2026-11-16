@@ -1728,10 +1728,18 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
                                   ? (qa as any).options.map((o: any) => o.key.toUpperCase()).filter((k: string) => ['A', 'B', 'C', 'D', 'E'].includes(k))
                                   : Object.keys(qa.distractorStats || {}).filter(k => ['A', 'B', 'C', 'D', 'E'].includes(k) && (k !== 'E' || (qa.distractorStats[k]?.count || 0) > 0));
 
+                                const hasEvidenceOfOptionE =
+                                  (qa.correctAnswer || '').toUpperCase().includes('E') ||
+                                  (Array.isArray((qa as any).options) && (qa as any).options.some((o: any) => o.key.toUpperCase() === 'E' && o.text && !o.text.toLowerCase().startsWith('pilihan'))) ||
+                                  ((qa.distractorStats?.['E']?.count || 0) > 0 && validKeys.includes('E'));
+
                                 let renderKeys = validKeys.length > 0 ? validKeys : ['A', 'B', 'C', 'D'];
+                                if (!hasEvidenceOfOptionE) {
+                                  renderKeys = renderKeys.filter((k: string) => k !== 'E');
+                                }
                                 if (!isPureTrueFalse && renderKeys.length < 4) {
                                   renderKeys = ['A', 'B', 'C', 'D'];
-                                  if (validKeys.includes('E') || (qa.distractorStats?.['E']?.count || 0) > 0) {
+                                  if (hasEvidenceOfOptionE) {
                                     renderKeys = ['A', 'B', 'C', 'D', 'E'];
                                   }
                                 }

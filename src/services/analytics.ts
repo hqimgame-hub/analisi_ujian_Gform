@@ -343,15 +343,18 @@ export class AnalyticsService {
         activeOptionKeys = ['A', 'B'];
       } else {
         // Untuk soal Pilihan Ganda: jangan biarkan opsi terpotong menjadi A-B hanya karena 0 pemilih!
-        // Selalu sertakan minimal A..D, dan tambahkan E jika ada bukti opsi E
+        // Opsi E HANYA aktif jika terdapat bukti sah opsi E (bukan variasi teks typo / respon non-standar):
         const hasOptionE =
-          validOptionKeys.includes('E') ||
-          (q.correctAnswer || '').trim().toUpperCase() === 'E' ||
-          (q.correctAnswer || '').includes('E') ||
-          qAnswers.some(a => {
-            const raw = (a.studentAnswer || '').trim().toUpperCase();
-            return raw === 'E' || raw.startsWith('E.') || raw.startsWith('E)') || raw.startsWith('E -') || raw.startsWith('OPSI E') || raw.startsWith('PILIHAN E');
-          });
+          validOptionKeys.includes('E') &&
+          (
+            (q.correctAnswer || '').trim().toUpperCase() === 'E' ||
+            (q.correctAnswer || '').includes('E') ||
+            (Array.isArray(q.options) && q.options.some(o => o.key.toUpperCase() === 'E' && !o.text.toUpperCase().startsWith('PILIHAN '))) ||
+            qAnswers.some(a => {
+              const raw = (a.studentAnswer || '').trim().toUpperCase();
+              return raw === 'E' || raw.startsWith('E.') || raw.startsWith('E)') || raw.startsWith('E -') || raw.startsWith('OPSI E') || raw.startsWith('PILIHAN E');
+            })
+          );
 
         if (hasOptionE) {
           activeOptionKeys = ['A', 'B', 'C', 'D', 'E'];
@@ -455,7 +458,26 @@ export class AnalyticsService {
           }
         });
 
-        // 3. Alokasikan teks jawaban siswa tanpa prefix berdasarkan urutan frekuensi pemilih
+        // 2b. JIKA KUNCI JAWABAN (q.correctAnswer) SUDAH BERNILAI HURUF TERTENTU (misal 'D' atau 'B'):
+        // Teks respon siswa yang cocok dengan kunci jawaban guru (isCorrect / isAnswerMatching)
+        // HARUS DIPETAKAN KE HURUF KUNCI JAWABAN q.correctAnswer TERSEBUT!
+        // TIDAK BOLEH dialokasikan ke 'A' berdasarkan urutan frekuensi pemilih terbanyak!
+        const cleanCorrectKey = cleanText(q.correctAnswer).toUpperCase();
+        if (activeOptionKeys.includes(cleanCorrectKey as any) && !textMappedOptionKeys.has(cleanCorrectKey as any)) {
+          const matchingCorrectAns = nonLetterStudentAnswers.find(ans => {
+            const ansObj = qAnswers.find(a => cleanText(a.studentAnswer).toUpperCase() === ans.toUpperCase());
+            return (ansObj && ansObj.isCorrect) || ScoringService.isAnswerMatching(ans, q.correctAnswer);
+          });
+          if (matchingCorrectAns) {
+            const u = matchingCorrectAns.toUpperCase();
+            textToOptionKey.set(u, cleanCorrectKey as any);
+            const stripped = stripPrefix(u);
+            if (stripped) textToOptionKey.set(stripped, cleanCorrectKey as any);
+            textMappedOptionKeys.add(cleanCorrectKey as any);
+          }
+        }
+
+        // 3. Alokasikan sisa teks jawaban siswa tanpa prefix ke slot yang masih tersedia
         const sortedByFreq = [...nonLetterStudentAnswers].sort((a, b) => {
           const freqA = distinctAnswerFrequencies.get(a.toUpperCase()) || 0;
           const freqB = distinctAnswerFrequencies.get(b.toUpperCase()) || 0;

@@ -1595,6 +1595,7 @@ export class ExportService {
           const correctSample = tryoutAnswersForClass.find(
             a => a.questionId === qId && a.isCorrect && a.studentAnswer && a.studentAnswer.trim() !== ''
           );
+          const inferredKey = correctSample?.studentAnswer?.trim().toUpperCase() || '-';
           missingQuestions.push({
             id: qId,
             uniqueCode: `${tryout.code || 'SOAL'}-Q${String(qNum).padStart(2, '0')}`,
@@ -1603,14 +1604,11 @@ export class ExportService {
             materialId: '',
             competencyId: '',
             questionText: `Butir Soal Nomor ${qNum}`,
-            options: [
-              { key: 'A', text: 'Pilihan A' },
-              { key: 'B', text: 'Pilihan B' },
-              { key: 'C', text: 'Pilihan C' },
-              { key: 'D', text: 'Pilihan D' },
-              { key: 'E', text: 'Pilihan E' },
-            ],
-            correctAnswer: correctSample?.studentAnswer?.trim().toUpperCase() || '-',
+            options: (inferredKey === 'E' ? ['A', 'B', 'C', 'D', 'E'] : ['A', 'B', 'C', 'D']).map(k => ({
+              key: k,
+              text: `Pilihan ${k}`,
+            })),
+            correctAnswer: inferredKey,
             weight: 1,
             status: 'ACTIVE',
           });

@@ -1100,10 +1100,18 @@ export const ItemAnalysisVisualizer: React.FC<ItemAnalysisVisualizerProps> = ({
                               ? item.options.map((o: any) => o.key.toUpperCase()).filter((k: string) => ['A', 'B', 'C', 'D', 'E'].includes(k))
                               : Object.keys(item.distractorStats || item.distractorCounts || {}).filter(k => ['A', 'B', 'C', 'D', 'E'].includes(k) && (k !== 'E' || (item.distractorStats?.[k]?.count || item.distractorCounts?.[k] || 0) > 0));
 
+                            const hasEvidenceOfOptionE =
+                              (item.correctAnswer || '').toUpperCase().includes('E') ||
+                              (Array.isArray(item.options) && item.options.some((o: any) => o.key.toUpperCase() === 'E' && o.text && !o.text.toLowerCase().startsWith('pilihan'))) ||
+                              ((item.distractorStats?.['E']?.count || item.distractorCounts?.['E'] || 0) > 0 && validKeys.includes('E'));
+
                             let renderKeys = validKeys.length > 0 ? validKeys : ['A', 'B', 'C', 'D'];
+                            if (!hasEvidenceOfOptionE) {
+                              renderKeys = renderKeys.filter((k: string) => k !== 'E');
+                            }
                             if (!isPureTrueFalse && renderKeys.length < 4) {
                               renderKeys = ['A', 'B', 'C', 'D'];
-                              if (validKeys.includes('E') || (item.distractorStats?.['E']?.count || 0) > 0) {
+                              if (hasEvidenceOfOptionE) {
                                 renderKeys = ['A', 'B', 'C', 'D', 'E'];
                               }
                             }

@@ -614,10 +614,34 @@ export class GoogleIntegrationService {
     const unprefixedSpreadsheetTexts: string[] = [];
     const seenSpreadsheetTexts = new Set<string>();
 
-    // Prioritaskan kunci jawaban resmi jika ada di posisi terdepan
-    const rawCandidates = rawKeyCell
-      ? [rawKeyCell, ...rawValues.filter(v => v !== rawKeyCell)]
-      : rawValues;
+    // Jika existingOptions sudah memuat teks materi nyata, daftarkan terlebih dahulu agar pemetaan huruf naskah terjaga
+    if (Array.isArray(existingOptions)) {
+      existingOptions.forEach(opt => {
+        const k = (opt.key || '').trim().toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
+        if (optionKeys.includes(k) && !isPlaceholderText(opt.text, k)) {
+          keyToText.set(k, opt.text.trim());
+        }
+      });
+    }
+
+    // Jika existingCorrectAnswer sudah bernilai huruf tertentu (misal 'D' atau 'B') dan baris kunci (rawKeyCell) berupa teks nyata:
+    // Petakan teks kunci langsung ke huruf existingCorrectAnswer agar kunci TIDAK bergeser ke 'A'!
+    const cleanExistingKey = (existingCorrectAnswer || '').trim().toUpperCase();
+    if (rawKeyCell && optionKeys.includes(cleanExistingKey as any) && !explicitPrefixMatches.has(cleanExistingKey as any)) {
+      const explicitKeyPrefix = this.extractExplicitOptionPrefix(rawKeyCell);
+      if (!explicitKeyPrefix) {
+        keyToText.set(cleanExistingKey as any, rawKeyCell);
+      }
+    }
+
+    // Kumpulkan kandidat nilai dari spreadsheet (tanpa memaksakan rawKeyCell selalu di urutan indeks 0)
+    const rawCandidates: string[] = [];
+    if (rawValues.length > 0) {
+      rawValues.forEach(v => rawCandidates.push(v));
+    }
+    if (rawKeyCell && !rawCandidates.includes(rawKeyCell)) {
+      rawCandidates.push(rawKeyCell);
+    }
 
     // Ekstraksi token kandidat: jika ada jawaban multi-select berdelimeter koma (PGK), pecah menjadi token atomik
     const candidateTokens: string[] = [];
@@ -705,15 +729,6 @@ export class GoogleIntegrationService {
           keyToText.set(targetKey, txt);
         }
       });
-    } else if (Array.isArray(existingOptions)) {
-      const existingNonPlaceholder = existingOptions.filter(opt => {
-        const k = (opt.key || '').trim().toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
-        return optionKeys.includes(k) && !isPlaceholderText(opt.text, k);
-      });
-      existingNonPlaceholder.forEach(opt => {
-        const k = (opt.key || '').trim().toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
-        keyToText.set(k, opt.text.trim());
-      });
     }
 
     // 3. Tentukan jumlah opsi aktif secara dinamis:
@@ -736,12 +751,11 @@ export class GoogleIntegrationService {
       activeOptionKeys = ['A', 'B'];
     } else {
       // Untuk soal Pilihan Ganda (PG / PGK / Menjodohkan):
-      // Jangan pernah memotong opsi menjadi hanya A-B atau A-C hanya karena pemilih opsi C/D adalah 0!
-      // Cek apakah ada bukti opsi E (kunci memuat E, respon memuat E, atau bank soal memuat E)
+      // Opsi E HANYA AKTIF jika ada bukti sah eksplisit (bukan variasi teks ke-5 yang mungkin merupakan typo/anomali):
       const hasEvidenceOfOptionE =
-        keyToText.has('E') ||
-        unprefixedSpreadsheetTexts.length >= 5 ||
-        (rawKeyCell && (rawKeyCell.toUpperCase().includes('E') || rawKeyCell.toUpperCase().startsWith('E.'))) ||
+        explicitPrefixMatches.has('E') ||
+        (rawKeyCell && (rawKeyCell.trim().toUpperCase() === 'E' || /^[E][\.\)\:\-\s]/i.test(rawKeyCell.trim()))) ||
+        (existingCorrectAnswer && (existingCorrectAnswer.trim().toUpperCase() === 'E' || /^[E][\.\)\:\-\s]/i.test(existingCorrectAnswer.trim()))) ||
         (Array.isArray(existingOptions) && existingOptions.some(o => o.key.toUpperCase() === 'E' && !isPlaceholderText(o.text, 'E')));
 
       if (hasEvidenceOfOptionE) {
