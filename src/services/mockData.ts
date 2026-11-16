@@ -1,63 +1,275 @@
 import {
-  User, Teacher, Student, ClassRoom, StudentClass, AcademicYear, Subject,
-  TeacherSubject, Material, Competency, Tryout, TryoutSubject, Question,
-  TryoutQuestion, GoogleForm, Response, Answer, Score, QuestionAnalysis,
-  Explanation, AuditLog
+  AcademicYear, User, Teacher, ClassRoom, StudentClass, Subject,
+  TeacherSubject, Material, Competency, Student, Tryout,
+  TryoutSubject, Question, TryoutQuestion, Explanation,
+  Response, Answer, Score, AuditLog, SchoolProfile, LiveMonitoringConfig, ExamPackage
 } from '../types/database';
 
+export const INITIAL_SCHOOL_PROFILE: SchoolProfile = {
+  "name": "SMP AYO SINAU",
+  "subHeader": "SISTEM ANALISIS TRY OUT",
+  "address": "Alamat Sekolah · Kota · Akreditasi · NPSN",
+  "principalName": "Prof. Kepala Sekolah, M.Pd",
+  "principalNip": "-",
+  "academicYear": "2025/2026 (Semester Genap)"
+};
+
+export const INITIAL_LIVE_MONITORING_CONFIG: LiveMonitoringConfig = {
+  isEnabled: true,
+  publicPath: '/rekap',
+  displayMode: 'COMPACT',
+  autoScroll: true,
+  scrollIntervalSeconds: 15,
+  showRanks: true,
+  showClassAverages: true,
+  showPassingStatus: true,
+  showTargetStatus: true,
+  theme: 'LIGHT',
+  subjectColumns: [
+    { subjectId: 'f8391d29-1aa2-4c16-a1e6-80f6341d07d2', isVisible: true, order: 0 }
+  ]
+};
+
 export const INITIAL_ACADEMIC_YEARS: AcademicYear[] = [
-  { id: '0ffe2ac4-48bd-400b-ae8c-05ecff36e4a1', yearLabel: '2025/2026', semester: 'EVEN', isActive: true },
+  {
+    "id": "0ffe2ac4-48bd-400b-ae8c-05ecff36e4a1",
+    "yearLabel": "2025/2026",
+    "semester": "EVEN",
+    "isActive": true
+  }
 ];
 
 export const INITIAL_USERS: User[] = [
   {
-    id: 'u-admin-custom',
-    email: 'admin@sekolah.com',
-    role: 'ADMIN',
-    name: 'Admin',
-    password: 'admin123',
-    createdAt: '2025-07-01T08:00:00Z',
+    "id": "u-admin-custom",
+    "email": "admin@sekolah.com",
+    "role": "ADMIN",
+    "name": "Admin",
+    "password": "admin123",
+    "createdAt": "2025-07-01T08:00:00Z"
   },
   {
-    id: 'u-admin',
-    email: 'admin@sekolah.sch.id',
-    role: 'ADMIN',
-    name: 'Administrator Sekolah',
-    password: 'password123',
-    createdAt: '2025-07-01T08:00:00Z',
+    "id": "u-admin",
+    "email": "admin@sekolah.sch.id",
+    "role": "ADMIN",
+    "name": "Administrator Sekolah",
+    "password": "password123",
+    "createdAt": "2025-07-01T08:00:00Z"
   },
+  {
+    "id": "b235f292-0c68-4466-a6ba-45b2fafc86fa",
+    "email": "2345678910@guru.sekolah.id",
+    "role": "WALI_KELAS",
+    "name": "Wali Kelas 9A",
+    "createdAt": "2026-11-03T04:12:02.281103+00:00",
+    "password": "password123"
+  },
+  {
+    "id": "6db67307-8c73-4a4a-bb26-562125569a9e",
+    "email": "3456789012@guru.sekolah.id",
+    "role": "WALI_KELAS",
+    "name": "Wali Kelas 9B",
+    "createdAt": "2026-11-03T04:12:37.018884+00:00",
+    "password": "password123"
+  },
+  {
+    "id": "f9fc09b8-20a1-4ccc-b94d-b19bffd14ca3",
+    "email": "1234567890@guru.sekolah.id",
+    "role": "GURU",
+    "name": "Guru Bahasa Indonesia",
+    "createdAt": "2026-11-03T04:11:16.789623+00:00",
+    "password": "password123"
+  },
+  {
+    "id": "53e88e41-625e-4509-a612-105b7485364b",
+    "email": "0123456789@guru.sekolah.id",
+    "role": "GURU",
+    "name": "Guru Matematika",
+    "createdAt": "2026-11-03T04:10:45.226188+00:00",
+    "password": "password123"
+  }
 ];
 
 export const INITIAL_TEACHERS: Teacher[] = [
   {
-    id: 't-admin-custom',
-    userId: 'u-admin-custom',
-    nip: 'ADMIN-001',
-    name: 'Admin',
-    email: 'admin@sekolah.com',
-    phone: '',
-    password: 'admin123',
-    subjectPermissions: [],
-    classPermissions: [],
-    isWaliKelas: false,
+    "id": "t-admin-custom",
+    "userId": "u-admin-custom",
+    "nip": "ADMIN-001",
+    "name": "Admin",
+    "email": "admin@sekolah.com",
+    "phone": "",
+    "password": "admin123",
+    "subjectPermissions": [],
+    "classPermissions": [],
+    "isWaliKelas": false
   },
   {
-    id: 't-admin',
-    userId: 'u-admin',
-    nip: 'NIP-ADMIN',
-    name: 'Administrator Sekolah',
-    email: 'admin@sekolah.sch.id',
-    phone: '',
-    password: 'password123',
-    subjectPermissions: [],
-    classPermissions: [],
-    isWaliKelas: false,
+    "id": "t-admin",
+    "userId": "u-admin",
+    "nip": "NIP-ADMIN",
+    "name": "Administrator Sekolah",
+    "email": "admin@sekolah.sch.id",
+    "phone": "",
+    "password": "password123",
+    "subjectPermissions": [],
+    "classPermissions": [],
+    "isWaliKelas": false
   },
+  {
+    "id": "fec4e28a-b781-4e55-a8ae-60b8ca548bbb",
+    "userId": "b235f292-0c68-4466-a6ba-45b2fafc86fa",
+    "nip": "2345678910",
+    "name": "Wali Kelas 9A",
+    "email": "2345678910@guru.sekolah.id",
+    "password": "password123",
+    "subjectPermissions": [],
+    "classPermissions": [],
+    "isWaliKelas": true,
+    "homeRoomClassId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812"
+  },
+  {
+    "id": "4e8ff63f-f7f7-4bc6-99fe-2530e444bf5e",
+    "userId": "6db67307-8c73-4a4a-bb26-562125569a9e",
+    "nip": "3456789012",
+    "name": "Wali Kelas 9B",
+    "email": "3456789012@guru.sekolah.id",
+    "password": "password123",
+    "subjectPermissions": [],
+    "classPermissions": [],
+    "isWaliKelas": true,
+    "homeRoomClassId": "f2bdffce-8b09-480d-a6a9-56cba53583e0"
+  },
+  {
+    "id": "a88a0e79-5b92-4197-a95b-13c1ca57902a",
+    "userId": "f9fc09b8-20a1-4ccc-b94d-b19bffd14ca3",
+    "nip": "1234567890",
+    "name": "Guru Bahasa Indonesia",
+    "email": "1234567890@guru.sekolah.id",
+    "password": "password123",
+    "subjectPermissions": [
+      "subj-1793678811210"
+    ],
+    "classPermissions": [
+      "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+      "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+      "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+      "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+      "56da1747-4642-4b1f-b357-d280a4e98e4c",
+      "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+      "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+      "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+      "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+      "173a5708-54b5-466f-b8a2-52d3fb03fa6c"
+    ],
+    "isWaliKelas": false
+  },
+  {
+    "id": "d6fb5a66-22ec-46e1-bddb-c8642aa3fc05",
+    "userId": "53e88e41-625e-4509-a612-105b7485364b",
+    "nip": "0123456789",
+    "name": "Guru Matematika",
+    "email": "0123456789@guru.sekolah.id",
+    "password": "password123",
+    "subjectPermissions": [
+      "subj-1793678833509"
+    ],
+    "classPermissions": [
+      "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+      "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+      "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+      "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+      "56da1747-4642-4b1f-b357-d280a4e98e4c",
+      "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+      "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+      "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+      "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+      "173a5708-54b5-466f-b8a2-52d3fb03fa6c"
+    ],
+    "isWaliKelas": false
+  }
 ];
 
-export const INITIAL_CLASSES: ClassRoom[] = [];
+export const INITIAL_CLASSES: ClassRoom[] = [
+  {
+    "id": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "name": "9C",
+    "gradeLevel": "9",
+    "academicYearId": "0ffe2ac4-48bd-400b-ae8c-05ecff36e4a1"
+  },
+  {
+    "id": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "name": "9D",
+    "gradeLevel": "9",
+    "academicYearId": "0ffe2ac4-48bd-400b-ae8c-05ecff36e4a1"
+  },
+  {
+    "id": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "name": "9E",
+    "gradeLevel": "9",
+    "academicYearId": "0ffe2ac4-48bd-400b-ae8c-05ecff36e4a1"
+  },
+  {
+    "id": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "name": "9F",
+    "gradeLevel": "9",
+    "academicYearId": "0ffe2ac4-48bd-400b-ae8c-05ecff36e4a1"
+  },
+  {
+    "id": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "name": "9G",
+    "gradeLevel": "9",
+    "academicYearId": "0ffe2ac4-48bd-400b-ae8c-05ecff36e4a1"
+  },
+  {
+    "id": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "name": "9H",
+    "gradeLevel": "9",
+    "academicYearId": "0ffe2ac4-48bd-400b-ae8c-05ecff36e4a1"
+  },
+  {
+    "id": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "name": "9I",
+    "gradeLevel": "9",
+    "academicYearId": "0ffe2ac4-48bd-400b-ae8c-05ecff36e4a1"
+  },
+  {
+    "id": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "name": "9J",
+    "gradeLevel": "9",
+    "academicYearId": "0ffe2ac4-48bd-400b-ae8c-05ecff36e4a1"
+  },
+  {
+    "id": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "name": "9A",
+    "gradeLevel": "9",
+    "academicYearId": "0ffe2ac4-48bd-400b-ae8c-05ecff36e4a1",
+    "homeRoomTeacherId": "fec4e28a-b781-4e55-a8ae-60b8ca548bbb"
+  },
+  {
+    "id": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "name": "9B",
+    "gradeLevel": "9",
+    "academicYearId": "0ffe2ac4-48bd-400b-ae8c-05ecff36e4a1",
+    "homeRoomTeacherId": "4e8ff63f-f7f7-4bc6-99fe-2530e444bf5e"
+  }
+];
 
-export const INITIAL_SUBJECTS: Subject[] = [];
+export const INITIAL_SUBJECTS: Subject[] = [
+  {
+    "id": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "code": "BIN",
+    "name": "Bhs. Indonesia",
+    "category": "WAJIB",
+    "passingGrade": 75
+  },
+  {
+    "id": "08047ad8-dc5b-4b0a-911c-7981815c4a4f",
+    "code": "MAT",
+    "name": "Matematika",
+    "category": "WAJIB",
+    "passingGrade": 80
+  }
+];
 
 export const INITIAL_TEACHER_SUBJECTS: TeacherSubject[] = [];
 
@@ -65,13 +277,5486 @@ export const INITIAL_MATERIALS: Material[] = [];
 
 export const INITIAL_COMPETENCIES: Competency[] = [];
 
-export const INITIAL_STUDENTS: Student[] = [];
+export const INITIAL_STUDENTS: Student[] = [
+  {
+    "id": "143e8e19-9bf7-4fb0-8cbd-563f090a8738",
+    "nisn": "0114929923",
+    "nis": "0114929923",
+    "name": "Siswa 9J 1",
+    "gender": "L",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0114929923@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "d21034c2-66a9-48fc-a777-2f503ac0f501",
+    "nisn": "0108007168",
+    "nis": "0108007168",
+    "name": "Siswa 9J 2",
+    "gender": "L",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0108007168@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "5c2305b1-00b5-45ac-992f-41f443c14f3b",
+    "nisn": "0114000849",
+    "nis": "0114000849",
+    "name": "Siswa 9J 3",
+    "gender": "L",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0114000849@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "cac5b935-b16a-4aa8-bc29-2dd9f0dd4b57",
+    "nisn": "0127390504",
+    "nis": "0127390504",
+    "name": "Siswa 9J 4",
+    "gender": "P",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0127390504@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "9383fc09-e28e-48c5-9aa0-27d5a20ed178",
+    "nisn": "0111841617",
+    "nis": "0111841617",
+    "name": "Siswa 9J 5",
+    "gender": "L",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0111841617@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "54ced514-589b-415e-917a-a68d6b8ddb85",
+    "nisn": "0111797480",
+    "nis": "0111797480",
+    "name": "Siswa 9J 6",
+    "gender": "L",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0111797480@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "e0126b94-6f18-4b1c-bba2-2e1b1943a2ab",
+    "nisn": "0106353583",
+    "nis": "0106353583",
+    "name": "Siswa 9J 7",
+    "gender": "L",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0106353583@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "a09cdd60-17ef-4a43-a505-12ee4494b9bc",
+    "nisn": "0122034639",
+    "nis": "0122034639",
+    "name": "Siswa 9J 8",
+    "gender": "L",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0122034639@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "0f1169dc-05b9-4c3f-8d12-baec86d9f666",
+    "nisn": "0113550416",
+    "nis": "0113550416",
+    "name": "Siswa 9J 9",
+    "gender": "P",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0113550416@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "5d5b21ed-18ef-44fa-9d74-9d6f3dc332b3",
+    "nisn": "0119559974",
+    "nis": "0119559974",
+    "name": "Siswa 9J 10",
+    "gender": "P",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0119559974@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "266679fa-3196-4d53-b3a7-2c64f7cc1eb1",
+    "nisn": "0111303860",
+    "nis": "0111303860",
+    "name": "Siswa 9J 11",
+    "gender": "L",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0111303860@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "5cec1bc4-24f2-40a5-843f-4bb9d9d4da8c",
+    "nisn": "0115208997",
+    "nis": "0115208997",
+    "name": "Siswa 9J 12",
+    "gender": "P",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0115208997@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "71a68f80-b3be-4d43-ba51-186185ebfc1b",
+    "nisn": "0118817669",
+    "nis": "0118817669",
+    "name": "Siswa 9J 13",
+    "gender": "P",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0118817669@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "1c409867-818b-4775-b236-715a0076f32f",
+    "nisn": "0123273813",
+    "nis": "0123273813",
+    "name": "Siswa 9J 14",
+    "gender": "L",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0123273813@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "54487f0e-d20f-4760-a316-fd6064dba873",
+    "nisn": "0108254635",
+    "nis": "0108254635",
+    "name": "Siswa 9J 15",
+    "gender": "P",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0108254635@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "1fcd6d44-2a56-4b4b-8fa5-dfd520fd25f6",
+    "nisn": "0129157766",
+    "nis": "0129157766",
+    "name": "Siswa 9J 16",
+    "gender": "P",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0129157766@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "a63300f2-4865-42d9-8306-b78208c4ef7d",
+    "nisn": "0117047358",
+    "nis": "0117047358",
+    "name": "Siswa 9J 17",
+    "gender": "L",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0117047358@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "2a52bcec-ddd1-429a-8050-8405eeaf3b49",
+    "nisn": "0111227028",
+    "nis": "0111227028",
+    "name": "Siswa 9J 18",
+    "gender": "L",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0111227028@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "2ecfad55-4898-4499-b2ec-c5191d59b542",
+    "nisn": "0116285687",
+    "nis": "0116285687",
+    "name": "Siswa 9J 19",
+    "gender": "L",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0116285687@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "237d9e4e-813f-4ed7-a3a6-81cf1fb7739f",
+    "nisn": "0117705989",
+    "nis": "0117705989",
+    "name": "Siswa 9J 20",
+    "gender": "L",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0117705989@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "67e11609-c43d-4f50-af69-b5470ffea180",
+    "nisn": "0128234610",
+    "nis": "0128234610",
+    "name": "Siswa 9J 21",
+    "gender": "L",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0128234610@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "bda4ad88-4e67-42d0-8131-7daf480aee06",
+    "nisn": "0116859757",
+    "nis": "0116859757",
+    "name": "Siswa 9J 22",
+    "gender": "P",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0116859757@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "b0dfb2fa-a56c-4e59-9174-63ed463e45fc",
+    "nisn": "0117764254",
+    "nis": "0117764254",
+    "name": "Siswa 9J 23",
+    "gender": "P",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0117764254@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "790f5248-ffa4-4468-b31f-95f308da9eed",
+    "nisn": "0119766551",
+    "nis": "0119766551",
+    "name": "Siswa 9J 24",
+    "gender": "L",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0119766551@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "7cded2dc-c4bd-4432-95fc-22f7182187a0",
+    "nisn": "0118070061",
+    "nis": "0118070061",
+    "name": "Siswa 9J 25",
+    "gender": "L",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0118070061@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "75fdd534-73e8-4339-9b89-77ee8167b0c5",
+    "nisn": "0118606279",
+    "nis": "0118606279",
+    "name": "Siswa 9J 26",
+    "gender": "P",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0118606279@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "398c9234-01ba-4668-850b-562a4d637b6d",
+    "nisn": "0112760906",
+    "nis": "0112760906",
+    "name": "Siswa 9J 27",
+    "gender": "L",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0112760906@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "e4075035-d242-4797-8f89-c3fd357ec19a",
+    "nisn": "0112836253",
+    "nis": "0112836253",
+    "name": "Siswa 9J 28",
+    "gender": "P",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0112836253@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "87166c22-79d5-4718-92ad-54445c263efe",
+    "nisn": "0117436229",
+    "nis": "0117436229",
+    "name": "Siswa 9J 29",
+    "gender": "P",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0117436229@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "849cc289-399a-40e6-964f-cdf37c0964cd",
+    "nisn": "0113865358",
+    "nis": "0113865358",
+    "name": "Siswa 9J 30",
+    "gender": "P",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0113865358@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "22b19bfb-f273-4585-ad8c-081cd5134925",
+    "nisn": "0129863350",
+    "nis": "0129863350",
+    "name": "Siswa 9J 31",
+    "gender": "P",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0129863350@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "6bd94416-3b17-4d69-b7b8-9378a8533654",
+    "nisn": "0115844180",
+    "nis": "0115844180",
+    "name": "Siswa 9J 32",
+    "gender": "L",
+    "classId": "173a5708-54b5-466f-b8a2-52d3fb03fa6c",
+    "email": "0115844180@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "48c24e2a-b9e8-4da7-9fe1-12614001b3c3",
+    "nisn": "0115710944",
+    "nis": "0115710944",
+    "name": "Siswa 9I 1",
+    "gender": "L",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0115710944@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "d179fd3b-fa2a-44b5-a058-6414502aa166",
+    "nisn": "0116766362",
+    "nis": "0116766362",
+    "name": "Siswa 9I 2",
+    "gender": "P",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0116766362@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "f876197e-94d4-4bf6-b7c6-c7292d18ee2d",
+    "nisn": "0117642360",
+    "nis": "0117642360",
+    "name": "Siswa 9I 3",
+    "gender": "P",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0117642360@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "699fc7ec-b1a2-4954-8acd-cffdfedb956e",
+    "nisn": "0114918740",
+    "nis": "0114918740",
+    "name": "Siswa 9I 4",
+    "gender": "P",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0114918740@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "cc5f7b0b-9e4d-4f34-ad33-4a136ccf1368",
+    "nisn": "0111122406",
+    "nis": "0111122406",
+    "name": "Siswa 9I 5",
+    "gender": "P",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0111122406@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "f5846a37-134e-4d97-bb86-6184aeed15fe",
+    "nisn": "0125748192",
+    "nis": "0125748192",
+    "name": "Siswa 9I 6",
+    "gender": "P",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0125748192@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "e8a51725-6dbd-4886-bf81-f0d38492b775",
+    "nisn": "0115995757",
+    "nis": "0115995757",
+    "name": "Siswa 9I 7",
+    "gender": "L",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0115995757@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "8a8d5788-1049-4fb5-ad68-2765ac537173",
+    "nisn": "0122316563",
+    "nis": "0122316563",
+    "name": "Siswa 9I 8",
+    "gender": "P",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0122316563@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "4193be9d-6d8e-40b2-b558-05f6423e2e9d",
+    "nisn": "0119746232",
+    "nis": "0119746232",
+    "name": "Siswa 9I 9",
+    "gender": "L",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0119746232@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "c120a0a2-2563-4400-b24d-f9b676d15d30",
+    "nisn": "0126332751",
+    "nis": "0126332751",
+    "name": "Siswa 9I 10",
+    "gender": "P",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0126332751@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "fba37688-a29f-4a04-bdca-4346539b47c3",
+    "nisn": "0119252095",
+    "nis": "0119252095",
+    "name": "Siswa 9I 11",
+    "gender": "P",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0119252095@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "ad4e286d-c8c6-4028-8044-57235ca497b0",
+    "nisn": "0112919130",
+    "nis": "0112919130",
+    "name": "Siswa 9I 12",
+    "gender": "L",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0112919130@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "6ccdf955-9512-4b85-aa73-34f2b640064d",
+    "nisn": "0119811395",
+    "nis": "0119811395",
+    "name": "Siswa 9I 13",
+    "gender": "L",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0119811395@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "f0ead7c4-6cd0-4ed9-b58b-5aefadcdf1b7",
+    "nisn": "0111937788",
+    "nis": "0111937788",
+    "name": "Siswa 9I 14",
+    "gender": "P",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0111937788@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "4b4e50c0-a35e-4255-8332-0f4fe4c0feda",
+    "nisn": "0118208571",
+    "nis": "0118208571",
+    "name": "Siswa 9I 15",
+    "gender": "P",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0118208571@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "146d12e9-c755-4b2f-9de5-973a9722f493",
+    "nisn": "3113974226",
+    "nis": "3113974226",
+    "name": "Siswa 9I 16",
+    "gender": "L",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "3113974226@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "9079a224-0376-4aef-947c-78f44c02bdff",
+    "nisn": "0128285348",
+    "nis": "0128285348",
+    "name": "Siswa 9I 17",
+    "gender": "L",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0128285348@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "c1495d34-7263-4045-8d83-1ff3aadf1a79",
+    "nisn": "0104610748",
+    "nis": "0104610748",
+    "name": "Siswa 9I 18",
+    "gender": "L",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0104610748@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "e53083b7-2aaa-461c-8b20-b17db9906a0d",
+    "nisn": "0112331407",
+    "nis": "0112331407",
+    "name": "Siswa 9I 19",
+    "gender": "L",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0112331407@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "7ebe298b-37f4-49fa-9c12-297d57a57b7d",
+    "nisn": "0113667776",
+    "nis": "0113667776",
+    "name": "Siswa 9I 20",
+    "gender": "L",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0113667776@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "501a2daa-7e7b-436b-bace-c598f97ea8ac",
+    "nisn": "0119503693",
+    "nis": "0119503693",
+    "name": "Siswa 9I 21",
+    "gender": "L",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0119503693@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "a155e637-c29d-4138-98fb-c838297d4de4",
+    "nisn": "0117853734",
+    "nis": "0117853734",
+    "name": "Siswa 9I 22",
+    "gender": "L",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0117853734@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "214587c8-cba7-478e-a8e6-d93a885d32cb",
+    "nisn": "0115780730",
+    "nis": "0115780730",
+    "name": "Siswa 9I 23",
+    "gender": "P",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0115780730@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "62f0cb54-d4cc-42cd-a77c-6566f46e028f",
+    "nisn": "0117748925",
+    "nis": "0117748925",
+    "name": "Siswa 9I 24",
+    "gender": "L",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0117748925@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "0df16c26-335a-40d4-9bbd-220f7016c3a2",
+    "nisn": "0111703358",
+    "nis": "0111703358",
+    "name": "Siswa 9I 25",
+    "gender": "L",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0111703358@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "accb8c98-5f87-4d8d-a6ff-677e3ea4994a",
+    "nisn": "0106072541",
+    "nis": "0106072541",
+    "name": "Siswa 9I 26",
+    "gender": "L",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0106072541@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "07cb9cee-e677-4485-86ad-6dc24af2e451",
+    "nisn": "0116769336",
+    "nis": "0116769336",
+    "name": "Siswa 9I 27",
+    "gender": "L",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0116769336@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "b782810e-41c3-4eaa-aa32-17ea34edbaa1",
+    "nisn": "0107230342",
+    "nis": "0107230342",
+    "name": "Siswa 9I 28",
+    "gender": "L",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0107230342@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "f694e0c9-edaa-4da5-b8e0-cfa80c508040",
+    "nisn": "0115799443",
+    "nis": "0115799443",
+    "name": "Siswa 9I 29",
+    "gender": "P",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0115799443@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "c281f791-110e-4392-8b20-e0be0eb81d50",
+    "nisn": "3125760855",
+    "nis": "3125760855",
+    "name": "Siswa 9I 30",
+    "gender": "P",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "3125760855@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "dfb2e979-9fdb-41b5-807c-dbbaa003ab79",
+    "nisn": "0121809551",
+    "nis": "0121809551",
+    "name": "Siswa 9I 31",
+    "gender": "P",
+    "classId": "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+    "email": "0121809551@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "5f4b9622-3d52-4920-b56d-8fdbab2d8ad6",
+    "nisn": "0116273846",
+    "nis": "0116273846",
+    "name": "Siswa 9H 1",
+    "gender": "P",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0116273846@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "41c74230-de17-45cc-a71c-6495b4660d64",
+    "nisn": "0111534575",
+    "nis": "0111534575",
+    "name": "Siswa 9H 2",
+    "gender": "L",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0111534575@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "26b7bbef-0ae3-4ebb-8f6e-e6d26d9c50d3",
+    "nisn": "0114496502",
+    "nis": "0114496502",
+    "name": "Siswa 9H 3",
+    "gender": "L",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0114496502@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "2b511077-924c-467c-a781-f0a07e5d08cb",
+    "nisn": "0125547553",
+    "nis": "0125547553",
+    "name": "Siswa 9H 4",
+    "gender": "P",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0125547553@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "c45beb68-ed4a-4f7e-ac2f-4c4819cb1777",
+    "nisn": "0114025253",
+    "nis": "0114025253",
+    "name": "Siswa 9H 5",
+    "gender": "P",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0114025253@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "7183d6aa-743a-4a22-8bea-f0f017a8fcec",
+    "nisn": "0118646279",
+    "nis": "0118646279",
+    "name": "Siswa 9H 6",
+    "gender": "P",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0118646279@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "f8cc0637-dcd7-44ca-8367-45588fa63c3f",
+    "nisn": "0112469381",
+    "nis": "0112469381",
+    "name": "Siswa 9H 7",
+    "gender": "L",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0112469381@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "18779557-5959-4786-8f6e-b4db804a819a",
+    "nisn": "0101802224",
+    "nis": "0101802224",
+    "name": "Siswa 9H 8",
+    "gender": "L",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0101802224@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "eca31aab-f1d3-4fd8-976e-5e14f8ae7d37",
+    "nisn": "0121870076",
+    "nis": "0121870076",
+    "name": "Siswa 9H 9",
+    "gender": "L",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0121870076@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "b7254a94-f3c8-4aa1-831f-4232d121d87f",
+    "nisn": "0114619754",
+    "nis": "0114619754",
+    "name": "Siswa 9H 10",
+    "gender": "L",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0114619754@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "4b043781-4d6f-4961-af97-0a3d6668167a",
+    "nisn": "0115753360",
+    "nis": "0115753360",
+    "name": "Siswa 9H 11",
+    "gender": "P",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0115753360@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "dc621a8e-0647-4fca-83cf-b7e2b6168c71",
+    "nisn": "0127132867",
+    "nis": "0127132867",
+    "name": "Siswa 9H 12",
+    "gender": "P",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0127132867@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "dc5147db-5afc-4942-acf9-432919bb44c9",
+    "nisn": "0108374360",
+    "nis": "0108374360",
+    "name": "Siswa 9H 13",
+    "gender": "L",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0108374360@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "5501b223-a330-43a8-b4d4-6d70134fa1fc",
+    "nisn": "0115554581",
+    "nis": "0115554581",
+    "name": "Siswa 9H 14",
+    "gender": "L",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0115554581@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "4c40fd3e-aef1-4660-b38f-e0accb5c2da6",
+    "nisn": "0116760655",
+    "nis": "0116760655",
+    "name": "Siswa 9H 15",
+    "gender": "L",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0116760655@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "7bff09ef-9a84-41b5-bc10-e63469249206",
+    "nisn": "0116618926",
+    "nis": "0116618926",
+    "name": "Siswa 9H 16",
+    "gender": "P",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0116618926@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "1443e64a-b561-4aec-8fa5-987a9b74da6e",
+    "nisn": "0111188550",
+    "nis": "0111188550",
+    "name": "Siswa 9H 17",
+    "gender": "L",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0111188550@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "d49da517-1014-4ee9-b44d-99be9ad321fb",
+    "nisn": "0127024176",
+    "nis": "0127024176",
+    "name": "Siswa 9H 18",
+    "gender": "L",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0127024176@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "87f986eb-159d-4ce0-941a-b57043e964ec",
+    "nisn": "0126580209",
+    "nis": "0126580209",
+    "name": "Siswa 9H 19",
+    "gender": "L",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0126580209@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "11d938d6-d761-4e04-b4a1-97317642f7c7",
+    "nisn": "0115518852",
+    "nis": "0115518852",
+    "name": "Siswa 9H 20",
+    "gender": "P",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0115518852@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "d76ecb9f-8aa9-4ee2-aea6-fa9baf45e336",
+    "nisn": "0125328019",
+    "nis": "0125328019",
+    "name": "Siswa 9H 21",
+    "gender": "P",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0125328019@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "b43198da-5d60-4f6b-b882-1957e47da185",
+    "nisn": "0112870107",
+    "nis": "0112870107",
+    "name": "Siswa 9H 22",
+    "gender": "L",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0112870107@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "f217425d-ca3c-470e-a98a-63bb52dd1176",
+    "nisn": "0111929389",
+    "nis": "0111929389",
+    "name": "Siswa 9H 23",
+    "gender": "P",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0111929389@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "c2e077fc-b381-4769-a32b-411d050b8781",
+    "nisn": "0125596773",
+    "nis": "0125596773",
+    "name": "Siswa 9H 24",
+    "gender": "L",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0125596773@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "6aa4f5bd-80a6-499f-9519-9834918da464",
+    "nisn": "0122948906",
+    "nis": "0122948906",
+    "name": "Siswa 9H 25",
+    "gender": "L",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0122948906@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "1b513168-2ee9-408e-ae6b-6c2cb02cbe9a",
+    "nisn": "0123138380",
+    "nis": "0123138380",
+    "name": "Siswa 9H 26",
+    "gender": "L",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0123138380@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "4a0fbefc-a2de-4a5c-8fe5-06b272812caa",
+    "nisn": "0113548955",
+    "nis": "0113548955",
+    "name": "Siswa 9H 27",
+    "gender": "P",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0113548955@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "12d8f9fd-a894-40a6-890e-0c8a06abae33",
+    "nisn": "0115680282",
+    "nis": "0115680282",
+    "name": "Siswa 9H 28",
+    "gender": "P",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0115680282@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "6edb2c54-d7ce-4d2a-aa1d-29adf43adb9d",
+    "nisn": "0113840677",
+    "nis": "0113840677",
+    "name": "Siswa 9H 29",
+    "gender": "P",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0113840677@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "8d4c946b-e5a6-4b0e-a424-6747034adeb1",
+    "nisn": "0111994035",
+    "nis": "0111994035",
+    "name": "Siswa 9H 30",
+    "gender": "P",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0111994035@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "5b05a210-38d6-43f1-8082-2fe9dafdea69",
+    "nisn": "0121230138",
+    "nis": "0121230138",
+    "name": "Siswa 9H 31",
+    "gender": "P",
+    "classId": "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+    "email": "0121230138@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "d35a063d-fefd-439d-95d1-d5b34b74594b",
+    "nisn": "0123673694",
+    "nis": "0123673694",
+    "name": "Siswa 9G 1",
+    "gender": "P",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0123673694@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "728304da-b049-4f0c-9e93-4a1a692b0117",
+    "nisn": "0113504886",
+    "nis": "0113504886",
+    "name": "Siswa 9G 2",
+    "gender": "L",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0113504886@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "74f3dd2b-e083-4d34-a1fa-c0c4cc737345",
+    "nisn": "0119179650",
+    "nis": "0119179650",
+    "name": "Siswa 9G 3",
+    "gender": "P",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0119179650@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "fc454af4-05d7-474b-babb-fc7958d113db",
+    "nisn": "0118648741",
+    "nis": "0118648741",
+    "name": "Siswa 9G 4",
+    "gender": "L",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0118648741@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "b2265487-0060-4e71-96b0-9586d374a140",
+    "nisn": "0119950327",
+    "nis": "0119950327",
+    "name": "Siswa 9G 5",
+    "gender": "L",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0119950327@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "def5534b-2365-4a6a-a85d-b1cac1bb05ca",
+    "nisn": "0114982785",
+    "nis": "0114982785",
+    "name": "Siswa 9G 6",
+    "gender": "P",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0114982785@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "b7cacedf-3632-446d-bef8-b38b87cb881a",
+    "nisn": "0114627698",
+    "nis": "0114627698",
+    "name": "Siswa 9G 7",
+    "gender": "P",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0114627698@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "633ba8d7-0c4a-417c-ab66-06b92e7cf1a0",
+    "nisn": "0117541248",
+    "nis": "0117541248",
+    "name": "Siswa 9G 8",
+    "gender": "P",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0117541248@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "1227237c-1908-48f1-94ae-559a0e408eef",
+    "nisn": "0117184275",
+    "nis": "0117184275",
+    "name": "Siswa 9G 9",
+    "gender": "P",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0117184275@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "c7c7ed70-13d8-4b2c-b478-6c9707dc2285",
+    "nisn": "0118770882",
+    "nis": "0118770882",
+    "name": "Siswa 9G 10",
+    "gender": "L",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0118770882@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "e781ebdd-ba02-4bf5-9de6-1a1fd8b8a21b",
+    "nisn": "0125905857",
+    "nis": "0125905857",
+    "name": "Siswa 9G 11",
+    "gender": "P",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0125905857@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "fcbac08f-a3e5-4c5b-8bfa-d40de1a2eb8f",
+    "nisn": "3113249011",
+    "nis": "3113249011",
+    "name": "Siswa 9G 23",
+    "gender": "L",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "3113249011@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "8148d48c-4ee9-47ef-adfe-e49a7fed2499",
+    "nisn": "3095373326",
+    "nis": "3095373326",
+    "name": "Siswa 9F 4",
+    "gender": "L",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "3095373326@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "651750a8-b00b-4f80-8622-c2ba81acfdb6",
+    "nisn": "0113441280",
+    "nis": "0113441280",
+    "name": "Siswa 9F 14",
+    "gender": "P",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0113441280@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "4f2bb4e3-6a74-432a-bb55-39e6a868657a",
+    "nisn": "0127146849",
+    "nis": "0127146849",
+    "name": "Siswa 9F 22",
+    "gender": "L",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0127146849@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "13be912b-7878-4dcb-b8e0-001fb8200c91",
+    "nisn": "0128914312",
+    "nis": "0128914312",
+    "name": "Siswa 9E 12",
+    "gender": "L",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0128914312@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "d1274d3a-566b-4943-9dd1-e8c16139fcb7",
+    "nisn": "0115127322",
+    "nis": "0115127322",
+    "name": "Siswa 9E 21",
+    "gender": "L",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0115127322@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "d0ed9345-cc8c-4dce-b47f-78f7be0733e6",
+    "nisn": "0127114663",
+    "nis": "0127114663",
+    "name": "Siswa 9D 1",
+    "gender": "L",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0127114663@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "31638e51-c8ab-436c-8080-ca78adbc4824",
+    "nisn": "3118654686",
+    "nis": "3118654686",
+    "name": "Siswa 9D 3",
+    "gender": "L",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "3118654686@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "c6b75e69-8beb-4ab2-9556-9c9cd138752d",
+    "nisn": "0116864505",
+    "nis": "0116864505",
+    "name": "Siswa 9D 21",
+    "gender": "L",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0116864505@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "3c9e7623-670e-452f-a7a5-5b84387430d8",
+    "nisn": "0114356877",
+    "nis": "0114356877",
+    "name": "Siswa 9D 29",
+    "gender": "L",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0114356877@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "93e08726-f1e8-43c5-b879-f2a1c18c985e",
+    "nisn": "0124091068",
+    "nis": "0124091068",
+    "name": "Siswa 9C 9",
+    "gender": "P",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0124091068@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "51fad1a5-7803-4aef-b6e0-0c88585c70ee",
+    "nisn": "0118898783",
+    "nis": "0118898783",
+    "name": "Siswa 9C 17",
+    "gender": "L",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0118898783@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "afe5da49-a5f3-4f04-897a-8c2733668bab",
+    "nisn": "3100567738",
+    "nis": "3100567738",
+    "name": "Siswa 9C 18",
+    "gender": "P",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "3100567738@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "a03ecb69-1c15-4e25-8cdc-80c9067484a6",
+    "nisn": "0123065364",
+    "nis": "0123065364",
+    "name": "Siswa 9B 8",
+    "gender": "L",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0123065364@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "bc955a16-0619-4137-bdbe-72e8ab4464ba",
+    "nisn": "0126405550",
+    "nis": "0126405550",
+    "name": "Siswa 9B 28",
+    "gender": "P",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0126405550@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "bc6523c8-60e2-4faf-a8b1-0415d9a17e3d",
+    "nisn": "0115584422",
+    "nis": "0115584422",
+    "name": "Siswa 9B 29",
+    "gender": "P",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0115584422@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "779bad13-f01f-4c0f-aa40-c48eace020df",
+    "nisn": "0116162376",
+    "nis": "0116162376",
+    "name": "Siswa 9G 12",
+    "gender": "L",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0116162376@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "86e802a3-9858-4c1a-8ebe-d86a970a0a47",
+    "nisn": "0111460688",
+    "nis": "0111460688",
+    "name": "Siswa 9G 15",
+    "gender": "P",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0111460688@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "0f0a2bbf-45b3-4ba1-90cf-8261f0dd0903",
+    "nisn": "0121028694",
+    "nis": "0121028694",
+    "name": "Siswa 9G 24",
+    "gender": "L",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0121028694@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "267beac0-a1b8-4983-9e9a-1411c91e490d",
+    "nisn": "0102305651",
+    "nis": "0102305651",
+    "name": "Siswa 9F 1",
+    "gender": "P",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0102305651@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "9c9190d3-1472-4f72-8788-da6817ccf168",
+    "nisn": "0118636989",
+    "nis": "0118636989",
+    "name": "Siswa 9F 10",
+    "gender": "L",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0118636989@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "79efd3ed-5c46-477c-a43e-c603345fdf56",
+    "nisn": "0111677690",
+    "nis": "0111677690",
+    "name": "Siswa 9F 11",
+    "gender": "P",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0111677690@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "8556837e-5708-41f2-a950-11c7eaf7ea39",
+    "nisn": "0113754121",
+    "nis": "0113754121",
+    "name": "Siswa 9F 24",
+    "gender": "P",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0113754121@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "26163a88-1765-4afb-b6a3-ec156c8ebe5d",
+    "nisn": "0124906930",
+    "nis": "0124906930",
+    "name": "Siswa 9F 25",
+    "gender": "P",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0124906930@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "c73ac7c2-46ec-43f8-92eb-d3582f19eed7",
+    "nisn": "0121675100",
+    "nis": "0121675100",
+    "name": "Siswa 9E 5",
+    "gender": "P",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0121675100@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "54f8b889-851c-48e3-99b3-73e2a25c09bc",
+    "nisn": "3126334810",
+    "nis": "3126334810",
+    "name": "Siswa 9E 14",
+    "gender": "P",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "3126334810@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "f6c67705-c93c-49a3-8727-863a4757f3a1",
+    "nisn": "0115598491",
+    "nis": "0115598491",
+    "name": "Siswa 9E 15",
+    "gender": "P",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0115598491@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "70e9533c-6e98-43bf-ac8d-aa9ad2174d33",
+    "nisn": "0117607690",
+    "nis": "0117607690",
+    "name": "Siswa 9E 24",
+    "gender": "L",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0117607690@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "add0f8ab-2253-43af-85fc-acf44ac5e60a",
+    "nisn": "0118987367",
+    "nis": "0118987367",
+    "name": "Siswa 9D 6",
+    "gender": "P",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0118987367@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "d231fc32-7eaf-4669-8acf-363f340b720b",
+    "nisn": "0118136288",
+    "nis": "0118136288",
+    "name": "Siswa 9D 12",
+    "gender": "L",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0118136288@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "c0dea493-6c71-4c68-9033-3a58498d5a8e",
+    "nisn": "0119700227",
+    "nis": "0119700227",
+    "name": "Siswa 9D 23",
+    "gender": "P",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0119700227@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "eca52351-1c4f-4d53-80c3-ba310b8c61fa",
+    "nisn": "0119952044",
+    "nis": "0119952044",
+    "name": "Siswa 9C 13",
+    "gender": "P",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0119952044@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "6b407421-c023-4441-94be-89e82105b9ec",
+    "nisn": "0117308625",
+    "nis": "0117308625",
+    "name": "Siswa 9C 15",
+    "gender": "L",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0117308625@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "6084a6d5-d925-488d-9486-6bbcb9490ddb",
+    "nisn": "0116253193",
+    "nis": "0116253193",
+    "name": "Siswa 9C 25",
+    "gender": "L",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0116253193@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "08f3bc5c-3304-47e9-b52e-31c4cb562ef1",
+    "nisn": "0119829923",
+    "nis": "0119829923",
+    "name": "Siswa 9C 26",
+    "gender": "L",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0119829923@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "14762bf5-3606-4856-8dcb-6d7bd607b558",
+    "nisn": "0123866695",
+    "nis": "0123866695",
+    "name": "Siswa 9C 27",
+    "gender": "P",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0123866695@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "b642f5a9-577c-4ec4-a007-fce51db1ca65",
+    "nisn": "0115166531",
+    "nis": "0115166531",
+    "name": "Siswa 9C 29",
+    "gender": "L",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0115166531@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "862a6749-bf66-430b-b0cb-e53cfba2f16f",
+    "nisn": "0122691000",
+    "nis": "0122691000",
+    "name": "Siswa 9B 1",
+    "gender": "L",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0122691000@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "f08ada4e-6016-4200-9997-5c258a6eff41",
+    "nisn": "0116288844",
+    "nis": "0116288844",
+    "name": "Siswa 9B 9",
+    "gender": "L",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0116288844@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "4bf59e15-a2c3-489b-924d-ebae42010eb2",
+    "nisn": "0119738860",
+    "nis": "0119738860",
+    "name": "Siswa 9B 11",
+    "gender": "P",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0119738860@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "92c154b7-88bb-495d-aeee-1aeb04b796f8",
+    "nisn": "0107207859",
+    "nis": "0107207859",
+    "name": "Siswa 9B 12",
+    "gender": "L",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0107207859@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "cf8a9ae7-568a-4b89-8d41-ab62909c80ea",
+    "nisn": "0114333352",
+    "nis": "0114333352",
+    "name": "Siswa 9A 2",
+    "gender": "L",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0114333352@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "8fa8ed3e-1786-4eec-96fe-bb73999484d3",
+    "nisn": "0116215374",
+    "nis": "0116215374",
+    "name": "Siswa 9G 13",
+    "gender": "L",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0116215374@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "eee9d9cd-318b-4877-bcd8-151182c7076b",
+    "nisn": "0115669496",
+    "nis": "0115669496",
+    "name": "Siswa 9G 26",
+    "gender": "P",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0115669496@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "79c89dd9-50cc-47ae-ba5a-1ba416334876",
+    "nisn": "0116593234",
+    "nis": "0116593234",
+    "name": "Siswa 9F 5",
+    "gender": "P",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0116593234@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "96aad49d-3b82-457c-80e2-908fcd3b28de",
+    "nisn": "0112609756",
+    "nis": "0112609756",
+    "name": "Siswa 9F 15",
+    "gender": "P",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0112609756@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "adff9eeb-49b0-4b53-9a89-5d8b6844dfcc",
+    "nisn": "0111613474",
+    "nis": "0111613474",
+    "name": "Siswa 9F 28",
+    "gender": "P",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0111613474@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "3838cf4d-a6c2-46dc-a541-931364b04f6a",
+    "nisn": "0115018267",
+    "nis": "0115018267",
+    "name": "Siswa 9E 10",
+    "gender": "P",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0115018267@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "5ce1857c-c131-4a9d-acda-20727cea8662",
+    "nisn": "0128947780",
+    "nis": "0128947780",
+    "name": "Siswa 9E 16",
+    "gender": "P",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0128947780@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "0b47e676-8981-47e6-b488-3e7de27fe1e4",
+    "nisn": "0106883163",
+    "nis": "0106883163",
+    "name": "Siswa 9E 25",
+    "gender": "L",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0106883163@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "aac543c4-c059-4a5e-b487-8f750bf55173",
+    "nisn": "0111513343",
+    "nis": "0111513343",
+    "name": "Siswa 9D 7",
+    "gender": "L",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0111513343@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "b7e4ac81-0511-4a49-ae3e-625e20573a55",
+    "nisn": "0115514833",
+    "nis": "0115514833",
+    "name": "Siswa 9D 20",
+    "gender": "P",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0115514833@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "5f9bd5fb-3f86-4875-9af5-50269c8085ca",
+    "nisn": "0115756219",
+    "nis": "0115756219",
+    "name": "Siswa 9D 31",
+    "gender": "P",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0115756219@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "a0f803dc-5c80-416c-92ed-3afda2a36596",
+    "nisn": "0117773545",
+    "nis": "0117773545",
+    "name": "Siswa 9C 5",
+    "gender": "P",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0117773545@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "095d990e-5da8-4316-a038-0a1ee92a2095",
+    "nisn": "0113762297",
+    "nis": "0113762297",
+    "name": "Siswa 9C 20",
+    "gender": "P",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0113762297@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "4cb0d13e-854f-4574-aa51-83f29ea76471",
+    "nisn": "3111561539",
+    "nis": "3111561539",
+    "name": "Siswa 9C 31",
+    "gender": "P",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "3111561539@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "c68e3875-1179-4d91-a5ee-4aade57f681a",
+    "nisn": "0121959994",
+    "nis": "0121959994",
+    "name": "Siswa 9B 6",
+    "gender": "L",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0121959994@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "24698639-b2e6-4502-b3c3-16cbf4205ec2",
+    "nisn": "0115960343",
+    "nis": "0115960343",
+    "name": "Siswa 9B 7",
+    "gender": "L",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0115960343@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "160e9b1a-112b-4ae4-b90a-cc889c1fb1e9",
+    "nisn": "0117876609",
+    "nis": "0117876609",
+    "name": "Siswa 9A 7",
+    "gender": "P",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0117876609@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "1bdcfd95-665a-426c-924a-fd4cd7a79809",
+    "nisn": "0125312383",
+    "nis": "0125312383",
+    "name": "Siswa 9G 14",
+    "gender": "L",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0125312383@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "e44dbe18-3c82-4971-8d39-908a35d2832e",
+    "nisn": "0113294301",
+    "nis": "0113294301",
+    "name": "Siswa 9G 22",
+    "gender": "P",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0113294301@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "2b49cef8-bc8e-494f-8f2a-a9923c56c67a",
+    "nisn": "0116214578",
+    "nis": "0116214578",
+    "name": "Siswa 9F 2",
+    "gender": "L",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0116214578@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "8910219a-94a8-43b5-8a70-389b9e6f9240",
+    "nisn": "0121671753",
+    "nis": "0121671753",
+    "name": "Siswa 9F 18",
+    "gender": "L",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0121671753@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "e1eacd37-5b08-4e6d-ba3f-700474f8224d",
+    "nisn": "0114772685",
+    "nis": "0114772685",
+    "name": "Siswa 9F 30",
+    "gender": "P",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0114772685@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "896a34c7-ac8f-4d64-b189-8e5c32963a44",
+    "nisn": "0112191976",
+    "nis": "0112191976",
+    "name": "Siswa 9E 7",
+    "gender": "L",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0112191976@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "2b2435b5-5963-4562-badb-3927d6d9f45e",
+    "nisn": "0127372865",
+    "nis": "0127372865",
+    "name": "Siswa 9E 27",
+    "gender": "P",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0127372865@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "da5e8078-7769-40fd-bfb4-87b212368331",
+    "nisn": "3120388058",
+    "nis": "3120388058",
+    "name": "Siswa 9D 19",
+    "gender": "P",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "3120388058@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "2bfa2302-847d-4984-bcc1-6c9f2ed3c63c",
+    "nisn": "0121465221",
+    "nis": "0121465221",
+    "name": "Siswa 9C 2",
+    "gender": "P",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0121465221@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "80cf69e9-33f0-4b54-8d4b-6eba6d749612",
+    "nisn": "0111839284",
+    "nis": "0111839284",
+    "name": "Siswa 9C 10",
+    "gender": "L",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0111839284@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "90687a76-6aa0-43d4-90ae-44ce47e8f132",
+    "nisn": "0119340924",
+    "nis": "0119340924",
+    "name": "Siswa 9C 21",
+    "gender": "L",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0119340924@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "28ac8d76-d487-4320-9112-e4701db8b305",
+    "nisn": "0111475607",
+    "nis": "0111475607",
+    "name": "Siswa 9B 15",
+    "gender": "P",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0111475607@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "43bba59a-fb7d-4776-9568-a80693c9b9ce",
+    "nisn": "0114729968",
+    "nis": "0114729968",
+    "name": "Siswa 9B 16",
+    "gender": "P",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0114729968@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "3b77df17-cba7-40ff-91fc-d7ce0c331c7f",
+    "nisn": "0126584310",
+    "nis": "0126584310",
+    "name": "Siswa 9B 23",
+    "gender": "L",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0126584310@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "486b713f-7ad7-417e-8870-f7a41b5cf1e2",
+    "nisn": "0128581054",
+    "nis": "0128581054",
+    "name": "Siswa 9G 16",
+    "gender": "L",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0128581054@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "806b5343-07bb-4d9d-ac2c-5c64a38acd43",
+    "nisn": "0108460535",
+    "nis": "0108460535",
+    "name": "Siswa 9G 25",
+    "gender": "P",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0108460535@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "22ec8265-e08e-408d-b310-7e3abf55c6f8",
+    "nisn": "0114011695",
+    "nis": "0114011695",
+    "name": "Siswa 9F 3",
+    "gender": "L",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0114011695@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "405d3fcb-f66f-4ba1-a8f0-1b972d02a0fd",
+    "nisn": "3124707801",
+    "nis": "3124707801",
+    "name": "Siswa 9F 13",
+    "gender": "L",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "3124707801@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "530c1bb2-3832-4ba0-ad2b-5122cab544d4",
+    "nisn": "0127487823",
+    "nis": "0127487823",
+    "name": "Siswa 9F 21",
+    "gender": "L",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0127487823@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "f9b29598-6f22-469e-85d9-893b237c8d43",
+    "nisn": "0116637240",
+    "nis": "0116637240",
+    "name": "Siswa 9E 2",
+    "gender": "P",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0116637240@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "0be0a859-7d39-4184-92d2-268a302cbbf2",
+    "nisn": "0126981129",
+    "nis": "0126981129",
+    "name": "Siswa 9E 3",
+    "gender": "L",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0126981129@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "0c72c4ec-5a83-4748-9d74-c120fb862e99",
+    "nisn": "0124720549",
+    "nis": "0124720549",
+    "name": "Siswa 9E 8",
+    "gender": "P",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0124720549@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "7b977fc6-87d4-4a67-b0f2-7ca9535697c8",
+    "nisn": "0112752695",
+    "nis": "0112752695",
+    "name": "Siswa 9E 20",
+    "gender": "L",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0112752695@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "080dd89e-b492-40fd-8e5a-d4b8d31c0d82",
+    "nisn": "0124859391",
+    "nis": "0124859391",
+    "name": "Siswa 9E 29",
+    "gender": "L",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0124859391@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "34505a24-55a9-464c-ae38-31b9ddd92297",
+    "nisn": "0113189871",
+    "nis": "0113189871",
+    "name": "Siswa 9D 5",
+    "gender": "P",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0113189871@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "95e07688-d8f1-42e6-8541-2961dce1e5d5",
+    "nisn": "3117091108",
+    "nis": "3117091108",
+    "name": "Siswa 9D 18",
+    "gender": "P",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "3117091108@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "b5ba5ca5-9ad0-419a-a50b-f4bd738cc574",
+    "nisn": "0111725502",
+    "nis": "0111725502",
+    "name": "Siswa 9D 28",
+    "gender": "P",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0111725502@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "58a5a333-44a6-4358-8b86-ad2b260084b5",
+    "nisn": "0127296650",
+    "nis": "0127296650",
+    "name": "Siswa 9C 16",
+    "gender": "L",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0127296650@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "6cc9290d-f216-4778-bc62-5d1ec81f5fcd",
+    "nisn": "0114952172",
+    "nis": "0114952172",
+    "name": "Siswa 9C 32",
+    "gender": "L",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0114952172@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "e8fcf53c-e057-4389-9940-dc8a18ed7dfd",
+    "nisn": "0115236184",
+    "nis": "0115236184",
+    "name": "Siswa 9B 4",
+    "gender": "P",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0115236184@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "f9015c0c-c969-4131-8d69-d8d2b480c5da",
+    "nisn": "0114686153",
+    "nis": "0114686153",
+    "name": "Siswa 9A 6",
+    "gender": "P",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0114686153@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "47543144-c11b-437d-9f28-00525a42d67b",
+    "nisn": "0121505992",
+    "nis": "0121505992",
+    "name": "Siswa 9G 17",
+    "gender": "L",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0121505992@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "6b55d122-640f-45cc-a394-e08ad9745ce2",
+    "nisn": "0116969421",
+    "nis": "0116969421",
+    "name": "Siswa 9G 27",
+    "gender": "L",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0116969421@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "1211135a-7fca-494c-9b75-edf819a12ff7",
+    "nisn": "0126977882",
+    "nis": "0126977882",
+    "name": "Siswa 9F 6",
+    "gender": "L",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0126977882@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "d2fc6b05-f716-48f3-aad5-982d13f99111",
+    "nisn": "0124092985",
+    "nis": "0124092985",
+    "name": "Siswa 9F 16",
+    "gender": "P",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0124092985@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "95ccf840-20b6-4fc4-993b-599ba2d75e74",
+    "nisn": "0103900217",
+    "nis": "0103900217",
+    "name": "Siswa 9F 26",
+    "gender": "L",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0103900217@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "289004d8-e0af-4734-866c-89b760f9ee38",
+    "nisn": "0119053799",
+    "nis": "0119053799",
+    "name": "Siswa 9F 27",
+    "gender": "P",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0119053799@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "8050e5a9-5486-4eb4-bac9-f064eac8dc5a",
+    "nisn": "0113699515",
+    "nis": "0113699515",
+    "name": "Siswa 9E 9",
+    "gender": "P",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0113699515@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "640ae2b5-709f-4b02-ba0c-e4b67541ba1a",
+    "nisn": "0111134566",
+    "nis": "0111134566",
+    "name": "Siswa 9E 13",
+    "gender": "L",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0111134566@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "3f01ed7e-f7c8-4805-bc77-6c7ae0f04c3a",
+    "nisn": "0122755908",
+    "nis": "0122755908",
+    "name": "Siswa 9E 23",
+    "gender": "P",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0122755908@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "eae102d9-687c-4ec3-bf8b-eae16509bbda",
+    "nisn": "0122065808",
+    "nis": "0122065808",
+    "name": "Siswa 9D 25",
+    "gender": "L",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0122065808@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "2dd4e7b6-73bc-45cb-9712-09f82e3314d7",
+    "nisn": "0113385566",
+    "nis": "0113385566",
+    "name": "Siswa 9C 3",
+    "gender": "L",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0113385566@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "68eb5ad6-77dc-4910-9e99-3a7be1c87300",
+    "nisn": "0119841615",
+    "nis": "0119841615",
+    "name": "Siswa 9C 11",
+    "gender": "L",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0119841615@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "4b7d7af6-56f1-45b3-af0d-ca54d98403a5",
+    "nisn": "0117467401",
+    "nis": "0117467401",
+    "name": "Siswa 9C 23",
+    "gender": "P",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0117467401@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "7bacaa63-bae8-421d-af13-1b85e5d80be7",
+    "nisn": "0111941871",
+    "nis": "0111941871",
+    "name": "Siswa 9B 2",
+    "gender": "P",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0111941871@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "aa3aa6b4-738e-425b-bbf6-75b2675116a3",
+    "nisn": "0113894773",
+    "nis": "0113894773",
+    "name": "Siswa 9B 3",
+    "gender": "L",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0113894773@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "b09212e8-f109-4971-bcf7-e88da233972c",
+    "nisn": "0127574340",
+    "nis": "0127574340",
+    "name": "Siswa 9B 31",
+    "gender": "P",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0127574340@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "3a1044e1-d273-4545-82b8-763822c67624",
+    "nisn": "3111040589",
+    "nis": "3111040589",
+    "name": "Siswa 9A 1",
+    "gender": "P",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "3111040589@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "d2eebf77-87e3-4e44-9330-2f2a9988393f",
+    "nisn": "0118781108",
+    "nis": "0118781108",
+    "name": "Siswa 9A 3",
+    "gender": "L",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0118781108@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "ee755acc-9031-4ebd-80bd-c620c48e98b1",
+    "nisn": "0114549119",
+    "nis": "0114549119",
+    "name": "Siswa 9G 18",
+    "gender": "L",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0114549119@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "74efa401-f933-4f46-83f3-8c0664ea004b",
+    "nisn": "0118373387",
+    "nis": "0118373387",
+    "name": "Siswa 9G 20",
+    "gender": "P",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0118373387@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "ecc2acde-b824-40ab-a9f8-01ea402bec65",
+    "nisn": "0121280737",
+    "nis": "0121280737",
+    "name": "Siswa 9G 30",
+    "gender": "L",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0121280737@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "39e39ef1-3482-434b-8116-1553e1f95dae",
+    "nisn": "0122997817",
+    "nis": "0122997817",
+    "name": "Siswa 9F 12",
+    "gender": "P",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0122997817@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "8ee3387f-c114-4003-b618-968e9c762315",
+    "nisn": "0126581396",
+    "nis": "0126581396",
+    "name": "Siswa 9F 23",
+    "gender": "L",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0126581396@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "3cd1e3e4-4338-4dca-a55c-1d4551de729c",
+    "nisn": "0115506863",
+    "nis": "0115506863",
+    "name": "Siswa 9E 4",
+    "gender": "L",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0115506863@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "33d9c62c-3d91-4239-9cd5-9e6e3b8b863e",
+    "nisn": "0118486250",
+    "nis": "0118486250",
+    "name": "Siswa 9E 22",
+    "gender": "P",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0118486250@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "adefbb5e-80c8-4b8e-a99d-445c597fac50",
+    "nisn": "0113162416",
+    "nis": "0113162416",
+    "name": "Siswa 9D 4",
+    "gender": "L",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0113162416@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "2f691233-29a5-40c9-809a-d5e9264fea7e",
+    "nisn": "3100104017",
+    "nis": "3100104017",
+    "name": "Siswa 9D 11",
+    "gender": "L",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "3100104017@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "bda48920-ba03-4e8c-895b-9757e64ade75",
+    "nisn": "0111882732",
+    "nis": "0111882732",
+    "name": "Siswa 9D 22",
+    "gender": "P",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0111882732@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "4ee2ec1c-7b17-4972-b92d-3ddf21eb9a10",
+    "nisn": "0111559019",
+    "nis": "0111559019",
+    "name": "Siswa 9C 1",
+    "gender": "L",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0111559019@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "1aa78b2b-6c97-48d1-b88b-2ea4720726d6",
+    "nisn": "0114382791",
+    "nis": "0114382791",
+    "name": "Siswa 9C 22",
+    "gender": "L",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0114382791@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "2a522080-6c0f-4668-9f8e-eec3699f68ad",
+    "nisn": "0126759536",
+    "nis": "0126759536",
+    "name": "Siswa 9B 13",
+    "gender": "L",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0126759536@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "e47dd4b4-454b-4063-88d5-c057c94fc3d3",
+    "nisn": "0118758331",
+    "nis": "0118758331",
+    "name": "Siswa 9B 14",
+    "gender": "P",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0118758331@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "c9fbccee-9caa-41ab-89b7-1da3954e49b0",
+    "nisn": "0116131696",
+    "nis": "0116131696",
+    "name": "Siswa 9B 24",
+    "gender": "L",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0116131696@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "b18c7550-7e40-4414-8e90-1cb2e3a67dfd",
+    "nisn": "0119442478",
+    "nis": "0119442478",
+    "name": "Siswa 9A 4",
+    "gender": "P",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0119442478@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "a1d0fe1a-501a-42e2-bae4-1bd31a27e09b",
+    "nisn": "0114069144",
+    "nis": "0114069144",
+    "name": "Siswa 9A 5",
+    "gender": "P",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0114069144@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "7e3c6564-feff-4ce6-a5f3-7a40d72155b2",
+    "nisn": "0118667351",
+    "nis": "0118667351",
+    "name": "Siswa 9G 19",
+    "gender": "L",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0118667351@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "06f88468-7f9f-4f6f-b5a6-6397a4c96102",
+    "nisn": "0111110477",
+    "nis": "0111110477",
+    "name": "Siswa 9G 28",
+    "gender": "L",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0111110477@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "5ec2077d-ceb0-4ba7-8a25-74965cb72fab",
+    "nisn": "0115681888",
+    "nis": "0115681888",
+    "name": "Siswa 9F 8",
+    "gender": "L",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0115681888@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "fb1caade-b7a5-4410-9f5e-c6d2efd6bbb7",
+    "nisn": "0119070458",
+    "nis": "0119070458",
+    "name": "Siswa 9F 17",
+    "gender": "L",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0119070458@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "368bfafa-3111-4838-97f8-a8374f1e5158",
+    "nisn": "0129450624",
+    "nis": "0129450624",
+    "name": "Siswa 9F 29",
+    "gender": "P",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0129450624@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "41c54e27-f6bf-44c3-b83b-3996a742662d",
+    "nisn": "3118000747",
+    "nis": "3118000747",
+    "name": "Siswa 9E 6",
+    "gender": "L",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "3118000747@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "e33d262e-4b25-475d-be6c-6ab3fbe3ca10",
+    "nisn": "0113109799",
+    "nis": "0113109799",
+    "name": "Siswa 9E 11",
+    "gender": "L",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0113109799@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "82fc4308-ae32-4ced-92cf-3afd2c1180f5",
+    "nisn": "0113518651",
+    "nis": "0113518651",
+    "name": "Siswa 9E 17",
+    "gender": "P",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0113518651@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "867f9684-5e8a-4091-8966-44711b1d3e13",
+    "nisn": "0113505204",
+    "nis": "0113505204",
+    "name": "Siswa 9E 18",
+    "gender": "P",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0113505204@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "000cb57c-6730-4671-a7b9-dd35023975e9",
+    "nisn": "0116343136",
+    "nis": "0116343136",
+    "name": "Siswa 9E 26",
+    "gender": "L",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0116343136@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "6280f683-a35f-4b94-884e-435efe687e07",
+    "nisn": "0114448807",
+    "nis": "0114448807",
+    "name": "Siswa 9D 2",
+    "gender": "P",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0114448807@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "b3aeb720-bc1a-4ffc-b6eb-5724d10d0c20",
+    "nisn": "0117335906",
+    "nis": "0117335906",
+    "name": "Siswa 9D 8",
+    "gender": "L",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0117335906@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "1a64aae2-3f4e-40cf-8784-83f924451571",
+    "nisn": "0128592524",
+    "nis": "0128592524",
+    "name": "Siswa 9D 9",
+    "gender": "L",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0128592524@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "04e7db63-2fbe-489f-a125-84a6a48acb1d",
+    "nisn": "0115539797",
+    "nis": "0115539797",
+    "name": "Siswa 9D 15",
+    "gender": "L",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0115539797@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "259e23b2-1b74-4c67-84d8-7a83b9507fc3",
+    "nisn": "0113581800",
+    "nis": "0113581800",
+    "name": "Siswa 9D 24",
+    "gender": "P",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0113581800@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "f8de9074-6adf-4d66-9768-60bc34b2bfaa",
+    "nisn": "0118029325",
+    "nis": "0118029325",
+    "name": "Siswa 9D 30",
+    "gender": "L",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0118029325@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "9127c63b-a441-4792-8035-040eb9f7783f",
+    "nisn": "0124775667",
+    "nis": "0124775667",
+    "name": "Siswa 9C 6",
+    "gender": "P",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0124775667@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "31622596-f40b-4b4e-8175-a9fd12fd694c",
+    "nisn": "0119172840",
+    "nis": "0119172840",
+    "name": "Siswa 9C 7",
+    "gender": "L",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0119172840@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "b982cc11-ee53-4e12-8ed9-02dbdfc208df",
+    "nisn": "0119424010",
+    "nis": "0119424010",
+    "name": "Siswa 9C 12",
+    "gender": "P",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0119424010@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "4dfc9a9d-2288-4d67-84f2-99ac4ced7239",
+    "nisn": "0115719373",
+    "nis": "0115719373",
+    "name": "Siswa 9C 24",
+    "gender": "P",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0115719373@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "1e22f22e-a088-4b39-96df-dde14a897f78",
+    "nisn": "0117374794",
+    "nis": "0117374794",
+    "name": "Siswa 9C 28",
+    "gender": "L",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0117374794@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "8f8217e9-0e64-4ae3-a283-c3a924a58a41",
+    "nisn": "0128268704",
+    "nis": "0128268704",
+    "name": "Siswa 9B 5",
+    "gender": "P",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0128268704@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "642208c1-7e51-46dc-a91e-cd45e237e4d2",
+    "nisn": "0128373654",
+    "nis": "0128373654",
+    "name": "Siswa 9B 18",
+    "gender": "L",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0128373654@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "8414e829-6333-4ab4-ba60-1fcc64bfe1cd",
+    "nisn": "0118252356",
+    "nis": "0118252356",
+    "name": "Siswa 9B 19",
+    "gender": "L",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0118252356@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "35cfce7b-62a0-42c7-8eb0-450e2b18a1b5",
+    "nisn": "0115666936",
+    "nis": "0115666936",
+    "name": "Siswa 9B 22",
+    "gender": "P",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0115666936@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "bd2cb9b0-7a5d-4744-800e-c1d1afc2594b",
+    "nisn": "0115340840",
+    "nis": "0115340840",
+    "name": "Siswa 9B 27",
+    "gender": "P",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0115340840@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "31c04c9b-3b7d-40b4-8d3b-3965e3a54e0f",
+    "nisn": "0112162937",
+    "nis": "0112162937",
+    "name": "Siswa 9G 21",
+    "gender": "P",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0112162937@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "4e18dad1-de23-4b74-af35-b94357b6986b",
+    "nisn": "0111528865",
+    "nis": "0111528865",
+    "name": "Siswa 9G 31",
+    "gender": "P",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0111528865@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "94f87db6-2f03-476c-9a1a-b6aa34b02031",
+    "nisn": "0111029403",
+    "nis": "0111029403",
+    "name": "Siswa 9F 9",
+    "gender": "L",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0111029403@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "ed85d155-539b-4e9f-8af3-a63f253d3bd1",
+    "nisn": "0111124988",
+    "nis": "0111124988",
+    "name": "Siswa 9F 20",
+    "gender": "L",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0111124988@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "15a2596f-7150-4631-957f-2d3f3c3f3035",
+    "nisn": "0119956517",
+    "nis": "0119956517",
+    "name": "Siswa 9E 30",
+    "gender": "P",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0119956517@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "23881737-9f69-4042-a696-eaa5e4975e2e",
+    "nisn": "3110697348",
+    "nis": "3110697348",
+    "name": "Siswa 9E 31",
+    "gender": "P",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "3110697348@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "32d5ad2f-5061-4e6e-9ce2-b299d111ec23",
+    "nisn": "0119776454",
+    "nis": "0119776454",
+    "name": "Siswa 9E 32",
+    "gender": "L",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0119776454@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "9e642359-520f-4ce4-a833-331c280bf266",
+    "nisn": "0118292883",
+    "nis": "0118292883",
+    "name": "Siswa 9D 17",
+    "gender": "L",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0118292883@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "c4bcfaeb-5716-434f-a608-a261b7eaca60",
+    "nisn": "0121304395",
+    "nis": "0121304395",
+    "name": "Siswa 9D 26",
+    "gender": "L",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0121304395@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "53fc6433-4965-4328-9a9f-927888ed6954",
+    "nisn": "0116780405",
+    "nis": "0116780405",
+    "name": "Siswa 9C 14",
+    "gender": "L",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0116780405@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "76261f66-25a7-4ba7-b3f0-a13c27214923",
+    "nisn": "0111754482",
+    "nis": "0111754482",
+    "name": "Siswa 9B 17",
+    "gender": "L",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0111754482@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "5dcd4699-12c6-4dab-8b84-c224fc629f4b",
+    "nisn": "0118102283",
+    "nis": "0118102283",
+    "name": "Siswa 9B 20",
+    "gender": "L",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0118102283@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "3cc5210b-a594-43a3-ad48-87751b24a0cc",
+    "nisn": "0125444169",
+    "nis": "0125444169",
+    "name": "Siswa 9B 21",
+    "gender": "P",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0125444169@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "01b776ec-a944-43b9-9d99-785eec098aae",
+    "nisn": "0117305429",
+    "nis": "0117305429",
+    "name": "Siswa 9B 25",
+    "gender": "P",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0117305429@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "d26e5055-2231-4d50-9b87-3c49d86f83ef",
+    "nisn": "0111052876",
+    "nis": "0111052876",
+    "name": "Siswa 9B 26",
+    "gender": "L",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0111052876@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "8b58d26b-4e83-4d34-98a9-f05f4fd9e748",
+    "nisn": "0111219950",
+    "nis": "0111219950",
+    "name": "Siswa 9G 29",
+    "gender": "P",
+    "classId": "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+    "email": "0111219950@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "124c9497-3c48-4469-b03c-67c3b1c63410",
+    "nisn": "0118981080",
+    "nis": "0118981080",
+    "name": "Siswa 9F 7",
+    "gender": "L",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0118981080@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "9b09c1ec-4551-4068-931f-6a653aebacbf",
+    "nisn": "0118634658",
+    "nis": "0118634658",
+    "name": "Siswa 9F 19",
+    "gender": "L",
+    "classId": "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+    "email": "0118634658@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "29578e0a-1f6e-4544-b26b-8ad2b3aaa1f6",
+    "nisn": "0119295390",
+    "nis": "0119295390",
+    "name": "Siswa 9E 1",
+    "gender": "L",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0119295390@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "8dbf38d6-1224-43a8-af9b-572b95fd7ebb",
+    "nisn": "0113320472",
+    "nis": "0113320472",
+    "name": "Siswa 9E 19",
+    "gender": "L",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0113320472@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "074a80e2-d310-4ffe-9d54-89806f5af93c",
+    "nisn": "0115186437",
+    "nis": "0115186437",
+    "name": "Siswa 9E 28",
+    "gender": "L",
+    "classId": "56da1747-4642-4b1f-b357-d280a4e98e4c",
+    "email": "0115186437@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "6870e2dc-d8a6-49d1-a0ae-be4824782ddb",
+    "nisn": "0118501572",
+    "nis": "0118501572",
+    "name": "Siswa 9D 10",
+    "gender": "P",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0118501572@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "7f64dc8f-f81d-4d59-ba0d-f7b078d296a8",
+    "nisn": "0114884532",
+    "nis": "0114884532",
+    "name": "Siswa 9D 13",
+    "gender": "L",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0114884532@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "cdab4723-7b37-40a0-b3e7-da3fad57db20",
+    "nisn": "3110991166",
+    "nis": "3110991166",
+    "name": "Siswa 9D 14",
+    "gender": "P",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "3110991166@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "275ccb3e-47d8-4960-9ac6-42ad5babc5a4",
+    "nisn": "0114485607",
+    "nis": "0114485607",
+    "name": "Siswa 9D 16",
+    "gender": "L",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0114485607@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "0ee4bba2-069f-45cb-81f4-3390b3a94913",
+    "nisn": "0116387753",
+    "nis": "0116387753",
+    "name": "Siswa 9D 27",
+    "gender": "P",
+    "classId": "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+    "email": "0116387753@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "2d98cbf7-59a0-42cc-9a69-3d537ed1efaf",
+    "nisn": "0112572888",
+    "nis": "0112572888",
+    "name": "Siswa 9C 4",
+    "gender": "P",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0112572888@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "44aafc05-23b7-4595-9945-b73744d9fdd5",
+    "nisn": "0114257900",
+    "nis": "0114257900",
+    "name": "Siswa 9C 8",
+    "gender": "L",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0114257900@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "e86033c6-9ed0-461a-b582-e8dfd9e4ea7d",
+    "nisn": "0129038187",
+    "nis": "0129038187",
+    "name": "Siswa 9C 19",
+    "gender": "P",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0129038187@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "227d6880-146f-4887-88a8-2643c0a8c1dc",
+    "nisn": "0122245483",
+    "nis": "0122245483",
+    "name": "Siswa 9C 30",
+    "gender": "P",
+    "classId": "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+    "email": "0122245483@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "9e60d79f-adbf-4bbb-ae99-e262539eecce",
+    "nisn": "0108937773",
+    "nis": "0108937773",
+    "name": "Siswa 9B 10",
+    "gender": "L",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0108937773@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "8d75c986-0f2d-4922-9079-5ebad0148025",
+    "nisn": "0119837698",
+    "nis": "0119837698",
+    "name": "Siswa 9B 30",
+    "gender": "P",
+    "classId": "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+    "email": "0119837698@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "fb2a5856-f2a9-4f19-81db-f3d90fa47dd0",
+    "nisn": "0129925194",
+    "nis": "0129925194",
+    "name": "Siswa 9A 8",
+    "gender": "P",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0129925194@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "c86a4bd0-0370-4f9b-b5c5-4e2d87219968",
+    "nisn": "0121142732",
+    "nis": "0121142732",
+    "name": "Siswa 9A 9",
+    "gender": "P",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0121142732@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "ce722ffa-4218-4d7e-8d35-4e230632eb5c",
+    "nisn": "0114130255",
+    "nis": "0114130255",
+    "name": "Siswa 9A 10",
+    "gender": "L",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0114130255@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "8d85d46f-45e0-44e9-9ef0-8aa78aa652fd",
+    "nisn": "0128506078",
+    "nis": "0128506078",
+    "name": "Siswa 9A 11",
+    "gender": "P",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0128506078@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "e712f340-1a61-4cf6-a18e-dba9a918cdea",
+    "nisn": "0115402170",
+    "nis": "0115402170",
+    "name": "Siswa 9A 12",
+    "gender": "L",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0115402170@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "8de4d5b5-87e2-4e2b-af24-076acdfd5b05",
+    "nisn": "0129802941",
+    "nis": "0129802941",
+    "name": "Siswa 9A 13",
+    "gender": "L",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0129802941@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "24775735-393b-426a-a80e-b74d39f06dbe",
+    "nisn": "0118877679",
+    "nis": "0118877679",
+    "name": "Siswa 9A 14",
+    "gender": "P",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0118877679@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "8721c75d-91d5-4c57-b80c-9a47fc7a83f7",
+    "nisn": "0119689225",
+    "nis": "0119689225",
+    "name": "Siswa 9A 15",
+    "gender": "P",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0119689225@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "f8679556-99c0-45b2-8369-837e3f8120d1",
+    "nisn": "0115818466",
+    "nis": "0115818466",
+    "name": "Siswa 9A 16",
+    "gender": "P",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0115818466@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "5b46700f-0c44-4f4e-9018-6d8059605b1a",
+    "nisn": "0116010450",
+    "nis": "0116010450",
+    "name": "Siswa 9A 17",
+    "gender": "L",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0116010450@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "2a0700c3-1735-455f-b1fb-e16afff679c4",
+    "nisn": "0115084016",
+    "nis": "0115084016",
+    "name": "Siswa 9A 18",
+    "gender": "P",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0115084016@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "afc6f2dd-3daa-444a-9ad6-ff7df504208d",
+    "nisn": "0112728548",
+    "nis": "0112728548",
+    "name": "Siswa 9A 19",
+    "gender": "L",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0112728548@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "b1edea25-5ebc-48bc-99c7-8438eea25e0c",
+    "nisn": "0115178337",
+    "nis": "0115178337",
+    "name": "Siswa 9A 20",
+    "gender": "L",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0115178337@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "164fe454-e648-4eaf-8fcd-ad3d737de60b",
+    "nisn": "0117529326",
+    "nis": "0117529326",
+    "name": "Siswa 9A 21",
+    "gender": "L",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0117529326@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "1ce8b6d1-77f0-4fe6-8788-7db5ae2cb4d6",
+    "nisn": "0116872488",
+    "nis": "0116872488",
+    "name": "Siswa 9A 22",
+    "gender": "L",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0116872488@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "3bf21090-3a76-48fa-8df7-5f570c8509d8",
+    "nisn": "0115397861",
+    "nis": "0115397861",
+    "name": "Siswa 9A 23",
+    "gender": "L",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0115397861@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "595095dc-e78b-41fa-b64f-c7fedc5c8820",
+    "nisn": "0116787298",
+    "nis": "0116787298",
+    "name": "Siswa 9A 24",
+    "gender": "L",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0116787298@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "0018c564-c5b0-4948-bf23-cb1c8c8d6488",
+    "nisn": "0113895398",
+    "nis": "0113895398",
+    "name": "Siswa 9A 25",
+    "gender": "P",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0113895398@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "140f6719-b232-48ac-bc7f-0db370aee003",
+    "nisn": "0116499702",
+    "nis": "0116499702",
+    "name": "Siswa 9A 26",
+    "gender": "P",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0116499702@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "d783864e-91a0-45cb-9963-4aa80c468015",
+    "nisn": "0113821876",
+    "nis": "0113821876",
+    "name": "Siswa 9A 27",
+    "gender": "P",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0113821876@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "980e50d1-2d35-4914-af25-d7c564cf7d46",
+    "nisn": "0118608795",
+    "nis": "0118608795",
+    "name": "Siswa 9A 28",
+    "gender": "L",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0118608795@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "ece6e3a7-9862-4f7f-b912-298c3ec8a21e",
+    "nisn": "0104973248",
+    "nis": "0104973248",
+    "name": "Siswa 9A 29",
+    "gender": "L",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0104973248@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "6da391cb-3176-472b-b0a9-0cea2c22f77f",
+    "nisn": "0119818083",
+    "nis": "0119818083",
+    "name": "Siswa 9A 30",
+    "gender": "L",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "0119818083@siswa.sch.id",
+    "birthDate": "2011-05-02",
+    "targetScore": 80,
+    "isAnswerKeyAccount": false
+  },
+  {
+    "id": "cc51df88-fb42-45f5-b51e-1156544da08d",
+    "nisn": "111122222",
+    "nis": "111122222",
+    "name": "Kunci Jawaban",
+    "gender": "L",
+    "classId": "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+    "email": "111122222@siswa.sch.id",
+    "birthDate": "2008-05-14",
+    "targetScore": 85,
+    "isAnswerKeyAccount": true
+  }
+];
 
-export const INITIAL_TRYOUTS: Tryout[] = [];
+export const INITIAL_EXAM_PACKAGES: ExamPackage[] = [
+  {
+    "id": "3918c1d7-a5e3-4766-ba92-0a7bd2c2bc25",
+    "code": "PKT-9829",
+    "title": "Try Out TKA",
+    "assessmentType": "TRYOUT",
+    "academicYearId": "0ffe2ac4-48bd-400b-ae8c-05ecff36e4a1",
+    "targetGrades": [
+      "9"
+    ],
+    "targetClassIds": [
+      "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+      "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+      "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+      "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+      "56da1747-4642-4b1f-b357-d280a4e98e4c",
+      "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+      "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+      "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+      "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+      "173a5708-54b5-466f-b8a2-52d3fb03fa6c"
+    ],
+    "startDate": "2026-11-03T00:00:00+00:00",
+    "endDate": "2026-11-17T00:00:00+00:00",
+    "status": "ACTIVE",
+    "subjects": [
+      {
+        "id": "e0793b67-0a76-48d4-a213-f22b4e1d8f37",
+        "packageId": "3918c1d7-a5e3-4766-ba92-0a7bd2c2bc25",
+        "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+        "googleFormUrl": "https://forms.gle/5w8nsioLRje5knPT7",
+        "googleSheetUrl": "https://docs.google.com/spreadsheets/d/12gE3T1N1TcOQMVsvc4OxMdNmSi4ztIs6LFLszeyiu_o/edit?usp=drive_link",
+        "answerKey": [],
+        "totalQuestions": 40,
+        "durationMinutes": 60,
+        "passingGrade": 75,
+        "syncStatus": "SYNCED",
+        "lastUpdatedBy": "Guru Bahasa Indonesia",
+        "updatedAt": "2026-11-03T05:09:22.044902+00:00"
+      }
+    ],
+    "createdAt": "2026-11-03T05:05:14.160797+00:00",
+    "updatedAt": "2026-11-03T05:05:14.160797+00:00"
+  }
+];
+
+export const INITIAL_TRYOUTS: Tryout[] = [
+  {
+    "id": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "code": "TO-2026-01",
+    "title": "Try Out 1 - BIN",
+    "assessmentType": "TRYOUT",
+    "academicYearId": "0ffe2ac4-48bd-400b-ae8c-05ecff36e4a1",
+    "startDate": "2026-11-03T05:09:19.778+00:00",
+    "endDate": "2026-11-10T05:09:19.778+00:00",
+    "scoringConfig": {
+      "_meta": {
+        "answerKey": [
+          "Randu membantu Paman Tom dalam pertunjukan sulap yang menarik",
+          "BERGERAK, MENDATANGI",
+          "Zulbahri",
+          "Baik hati",
+          "IBU TEGAS DAN KERAS PENDIRIAN, PARKI BERANI MENYAMPAIKAN PENDAPAT",
+          "Pagi hari",
+          "Persahabatan",
+          "Maju",
+          "Salah",
+          "Denotasi",
+          "Konotasi",
+          "Penulis buku tidak teliti dan tidak mendalam mengulas masalah.",
+          "Cerita memiliki pesan moral tentang kesabaran dan kejujuran",
+          "4",
+          "3",
+          "Rambutmu tertata tak menutupi muka",
+          "Salah",
+          "HAMPARAN SAWAH TAMPAK MENGHIJAU, LANGIT BIRU DIHIASI AWAN PUTIH",
+          "Benar",
+          "Repetisi",
+          "Simile",
+          "Metafora",
+          "BANGSA INDONESIA TETAP BERSATU SEBAGAI SATU KESATUAN, MESKIPUN BERBEDA-BEDA, SETIAP DAERAH MEMILIKI BAHASA DAN BUDAYA, TETAPI TETAP HARUS SALING MENGHARGAI",
+          "Prismatis",
+          "Diafan",
+          "Kita harus menjaga sopan santun dan menghormati orang lain dalam kehidupan sehari-hari",
+          "Gembira",
+          "Tenang",
+          "Memberi Motivasi",
+          "Menghibur",
+          "Sampah plastik dan limbah pabrik dapat menyebabkan pencemaran tanah",
+          "ASSALAMUALAIKUM WARAHMATULLAHI WABARAKATU, NAMO BUDHAYA, OM SWASTIASTU, SALAM SEIAHTERA",
+          "Pembuka pidato",
+          "Isi pidato",
+          "ATAS PERHATIAN TEMAN-TEMAN, SAYA UCAPKANN TERIMA KASIH.",
+          "(1), (2), DAN (4)",
+          "Sampah yang menumpuk dapat menimbulkan berbagai penyakit",
+          "Kesehatan",
+          "KURIKULUM, LITERASI",
+          "mari kita segera mandi agar tubuh bersih dan terhindar dari penyakit",
+          "Salah",
+          "Manuskrip",
+          "Memoriter"
+        ],
+        "selectedQuestionColumns": [
+          "Perhatikan kutipan cerita berikut dengan saksama!\nRandu dahulu pernah naik ke panggung. Ia membantu Paman Tom dalam sebuah pertunjukan sulap. Randu diminta menarik sapu tangan yang menutupi kotak, lalu seekor burung keluar dan terbang mengitari panggung. Penonton sangat heboh dan bertepuk tangan lama sekali. Keesokan harinya, semua anak di sekolah menceritakan kejadian itu berulang-ulang. Guru kelas Randu bahkan ikut memuji pertunjukan itu di depan kelas. Saat itu Randu masih kelas 1 SD.\n \nBerdasarkan kutipan cerita tersebut, informasi yang sesuai adalah ….",
+          "Bacalah kutipan cerita berikut dengan saksama! \nHujan mulai reda, matahari hampir tenggelam, dari jauh terdengar suara Geri dan Yanti. “Fik, Fikri kita kumpul!” Aku pun beranjak dari sudut gubuk menghampiri sumber suara. \n“Kita harus menyusun strategi di saat ini,” kata Geri, penanggung jawab ekspedisi Tim Mapala Puncak Gunung Betung. \n \nSinonim atau padanan dari kata “beranjak” dan “menghampiri” yang bercetak tebal dalam cerita di atas yaitu … (pilih dua jawaban benar)",
+          "Bacalah kutipan cerita berikut dengan saksama! \nLampu di beranda depan rumah sudah dipasang Ibu. Zulbahri juga bercerita, kadang-kadang lambat-lambat, kadang-kadang cepat-cepat. Angin mendesir-desirkan daun-daun jarak. Bulan makin terang. Zulbahri berhenti bicara. Dari kantongnya dikeluarkan sehelai kertas, diberikan kepada Ayah. Air teh yang disediakan Ibu, tidak disinggung-singgungnya. Ia berdiri dengan menunduk lalu meninggalkan kami.\n \nTokoh utama dalam kutipan cerita tersebut adalah ....",
+          "Bacalah kutipan cerita berikut dengan saksama! \n“Apakah Ibu kenal dengan orang itu?” tanya Shila curiga\n“Tidak, Shila. Ibu meminjamkan uang kepadanya karena ibu merasa kasihan,” kata Ibu dengan iba.\n“Mengapa Ibu percaya begitu saja? Bisa saja dia itu penipu, Bu!” seru Shila tiba-tiba.\n“Penipu? Masya-Allah. Jangan buruk sangka, Shila! Kita harus saling membantu, Nak!” bantah Ibu dengan cepat sambil kembali menjaga warung. Shila cemberut sambil duduk di kursi, sedangkan Ibu melayani pembeli dengan sabar.\n\n Sifat ibu berdasarkan kutipan cerita pendek di atas, yaitu ….",
+          "Bacalah kutipan cerita berikut dengan saksama! \nIbu sangat ingin Parki tumbuh sehat dan tinggi. Untuk itu, Ibu menyuruh Parki makan telur setiap hari.\n“… tetapi, Bu, …,” ujar Parki, “aku bosan makan telur setiap hari.” \n“ini peraturan!” kata Ibu tegas. \nParki ingin membantah bahwa makanan bergizi tidak hanya telur, tetapi Ibu tidak mau mendengarkan. Menurut Ibu, komposisi gizi dalam sebutir telur sangat sempurna. Ibu ingin Parki tumbuh setinggi pemain basket profesional. Jadi, ia memasak telur setiap hari.\n \nBerdasarkan kutipan cerita tersebut, watak tokoh Parki dan Ibu adalah ….",
+          "Bacalah kutipan cerita berikut dengan saksama! \nJam bekerku berbunyi. Aku membereskan kamar tidur walaupun merasa sedikit menyesal karena tidak bisa melanjutkan mimpi. Selesai mandi aku menuju ruang makan untuk memulai sarapan. Ayah dan Ibu sudah duduk manis menungguku.\n\nLatar waktu pada kutipan cerita di atas, yaitu ….",
+          "Bacalah kutipan cerita berikut dengan saksama! \nKatanya, mutiara itu sangat indah. Namun, bagiku \"Dia\" lebih indah. \"Dia\" adalah sosok wanita yang cantik, berbalutkan kerudung panjang berwarna biru, matanya hitam dengan lesung pipi di kedua pipinya. Namanya adalah Nura, gadis sederhana nan ayu rupawan. Persahabatan kami bukan sekadar kata yang ditulis pada kertas tak bermakna, tapi persahabatan kami merupakan ikatan suci yang diperoleh di atas dua hati. Kami menulisnya dengan tinta kasih sayang dan suatu saat akan dihapus bersama dengan tetesan darah dan barangkali dengan nyawa.\n\nBerdasarkan isi cerita, tema yang paling menonjol dalam cerita di atas adalah ….",
+          "Bacalah kutipan cerita berikut dengan saksama! \nJam bekerku berbunyi. Aku membereskan kamar tidur walaupun merasa sedikit menyesal karena tidak bisa melanjutkan mimpi. Selesai mandi aku menuju ruang makan untuk memulai sarapan. Ayah dan Ibu sudah duduk manis menungguku.\n\nAlur yang digunakan pada kutipan cerita di atas, yaitu …",
+          "Bacalah kutipan cerita berikut dengan saksama! \nKatanya, mutiara itu sangat indah. Namun, bagiku \"Dia\" lebih indah. \"Dia\" adalah sosok wanita yang cantik, berbalutkan kerudung panjang berwarna biru, matanya hitam dengan lesung pipi di kedua pipinya. Namanya adalah Nura, gadis sederhana nan ayu rupawan. Persahabatan kami bukan sekadar kata yang ditulis pada kertas tak bermakna, tapi persahabatan kami merupakan ikatan suci yang diperoleh di atas dua hati. Kami menulisnya dengan tinta kasih sayang dan suatu saat akan dihapus bersama dengan tetesan darah dan barangkali dengan nyawa. [Amanat cerita di atas menyatakan bahwa persahabatan hanya bersifat sementara dan tidak perlu dijaga.]",
+          "Tentukan kalimat yang memiliki makna denotasi dan konotasi! [Jalanan sepi sekali pagi ini.]",
+          "Tentukan kalimat yang memiliki makna denotasi dan konotasi! [Jalanan sesunyi kuburan pagi ini.]",
+          "Cermati kutipan resensi berikut! \nUlasan buku karya sastra negara ini tidak mendalam dan tidak teliti karena desakan waktu yang disediakan kepada penulisnya. Buku ini merupakan catatan kesan-kesan pertama seorang pembaca.\n\nKalimat yang menyatakan kelemahan buku dalam kutipan resensi di atas adalah ...",
+          "Cermati kutipan resensi berikut! \nMenurut saya, cerita yang ditulis Rifan ini cukup menarik. Tokoh-tokohnya digambarkan dengan jelas. Rangkaian peristiwanya juga menarik. Lebih dari itu, kita dapat mengambil pelajaran bahwa kesabaran dan kejujuran itu sangat penting. Dua sifat ini akan membawa kebaikan pada diri kita.\n \nBerdasarkan kutipan resensi tersebut, salah satu keunggulan cerita adalah ….",
+          "Cermati puisi berikut dengan saksama! \nJAKARTA\n\nJakarta adalah kota metropolitan \nJakarta poros kehidupan warga Indonesia \nJakarta kota beribu manusia \nJakarta miniatur bangsa\n\nJumlah larik pada puisi berjudul “Jakarta” di atas, yaitu ….",
+          "Cermati puisi berikut dengan saksama! \nGEMPA BUMI\n\nBumi bergoyang tanah bergetar \nRumah-rumah roboh \nOrang-orang berlarian\n \nGempa bumi \nBila datang harus waspada \nBila ada harus siaga \nLarilah keluar rumah \n \nGempa bumi \nTak dapat dihindari \nBerdoalah kepada Tuhan \nAgar engkau dilindungi\n \nJumlah bait pada puisi berjudul “Gempa Bumi” di atas, yaitu ….",
+          "Bacalah penggalan puisi berikut!\nDefinisi cantik menurut kami sederhana\n…………………………………………………..\nTergelung rapi membentuk setengah bola\nTidak berwarna-warni cukup hitam saja\n \nLarik berima yang tepat untuk melengkapi puisi di atas adalah ….",
+          "Perhatikan penggalan puisi berikut!\nMalam akan tiba \ncicak cicak berbunyi di tembok  [Penggalan puisi tersebut mengandung imaji atau citraan peraba.]",
+          "Larik yang mengandung imaji pengelihatan adalah …. (pilih dua jawaban benar)",
+          "Perhatikan penggalan puisi berikut!\nEmansipasi alaan berekspresi katanya\nBukan kea rah yang lebih baik tapi sebaliknya\nJika saja Kartini masih ada\nPastilah miris melihat para wanita [Pemilihan diksi “Kartini” digunakan sebagai simbol perjuangan perempuan Indonesia.]",
+          "Perhatikan puisi berikut dengan saksama!\nHANYA\nKarya Sapardi Djoko Damono\n \nHanya suara burung yang kau dengar\ndan tak pernah kaulihat burung in\ntapi tahu burung itu ada di sana\n \nHanya desir angin yang kaurasa\ndan tak pernah kaulihat angin itu\ntapi percaya angin itu di sekitarmu\n \nHanya doaku yang bergetar malam ini\ndan tak pernah kau lihat siapa aku\ntapi yakin aku ada dalam dirimu\n \nPengulangan kata “Hanya” pada setiap bait puisi termasuk majas ….",
+          "Perhatikan larik puisi berikut!\n“Wajahmu indah bagai rembulan di malam hari.”\n \nMajas yang digunakan pada larik tersebut adalah ….",
+          "Perhatikan larik puisi berikut!\n“Ibu menjadi matahari dalam keluarga.”\n \nJenis majas pada larik tersebut adalah ….",
+          "Bacalah penggalan puisi berikut!\nBhinneka tunggal ika artinya satu\nSemboyan supaya kita bersatu padu\nTidak mudah goyah apalagi ragu\nMenghargai keberagaman agar tidak berseteru\n \nMaksud dari larik pertama pada puisi di atas adalah…. (pilih dua jawaban benar)",
+          "Bacalah penggalan puisi berikut!\nKetika dia tersenyum\nAku bisa melihat warna-warni dunia, segala irama, juga tawa\nBerhamburan di sekitarnya\n \nPenggalan puisi di atas adalah jenis puisi ….",
+          "Bacalah penggalan puisi berikut!\nAku membeli topi\nPedagangnya sudah tua\nSetiap hari membawa berlusin-lusin topi di keranjang\n \nPenggalan puisi di atas adalah jenis puisi …",
+          "Bacalah puisi berikut dengan saksama!\nKALAU, KALAU, KALAU\n \nKalau sopan santun masihlah ada\nTentu orana-orang tahu tata krama\nMembungkuk di depan orang tua\nTidak menyela perkataan siapa saja\nKalau sopan santun masihlah ada\nTak ada kasus norma susila\nHidup juga akan sentosa dan bahagia\nKalau, kalau, kalau masih ada\nTapi kenyataannya?\nBerbalik dengan harapan-harapan kita\n \nPesan yang terkandung dalam puisi di atas adalah ….",
+          "Pasangkan penggalan puisi dengan ekspresi yang sesuai untuk mendeklamasikan puisi tersebut! [Berangkat sekolah bersama teman. Tawa kecil mengisi perjalanan. Belajar bersama di dalam kelas. Hari terasa penuh kehangatan]",
+          "Pasangkan penggalan puisi dengan ekspresi yang sesuai untuk mendeklamasikan puisi tersebut! [Sungai mengalir perlahan. Daun jatuh di atas permukaan. Angin lembut menyentuh pepohonan. Hening terasa di seluruh halaman]",
+          "angkan pernyataan berikut dengan tujuan pidato yang tepat! [Pada hari Pendidikan, kepala sekolah berpidato mengenai pentignya belajar dan menggali potensi diri sendiri.]",
+          "angkan pernyataan berikut dengan tujuan pidato yang tepat! [Seorang pelawak terkenal berpidato pada acara tahun baru dan membuat masyarakat tertawa.]",
+          "Perhatikan kutipan teks pidato berikut dengan saksama!\nSampah plastik dan limbah pabrik menjadi penyumbang terbesar dalam penyebab pencemaran tanah. Bakteri yang terdapat dalam sampah dan limbah pabrik menyebabkan tanah tidak bisa ditanami tanaman. Jika ditanami, tanaman tidak bisa tumbuh subur. Bila hal ini tidak ditanggulangi secara cepat maka akan berpengaruh pada produksi pertanian. Untuk itu kita harus melakukan upaya penanggulangan bahaya pencemaran tanah dengan cepat. Kita harus membiasakan membuang sampah pada tempatnya sesuai dengan jenis sampah yaitu sampah organik, sampah anorganik, dan sampah Bahan Berbahaya dan Beracun (B3). Marilah kita lakukan apa yang bisa kita lakukan untuk menjaga lingkungan sekitar kita tetap bersih.\n \nInformasi yang terdapat dalam teks di atas adalah ….",
+          "Perhatikan kutipan teks pidato berikut dengan saksama!\n[…]\nYang saya hormati Bapak dan Ibu guru,\nserta siswa SMP Pelita Bangsa yang saya banggakan\nPada kesempatan kali ini, saya ingin menyampaikan lomba-lomba untuk memperingati hari ulang tahun SMP Pelita Bangsa\n \nSalam pembuka yang tepat untuk melengkapi kutipan pidato di atas, yaitu ... (pilih dua jawaban benar)",
+          "Perhatikan kutipan teks pidato berikut dengan saksama!\nSelamat pagi dan salam sejahtera bagi kita semua.\nYang terhormat Bapak Kepala Sekolah, Bapak dan Ibu guru, serta teman-teman yang saya banggakan.\nMarilah kita panjatkan puji syukur ke hadirat Tuhan Yang Maha Esa karena atas rahmat-Nya kita dapat berkumpul dalam keadaan sehat.\nPada kesempatan kali ini, saya akan menyampaikan pidato tentang pentingnya menjaga kebersihan lingkungan sekolah.\n \nKutipan pidato tersebut termasuk struktur bagian ....",
+          "Perhatikan kutipan teks pidato berikut dengan saksama!\nIndonesia ingin berkontribusi terhadap perubahan iklim sebagai negara dengan hutan mangrove terluas di dunia, yaitu 3,3 juta hektare. Salah satu contoh sukses, yaitu di Tahura Ngurah Rai bagaimana 1.300 hektare hutan mangrove ditanam, diperbaiki, dan dipelihara. Sebelumnya, daerah tersebut merupakan area tambak ikan yang terabrasi. Sekarang, sudah menjadi rumah bagi 33 spesies mangrove serta rumah bagi lebih dari 300 fauna, seperti ikan, udang, burung, monyet, dan ular.\n \nKutipan pidato tersebut termasuk struktur bagian ....",
+          "Perhatikan kutipan teks pidato berikut dengan saksama!\nSekian pidato yang dapat saya sampaikan. Semoga apa yang saya sampaikan dapat kita laksanakan, baik di lingkungan sekolah maupun di lingkungan rumah. [....]. Apabila ada kesalahan saya dalam menyampaikan pidato, saya mohon maaf.\nWassalamualaikum warahmatullahi wabarakatuh\n \nKalimat yang tepat untuk melengkapi kutipan teks pidato di atas yaitu ….",
+          "Perhatikan kutipan teks pidato berikut dengan saksama!\n(1) Indonesia ingin berkontribusi terhadap perubahan iklim sebagai negara dengan hutan mangrove terluas di dunia, yaitu 3,3 juta hektare. (2) Salah satu contoh sukses, yaitu di Tahura Ngurah Rai bagaimana 1.300 hektare hutan mangrove ditanam, diperbaiki, dan dipelihara. (3) Sebelumnya, daerah tersebut merupakan area tambak ikan yang terabrasi. (4) Sekarang, sudah menjadi rumah bagi 33 spesies mangrove serta rumah bagi lebih dari 300 fauna, seperti ikan, udang, burung, monyet, dan ular.\n \nData yang terdapat pada kutipan teks pidato di atas, ditunjukkan kalimat nomor ….",
+          "Pernyataan berikut yang termasuk kalimat fakta adalah ….",
+          "Perhatikan kutipan teks pidato berikut dengan saksama!\nSeluruh siswa diharapkan menjaga kebersihan lingkungan sekolah. Sampah yang menumpuk dapat menyebabkan berbagai penyakit. Oleh karena itu, kita harus membuang sampah pada tempatnya.\n \nIstilah penyakit dalam kutipan tersebut berkaitan dengan bidang ilmu ....",
+          "Perhatikan kutipan teks pidato berikut dengan saksama!\nLiterasi sangat penting untuk meningkatkan kualitas pendidikan siswa. Kurikulum yang baik juga membantu proses pembelajaran menjadi lebih terarah. Dengan belajar secara tekun, siswa dapat menambah wawasan.\n \nKata ilmiah bidang pendidikan pada kutipan tersebut adalah .... (pilih dua jawaban benar)",
+          "Perhatikan kutipan teks pidato berikut dengan saksama!\nKetika pulang dari tempat umum, kita sangat ditekankan untuk mandi karena tidak tahu apakah kita sudah terpapar virus di luar sana, oleh karena itu, […].\n \nKalimat persuasif yang tepat untuk melengkapi kutipan di atas yaitu ….",
+          "Perhatikan pernyataan berikut!\n“Selamat atas keberhasilanmu menjadi juara kelas!.” [Pernyataan tersebut termasuk ucapan simpati dan peduli.]",
+          "Perhatikan ilustrasi berikut!\nSeorang guru memberikan contoh berpidato. Beliau membaca teks tersebut di depan para siswanya. \n\nBerdasarkan ilustrasi di atas, metode pidato yang digunakan yaitu …",
+          "Perhatikan ilustrasi berikut!\nSeorang siswa menghafalkan teks pidato dalam rangka berpidato ketika pemilihan ketua OSIS. \n \nBerdasarkan ilustrasi di atas, metode pidato yang digunakan yaitu …"
+        ]
+      },
+      "maxScore": 100,
+      "wrongScore": 0,
+      "scoreSource": "GOOGLE_FORM",
+      "scoringType": "EQUAL_WEIGHT",
+      "correctScore": 1,
+      "passingGrade": 75,
+      "unansweredScore": 0,
+      "allowNegativeMarking": false
+    },
+    "status": "ACTIVE",
+    "description": "Paket Ujian TryOut TO-2026-01 terhubung dengan Google Form & Google Sheet. Masuk ke wadah: Try Out TKA",
+    "googleFormUrl": "https://forms.gle/5w8nsioLRje5knPT7",
+    "googleSheetUrl": "https://docs.google.com/spreadsheets/d/12gE3T1N1TcOQMVsvc4OxMdNmSi4ztIs6LFLszeyiu_o/edit?usp=drive_link",
+    "packageId": "3918c1d7-a5e3-4766-ba92-0a7bd2c2bc25",
+    "targetClassIds": [
+      "65c671a3-038a-4c09-bb8a-d3b09a2a7812",
+      "f2bdffce-8b09-480d-a6a9-56cba53583e0",
+      "a5aa6dd3-14af-4e01-90e4-0e1b47ce7c26",
+      "1d37d478-6cb7-4bef-bd6f-2b51d29ee32e",
+      "56da1747-4642-4b1f-b357-d280a4e98e4c",
+      "6643ebf2-3c0e-489a-84d0-b10852c85f21",
+      "50c6d6cd-c393-489f-8da6-fad5e4308f07",
+      "640a1f77-0f57-4727-a6a2-f62a6a55fd2a",
+      "725b6c5f-e5ec-496b-b5a4-3c6400258f8a",
+      "173a5708-54b5-466f-b8a2-52d3fb03fa6c"
+    ],
+    "selectedQuestionColumns": [
+      "Perhatikan kutipan cerita berikut dengan saksama!\nRandu dahulu pernah naik ke panggung. Ia membantu Paman Tom dalam sebuah pertunjukan sulap. Randu diminta menarik sapu tangan yang menutupi kotak, lalu seekor burung keluar dan terbang mengitari panggung. Penonton sangat heboh dan bertepuk tangan lama sekali. Keesokan harinya, semua anak di sekolah menceritakan kejadian itu berulang-ulang. Guru kelas Randu bahkan ikut memuji pertunjukan itu di depan kelas. Saat itu Randu masih kelas 1 SD.\n \nBerdasarkan kutipan cerita tersebut, informasi yang sesuai adalah ….",
+      "Bacalah kutipan cerita berikut dengan saksama! \nHujan mulai reda, matahari hampir tenggelam, dari jauh terdengar suara Geri dan Yanti. “Fik, Fikri kita kumpul!” Aku pun beranjak dari sudut gubuk menghampiri sumber suara. \n“Kita harus menyusun strategi di saat ini,” kata Geri, penanggung jawab ekspedisi Tim Mapala Puncak Gunung Betung. \n \nSinonim atau padanan dari kata “beranjak” dan “menghampiri” yang bercetak tebal dalam cerita di atas yaitu … (pilih dua jawaban benar)",
+      "Bacalah kutipan cerita berikut dengan saksama! \nLampu di beranda depan rumah sudah dipasang Ibu. Zulbahri juga bercerita, kadang-kadang lambat-lambat, kadang-kadang cepat-cepat. Angin mendesir-desirkan daun-daun jarak. Bulan makin terang. Zulbahri berhenti bicara. Dari kantongnya dikeluarkan sehelai kertas, diberikan kepada Ayah. Air teh yang disediakan Ibu, tidak disinggung-singgungnya. Ia berdiri dengan menunduk lalu meninggalkan kami.\n \nTokoh utama dalam kutipan cerita tersebut adalah ....",
+      "Bacalah kutipan cerita berikut dengan saksama! \n“Apakah Ibu kenal dengan orang itu?” tanya Shila curiga\n“Tidak, Shila. Ibu meminjamkan uang kepadanya karena ibu merasa kasihan,” kata Ibu dengan iba.\n“Mengapa Ibu percaya begitu saja? Bisa saja dia itu penipu, Bu!” seru Shila tiba-tiba.\n“Penipu? Masya-Allah. Jangan buruk sangka, Shila! Kita harus saling membantu, Nak!” bantah Ibu dengan cepat sambil kembali menjaga warung. Shila cemberut sambil duduk di kursi, sedangkan Ibu melayani pembeli dengan sabar.\n\n Sifat ibu berdasarkan kutipan cerita pendek di atas, yaitu ….",
+      "Bacalah kutipan cerita berikut dengan saksama! \nIbu sangat ingin Parki tumbuh sehat dan tinggi. Untuk itu, Ibu menyuruh Parki makan telur setiap hari.\n“… tetapi, Bu, …,” ujar Parki, “aku bosan makan telur setiap hari.” \n“ini peraturan!” kata Ibu tegas. \nParki ingin membantah bahwa makanan bergizi tidak hanya telur, tetapi Ibu tidak mau mendengarkan. Menurut Ibu, komposisi gizi dalam sebutir telur sangat sempurna. Ibu ingin Parki tumbuh setinggi pemain basket profesional. Jadi, ia memasak telur setiap hari.\n \nBerdasarkan kutipan cerita tersebut, watak tokoh Parki dan Ibu adalah ….",
+      "Bacalah kutipan cerita berikut dengan saksama! \nJam bekerku berbunyi. Aku membereskan kamar tidur walaupun merasa sedikit menyesal karena tidak bisa melanjutkan mimpi. Selesai mandi aku menuju ruang makan untuk memulai sarapan. Ayah dan Ibu sudah duduk manis menungguku.\n\nLatar waktu pada kutipan cerita di atas, yaitu ….",
+      "Bacalah kutipan cerita berikut dengan saksama! \nKatanya, mutiara itu sangat indah. Namun, bagiku \"Dia\" lebih indah. \"Dia\" adalah sosok wanita yang cantik, berbalutkan kerudung panjang berwarna biru, matanya hitam dengan lesung pipi di kedua pipinya. Namanya adalah Nura, gadis sederhana nan ayu rupawan. Persahabatan kami bukan sekadar kata yang ditulis pada kertas tak bermakna, tapi persahabatan kami merupakan ikatan suci yang diperoleh di atas dua hati. Kami menulisnya dengan tinta kasih sayang dan suatu saat akan dihapus bersama dengan tetesan darah dan barangkali dengan nyawa.\n\nBerdasarkan isi cerita, tema yang paling menonjol dalam cerita di atas adalah ….",
+      "Bacalah kutipan cerita berikut dengan saksama! \nJam bekerku berbunyi. Aku membereskan kamar tidur walaupun merasa sedikit menyesal karena tidak bisa melanjutkan mimpi. Selesai mandi aku menuju ruang makan untuk memulai sarapan. Ayah dan Ibu sudah duduk manis menungguku.\n\nAlur yang digunakan pada kutipan cerita di atas, yaitu …",
+      "Bacalah kutipan cerita berikut dengan saksama! \nKatanya, mutiara itu sangat indah. Namun, bagiku \"Dia\" lebih indah. \"Dia\" adalah sosok wanita yang cantik, berbalutkan kerudung panjang berwarna biru, matanya hitam dengan lesung pipi di kedua pipinya. Namanya adalah Nura, gadis sederhana nan ayu rupawan. Persahabatan kami bukan sekadar kata yang ditulis pada kertas tak bermakna, tapi persahabatan kami merupakan ikatan suci yang diperoleh di atas dua hati. Kami menulisnya dengan tinta kasih sayang dan suatu saat akan dihapus bersama dengan tetesan darah dan barangkali dengan nyawa. [Amanat cerita di atas menyatakan bahwa persahabatan hanya bersifat sementara dan tidak perlu dijaga.]",
+      "Tentukan kalimat yang memiliki makna denotasi dan konotasi! [Jalanan sepi sekali pagi ini.]",
+      "Tentukan kalimat yang memiliki makna denotasi dan konotasi! [Jalanan sesunyi kuburan pagi ini.]",
+      "Cermati kutipan resensi berikut! \nUlasan buku karya sastra negara ini tidak mendalam dan tidak teliti karena desakan waktu yang disediakan kepada penulisnya. Buku ini merupakan catatan kesan-kesan pertama seorang pembaca.\n\nKalimat yang menyatakan kelemahan buku dalam kutipan resensi di atas adalah ...",
+      "Cermati kutipan resensi berikut! \nMenurut saya, cerita yang ditulis Rifan ini cukup menarik. Tokoh-tokohnya digambarkan dengan jelas. Rangkaian peristiwanya juga menarik. Lebih dari itu, kita dapat mengambil pelajaran bahwa kesabaran dan kejujuran itu sangat penting. Dua sifat ini akan membawa kebaikan pada diri kita.\n \nBerdasarkan kutipan resensi tersebut, salah satu keunggulan cerita adalah ….",
+      "Cermati puisi berikut dengan saksama! \nJAKARTA\n\nJakarta adalah kota metropolitan \nJakarta poros kehidupan warga Indonesia \nJakarta kota beribu manusia \nJakarta miniatur bangsa\n\nJumlah larik pada puisi berjudul “Jakarta” di atas, yaitu ….",
+      "Cermati puisi berikut dengan saksama! \nGEMPA BUMI\n\nBumi bergoyang tanah bergetar \nRumah-rumah roboh \nOrang-orang berlarian\n \nGempa bumi \nBila datang harus waspada \nBila ada harus siaga \nLarilah keluar rumah \n \nGempa bumi \nTak dapat dihindari \nBerdoalah kepada Tuhan \nAgar engkau dilindungi\n \nJumlah bait pada puisi berjudul “Gempa Bumi” di atas, yaitu ….",
+      "Bacalah penggalan puisi berikut!\nDefinisi cantik menurut kami sederhana\n…………………………………………………..\nTergelung rapi membentuk setengah bola\nTidak berwarna-warni cukup hitam saja\n \nLarik berima yang tepat untuk melengkapi puisi di atas adalah ….",
+      "Perhatikan penggalan puisi berikut!\nMalam akan tiba \ncicak cicak berbunyi di tembok  [Penggalan puisi tersebut mengandung imaji atau citraan peraba.]",
+      "Larik yang mengandung imaji pengelihatan adalah …. (pilih dua jawaban benar)",
+      "Perhatikan penggalan puisi berikut!\nEmansipasi alaan berekspresi katanya\nBukan kea rah yang lebih baik tapi sebaliknya\nJika saja Kartini masih ada\nPastilah miris melihat para wanita [Pemilihan diksi “Kartini” digunakan sebagai simbol perjuangan perempuan Indonesia.]",
+      "Perhatikan puisi berikut dengan saksama!\nHANYA\nKarya Sapardi Djoko Damono\n \nHanya suara burung yang kau dengar\ndan tak pernah kaulihat burung in\ntapi tahu burung itu ada di sana\n \nHanya desir angin yang kaurasa\ndan tak pernah kaulihat angin itu\ntapi percaya angin itu di sekitarmu\n \nHanya doaku yang bergetar malam ini\ndan tak pernah kau lihat siapa aku\ntapi yakin aku ada dalam dirimu\n \nPengulangan kata “Hanya” pada setiap bait puisi termasuk majas ….",
+      "Perhatikan larik puisi berikut!\n“Wajahmu indah bagai rembulan di malam hari.”\n \nMajas yang digunakan pada larik tersebut adalah ….",
+      "Perhatikan larik puisi berikut!\n“Ibu menjadi matahari dalam keluarga.”\n \nJenis majas pada larik tersebut adalah ….",
+      "Bacalah penggalan puisi berikut!\nBhinneka tunggal ika artinya satu\nSemboyan supaya kita bersatu padu\nTidak mudah goyah apalagi ragu\nMenghargai keberagaman agar tidak berseteru\n \nMaksud dari larik pertama pada puisi di atas adalah…. (pilih dua jawaban benar)",
+      "Bacalah penggalan puisi berikut!\nKetika dia tersenyum\nAku bisa melihat warna-warni dunia, segala irama, juga tawa\nBerhamburan di sekitarnya\n \nPenggalan puisi di atas adalah jenis puisi ….",
+      "Bacalah penggalan puisi berikut!\nAku membeli topi\nPedagangnya sudah tua\nSetiap hari membawa berlusin-lusin topi di keranjang\n \nPenggalan puisi di atas adalah jenis puisi …",
+      "Bacalah puisi berikut dengan saksama!\nKALAU, KALAU, KALAU\n \nKalau sopan santun masihlah ada\nTentu orana-orang tahu tata krama\nMembungkuk di depan orang tua\nTidak menyela perkataan siapa saja\nKalau sopan santun masihlah ada\nTak ada kasus norma susila\nHidup juga akan sentosa dan bahagia\nKalau, kalau, kalau masih ada\nTapi kenyataannya?\nBerbalik dengan harapan-harapan kita\n \nPesan yang terkandung dalam puisi di atas adalah ….",
+      "Pasangkan penggalan puisi dengan ekspresi yang sesuai untuk mendeklamasikan puisi tersebut! [Berangkat sekolah bersama teman. Tawa kecil mengisi perjalanan. Belajar bersama di dalam kelas. Hari terasa penuh kehangatan]",
+      "Pasangkan penggalan puisi dengan ekspresi yang sesuai untuk mendeklamasikan puisi tersebut! [Sungai mengalir perlahan. Daun jatuh di atas permukaan. Angin lembut menyentuh pepohonan. Hening terasa di seluruh halaman]",
+      "angkan pernyataan berikut dengan tujuan pidato yang tepat! [Pada hari Pendidikan, kepala sekolah berpidato mengenai pentignya belajar dan menggali potensi diri sendiri.]",
+      "angkan pernyataan berikut dengan tujuan pidato yang tepat! [Seorang pelawak terkenal berpidato pada acara tahun baru dan membuat masyarakat tertawa.]",
+      "Perhatikan kutipan teks pidato berikut dengan saksama!\nSampah plastik dan limbah pabrik menjadi penyumbang terbesar dalam penyebab pencemaran tanah. Bakteri yang terdapat dalam sampah dan limbah pabrik menyebabkan tanah tidak bisa ditanami tanaman. Jika ditanami, tanaman tidak bisa tumbuh subur. Bila hal ini tidak ditanggulangi secara cepat maka akan berpengaruh pada produksi pertanian. Untuk itu kita harus melakukan upaya penanggulangan bahaya pencemaran tanah dengan cepat. Kita harus membiasakan membuang sampah pada tempatnya sesuai dengan jenis sampah yaitu sampah organik, sampah anorganik, dan sampah Bahan Berbahaya dan Beracun (B3). Marilah kita lakukan apa yang bisa kita lakukan untuk menjaga lingkungan sekitar kita tetap bersih.\n \nInformasi yang terdapat dalam teks di atas adalah ….",
+      "Perhatikan kutipan teks pidato berikut dengan saksama!\n[…]\nYang saya hormati Bapak dan Ibu guru,\nserta siswa SMP Pelita Bangsa yang saya banggakan\nPada kesempatan kali ini, saya ingin menyampaikan lomba-lomba untuk memperingati hari ulang tahun SMP Pelita Bangsa\n \nSalam pembuka yang tepat untuk melengkapi kutipan pidato di atas, yaitu ... (pilih dua jawaban benar)",
+      "Perhatikan kutipan teks pidato berikut dengan saksama!\nSelamat pagi dan salam sejahtera bagi kita semua.\nYang terhormat Bapak Kepala Sekolah, Bapak dan Ibu guru, serta teman-teman yang saya banggakan.\nMarilah kita panjatkan puji syukur ke hadirat Tuhan Yang Maha Esa karena atas rahmat-Nya kita dapat berkumpul dalam keadaan sehat.\nPada kesempatan kali ini, saya akan menyampaikan pidato tentang pentingnya menjaga kebersihan lingkungan sekolah.\n \nKutipan pidato tersebut termasuk struktur bagian ....",
+      "Perhatikan kutipan teks pidato berikut dengan saksama!\nIndonesia ingin berkontribusi terhadap perubahan iklim sebagai negara dengan hutan mangrove terluas di dunia, yaitu 3,3 juta hektare. Salah satu contoh sukses, yaitu di Tahura Ngurah Rai bagaimana 1.300 hektare hutan mangrove ditanam, diperbaiki, dan dipelihara. Sebelumnya, daerah tersebut merupakan area tambak ikan yang terabrasi. Sekarang, sudah menjadi rumah bagi 33 spesies mangrove serta rumah bagi lebih dari 300 fauna, seperti ikan, udang, burung, monyet, dan ular.\n \nKutipan pidato tersebut termasuk struktur bagian ....",
+      "Perhatikan kutipan teks pidato berikut dengan saksama!\nSekian pidato yang dapat saya sampaikan. Semoga apa yang saya sampaikan dapat kita laksanakan, baik di lingkungan sekolah maupun di lingkungan rumah. [....]. Apabila ada kesalahan saya dalam menyampaikan pidato, saya mohon maaf.\nWassalamualaikum warahmatullahi wabarakatuh\n \nKalimat yang tepat untuk melengkapi kutipan teks pidato di atas yaitu ….",
+      "Perhatikan kutipan teks pidato berikut dengan saksama!\n(1) Indonesia ingin berkontribusi terhadap perubahan iklim sebagai negara dengan hutan mangrove terluas di dunia, yaitu 3,3 juta hektare. (2) Salah satu contoh sukses, yaitu di Tahura Ngurah Rai bagaimana 1.300 hektare hutan mangrove ditanam, diperbaiki, dan dipelihara. (3) Sebelumnya, daerah tersebut merupakan area tambak ikan yang terabrasi. (4) Sekarang, sudah menjadi rumah bagi 33 spesies mangrove serta rumah bagi lebih dari 300 fauna, seperti ikan, udang, burung, monyet, dan ular.\n \nData yang terdapat pada kutipan teks pidato di atas, ditunjukkan kalimat nomor ….",
+      "Pernyataan berikut yang termasuk kalimat fakta adalah ….",
+      "Perhatikan kutipan teks pidato berikut dengan saksama!\nSeluruh siswa diharapkan menjaga kebersihan lingkungan sekolah. Sampah yang menumpuk dapat menyebabkan berbagai penyakit. Oleh karena itu, kita harus membuang sampah pada tempatnya.\n \nIstilah penyakit dalam kutipan tersebut berkaitan dengan bidang ilmu ....",
+      "Perhatikan kutipan teks pidato berikut dengan saksama!\nLiterasi sangat penting untuk meningkatkan kualitas pendidikan siswa. Kurikulum yang baik juga membantu proses pembelajaran menjadi lebih terarah. Dengan belajar secara tekun, siswa dapat menambah wawasan.\n \nKata ilmiah bidang pendidikan pada kutipan tersebut adalah .... (pilih dua jawaban benar)",
+      "Perhatikan kutipan teks pidato berikut dengan saksama!\nKetika pulang dari tempat umum, kita sangat ditekankan untuk mandi karena tidak tahu apakah kita sudah terpapar virus di luar sana, oleh karena itu, […].\n \nKalimat persuasif yang tepat untuk melengkapi kutipan di atas yaitu ….",
+      "Perhatikan pernyataan berikut!\n“Selamat atas keberhasilanmu menjadi juara kelas!.” [Pernyataan tersebut termasuk ucapan simpati dan peduli.]",
+      "Perhatikan ilustrasi berikut!\nSeorang guru memberikan contoh berpidato. Beliau membaca teks tersebut di depan para siswanya. \n\nBerdasarkan ilustrasi di atas, metode pidato yang digunakan yaitu …",
+      "Perhatikan ilustrasi berikut!\nSeorang siswa menghafalkan teks pidato dalam rangka berpidato ketika pemilihan ketua OSIS. \n \nBerdasarkan ilustrasi di atas, metode pidato yang digunakan yaitu …"
+    ],
+    "answerKey": [
+      "Randu membantu Paman Tom dalam pertunjukan sulap yang menarik",
+      "BERGERAK, MENDATANGI",
+      "Zulbahri",
+      "Baik hati",
+      "IBU TEGAS DAN KERAS PENDIRIAN, PARKI BERANI MENYAMPAIKAN PENDAPAT",
+      "Pagi hari",
+      "Persahabatan",
+      "Maju",
+      "Salah",
+      "Denotasi",
+      "Konotasi",
+      "Penulis buku tidak teliti dan tidak mendalam mengulas masalah.",
+      "Cerita memiliki pesan moral tentang kesabaran dan kejujuran",
+      "4",
+      "3",
+      "Rambutmu tertata tak menutupi muka",
+      "Salah",
+      "HAMPARAN SAWAH TAMPAK MENGHIJAU, LANGIT BIRU DIHIASI AWAN PUTIH",
+      "Benar",
+      "Repetisi",
+      "Simile",
+      "Metafora",
+      "BANGSA INDONESIA TETAP BERSATU SEBAGAI SATU KESATUAN, MESKIPUN BERBEDA-BEDA, SETIAP DAERAH MEMILIKI BAHASA DAN BUDAYA, TETAPI TETAP HARUS SALING MENGHARGAI",
+      "Prismatis",
+      "Diafan",
+      "Kita harus menjaga sopan santun dan menghormati orang lain dalam kehidupan sehari-hari",
+      "Gembira",
+      "Tenang",
+      "Memberi Motivasi",
+      "Menghibur",
+      "Sampah plastik dan limbah pabrik dapat menyebabkan pencemaran tanah",
+      "ASSALAMUALAIKUM WARAHMATULLAHI WABARAKATU, NAMO BUDHAYA, OM SWASTIASTU, SALAM SEIAHTERA",
+      "Pembuka pidato",
+      "Isi pidato",
+      "ATAS PERHATIAN TEMAN-TEMAN, SAYA UCAPKANN TERIMA KASIH.",
+      "(1), (2), DAN (4)",
+      "Sampah yang menumpuk dapat menimbulkan berbagai penyakit",
+      "Kesehatan",
+      "KURIKULUM, LITERASI",
+      "mari kita segera mandi agar tubuh bersih dan terhindar dari penyakit",
+      "Salah",
+      "Manuskrip",
+      "Memoriter"
+    ]
+  }
+];
 
 export const INITIAL_TRYOUT_SUBJECTS: TryoutSubject[] = [];
 
-export const INITIAL_QUESTIONS: Question[] = [];
+export const INITIAL_QUESTIONS: Question[] = [
+  {
+    "uniqueCode": "BIN-Q001",
+    "questionNumber": 1,
+    "questionText": "Perhatikan kutipan cerita berikut dengan saksama!\nRandu dahulu pernah naik ke panggung. Ia membantu Paman Tom dalam sebuah pertunjukan sulap. Randu diminta menarik sapu tangan yang menutupi kotak, lalu seekor burung keluar dan terbang mengitari panggung. Penonton sangat heboh dan bertepuk tangan lama sekali. Keesokan harinya, semua anak di sekolah menceritakan kejadian itu berulang-ulang. Guru kelas Randu bahkan ikut memuji pertunjukan itu di depan kelas. Saat itu Randu masih kelas 1 SD.\n \nBerdasarkan kutipan cerita tersebut, informasi yang sesuai adalah ….",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Randu membantu Paman Tom dalam pertunjukan sulap yang menarik",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964630"
+  },
+  {
+    "uniqueCode": "BIN-Q002",
+    "questionNumber": 2,
+    "questionText": "Bacalah kutipan cerita berikut dengan saksama! \nHujan mulai reda, matahari hampir tenggelam, dari jauh terdengar suara Geri dan Yanti. “Fik, Fikri kita kumpul!” Aku pun beranjak dari sudut gubuk menghampiri sumber suara. \n“Kita harus menyusun strategi di saat ini,” kata Geri, penanggung jawab ekspedisi Tim Mapala Puncak Gunung Betung. \n \nSinonim atau padanan dari kata “beranjak” dan “menghampiri” yang bercetak tebal dalam cerita di atas yaitu … (pilih dua jawaban benar)",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "BERGERAK, MENDATANGI",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964636"
+  },
+  {
+    "uniqueCode": "BIN-Q003",
+    "questionNumber": 3,
+    "questionText": "Bacalah kutipan cerita berikut dengan saksama! \nLampu di beranda depan rumah sudah dipasang Ibu. Zulbahri juga bercerita, kadang-kadang lambat-lambat, kadang-kadang cepat-cepat. Angin mendesir-desirkan daun-daun jarak. Bulan makin terang. Zulbahri berhenti bicara. Dari kantongnya dikeluarkan sehelai kertas, diberikan kepada Ayah. Air teh yang disediakan Ibu, tidak disinggung-singgungnya. Ia berdiri dengan menunduk lalu meninggalkan kami.\n \nTokoh utama dalam kutipan cerita tersebut adalah ....",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Zulbahri",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964658"
+  },
+  {
+    "uniqueCode": "BIN-Q004",
+    "questionNumber": 4,
+    "questionText": "Bacalah kutipan cerita berikut dengan saksama! \n“Apakah Ibu kenal dengan orang itu?” tanya Shila curiga\n“Tidak, Shila. Ibu meminjamkan uang kepadanya karena ibu merasa kasihan,” kata Ibu dengan iba.\n“Mengapa Ibu percaya begitu saja? Bisa saja dia itu penipu, Bu!” seru Shila tiba-tiba.\n“Penipu? Masya-Allah. Jangan buruk sangka, Shila! Kita harus saling membantu, Nak!” bantah Ibu dengan cepat sambil kembali menjaga warung. Shila cemberut sambil duduk di kursi, sedangkan Ibu melayani pembeli dengan sabar.\n\n Sifat ibu berdasarkan kutipan cerita pendek di atas, yaitu ….",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Baik hati",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964663"
+  },
+  {
+    "uniqueCode": "BIN-Q005",
+    "questionNumber": 5,
+    "questionText": "Bacalah kutipan cerita berikut dengan saksama! \nIbu sangat ingin Parki tumbuh sehat dan tinggi. Untuk itu, Ibu menyuruh Parki makan telur setiap hari.\n“… tetapi, Bu, …,” ujar Parki, “aku bosan makan telur setiap hari.” \n“ini peraturan!” kata Ibu tegas. \nParki ingin membantah bahwa makanan bergizi tidak hanya telur, tetapi Ibu tidak mau mendengarkan. Menurut Ibu, komposisi gizi dalam sebutir telur sangat sempurna. Ibu ingin Parki tumbuh setinggi pemain basket profesional. Jadi, ia memasak telur setiap hari.\n \nBerdasarkan kutipan cerita tersebut, watak tokoh Parki dan Ibu adalah ….",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "IBU TEGAS DAN KERAS PENDIRIAN, PARKI BERANI MENYAMPAIKAN PENDAPAT",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964669"
+  },
+  {
+    "uniqueCode": "BIN-Q006",
+    "questionNumber": 6,
+    "questionText": "Bacalah kutipan cerita berikut dengan saksama! \nJam bekerku berbunyi. Aku membereskan kamar tidur walaupun merasa sedikit menyesal karena tidak bisa melanjutkan mimpi. Selesai mandi aku menuju ruang makan untuk memulai sarapan. Ayah dan Ibu sudah duduk manis menungguku.\n\nLatar waktu pada kutipan cerita di atas, yaitu ….",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Pagi hari",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964674"
+  },
+  {
+    "uniqueCode": "BIN-Q007",
+    "questionNumber": 7,
+    "questionText": "Bacalah kutipan cerita berikut dengan saksama! \nKatanya, mutiara itu sangat indah. Namun, bagiku \"Dia\" lebih indah. \"Dia\" adalah sosok wanita yang cantik, berbalutkan kerudung panjang berwarna biru, matanya hitam dengan lesung pipi di kedua pipinya. Namanya adalah Nura, gadis sederhana nan ayu rupawan. Persahabatan kami bukan sekadar kata yang ditulis pada kertas tak bermakna, tapi persahabatan kami merupakan ikatan suci yang diperoleh di atas dua hati. Kami menulisnya dengan tinta kasih sayang dan suatu saat akan dihapus bersama dengan tetesan darah dan barangkali dengan nyawa.\n\nBerdasarkan isi cerita, tema yang paling menonjol dalam cerita di atas adalah ….",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Persahabatan",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964680"
+  },
+  {
+    "uniqueCode": "BIN-Q008",
+    "questionNumber": 8,
+    "questionText": "Bacalah kutipan cerita berikut dengan saksama! \nJam bekerku berbunyi. Aku membereskan kamar tidur walaupun merasa sedikit menyesal karena tidak bisa melanjutkan mimpi. Selesai mandi aku menuju ruang makan untuk memulai sarapan. Ayah dan Ibu sudah duduk manis menungguku.\n\nAlur yang digunakan pada kutipan cerita di atas, yaitu …",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Maju",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964684"
+  },
+  {
+    "uniqueCode": "BIN-Q009",
+    "questionNumber": 9,
+    "questionText": "Bacalah kutipan cerita berikut dengan saksama! \nKatanya, mutiara itu sangat indah. Namun, bagiku \"Dia\" lebih indah. \"Dia\" adalah sosok wanita yang cantik, berbalutkan kerudung panjang berwarna biru, matanya hitam dengan lesung pipi di kedua pipinya. Namanya adalah Nura, gadis sederhana nan ayu rupawan. Persahabatan kami bukan sekadar kata yang ditulis pada kertas tak bermakna, tapi persahabatan kami merupakan ikatan suci yang diperoleh di atas dua hati. Kami menulisnya dengan tinta kasih sayang dan suatu saat akan dihapus bersama dengan tetesan darah dan barangkali dengan nyawa. [Amanat cerita di atas menyatakan bahwa persahabatan hanya bersifat sementara dan tidak perlu dijaga.]",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Salah",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964688"
+  },
+  {
+    "uniqueCode": "BIN-Q010",
+    "questionNumber": 10,
+    "questionText": "Tentukan kalimat yang memiliki makna denotasi dan konotasi! [Jalanan sepi sekali pagi ini.]",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Denotasi",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964693"
+  },
+  {
+    "uniqueCode": "BIN-Q011",
+    "questionNumber": 11,
+    "questionText": "Tentukan kalimat yang memiliki makna denotasi dan konotasi! [Jalanan sesunyi kuburan pagi ini.]",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Konotasi",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964697"
+  },
+  {
+    "uniqueCode": "BIN-Q012",
+    "questionNumber": 12,
+    "questionText": "Cermati kutipan resensi berikut! \nUlasan buku karya sastra negara ini tidak mendalam dan tidak teliti karena desakan waktu yang disediakan kepada penulisnya. Buku ini merupakan catatan kesan-kesan pertama seorang pembaca.\n\nKalimat yang menyatakan kelemahan buku dalam kutipan resensi di atas adalah ...",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Penulis buku tidak teliti dan tidak mendalam mengulas masalah.",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964702"
+  },
+  {
+    "uniqueCode": "BIN-Q013",
+    "questionNumber": 13,
+    "questionText": "Cermati kutipan resensi berikut! \nMenurut saya, cerita yang ditulis Rifan ini cukup menarik. Tokoh-tokohnya digambarkan dengan jelas. Rangkaian peristiwanya juga menarik. Lebih dari itu, kita dapat mengambil pelajaran bahwa kesabaran dan kejujuran itu sangat penting. Dua sifat ini akan membawa kebaikan pada diri kita.\n \nBerdasarkan kutipan resensi tersebut, salah satu keunggulan cerita adalah ….",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Cerita memiliki pesan moral tentang kesabaran dan kejujuran",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964706"
+  },
+  {
+    "uniqueCode": "BIN-Q014",
+    "questionNumber": 14,
+    "questionText": "Cermati puisi berikut dengan saksama! \nJAKARTA\n\nJakarta adalah kota metropolitan \nJakarta poros kehidupan warga Indonesia \nJakarta kota beribu manusia \nJakarta miniatur bangsa\n\nJumlah larik pada puisi berjudul “Jakarta” di atas, yaitu ….",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "4",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964711"
+  },
+  {
+    "uniqueCode": "BIN-Q015",
+    "questionNumber": 15,
+    "questionText": "Cermati puisi berikut dengan saksama! \nGEMPA BUMI\n\nBumi bergoyang tanah bergetar \nRumah-rumah roboh \nOrang-orang berlarian\n \nGempa bumi \nBila datang harus waspada \nBila ada harus siaga \nLarilah keluar rumah \n \nGempa bumi \nTak dapat dihindari \nBerdoalah kepada Tuhan \nAgar engkau dilindungi\n \nJumlah bait pada puisi berjudul “Gempa Bumi” di atas, yaitu ….",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "3",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964715"
+  },
+  {
+    "uniqueCode": "BIN-Q016",
+    "questionNumber": 16,
+    "questionText": "Bacalah penggalan puisi berikut!\nDefinisi cantik menurut kami sederhana\n…………………………………………………..\nTergelung rapi membentuk setengah bola\nTidak berwarna-warni cukup hitam saja\n \nLarik berima yang tepat untuk melengkapi puisi di atas adalah ….",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Rambutmu tertata tak menutupi muka",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964720"
+  },
+  {
+    "uniqueCode": "BIN-Q017",
+    "questionNumber": 17,
+    "questionText": "Perhatikan penggalan puisi berikut!\nMalam akan tiba \ncicak cicak berbunyi di tembok  [Penggalan puisi tersebut mengandung imaji atau citraan peraba.]",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Salah",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964726"
+  },
+  {
+    "uniqueCode": "BIN-Q018",
+    "questionNumber": 18,
+    "questionText": "Larik yang mengandung imaji pengelihatan adalah …. (pilih dua jawaban benar)",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "HAMPARAN SAWAH TAMPAK MENGHIJAU, LANGIT BIRU DIHIASI AWAN PUTIH",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964732"
+  },
+  {
+    "uniqueCode": "BIN-Q019",
+    "questionNumber": 19,
+    "questionText": "Perhatikan penggalan puisi berikut!\nEmansipasi alaan berekspresi katanya\nBukan kea rah yang lebih baik tapi sebaliknya\nJika saja Kartini masih ada\nPastilah miris melihat para wanita [Pemilihan diksi “Kartini” digunakan sebagai simbol perjuangan perempuan Indonesia.]",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Benar",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964737"
+  },
+  {
+    "uniqueCode": "BIN-Q020",
+    "questionNumber": 20,
+    "questionText": "Perhatikan puisi berikut dengan saksama!\nHANYA\nKarya Sapardi Djoko Damono\n \nHanya suara burung yang kau dengar\ndan tak pernah kaulihat burung in\ntapi tahu burung itu ada di sana\n \nHanya desir angin yang kaurasa\ndan tak pernah kaulihat angin itu\ntapi percaya angin itu di sekitarmu\n \nHanya doaku yang bergetar malam ini\ndan tak pernah kau lihat siapa aku\ntapi yakin aku ada dalam dirimu\n \nPengulangan kata “Hanya” pada setiap bait puisi termasuk majas ….",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Repetisi",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964741"
+  },
+  {
+    "uniqueCode": "BIN-Q021",
+    "questionNumber": 21,
+    "questionText": "Perhatikan larik puisi berikut!\n“Wajahmu indah bagai rembulan di malam hari.”\n \nMajas yang digunakan pada larik tersebut adalah ….",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Simile",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964746"
+  },
+  {
+    "uniqueCode": "BIN-Q022",
+    "questionNumber": 22,
+    "questionText": "Perhatikan larik puisi berikut!\n“Ibu menjadi matahari dalam keluarga.”\n \nJenis majas pada larik tersebut adalah ….",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Metafora",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964754"
+  },
+  {
+    "uniqueCode": "BIN-Q023",
+    "questionNumber": 23,
+    "questionText": "Bacalah penggalan puisi berikut!\nBhinneka tunggal ika artinya satu\nSemboyan supaya kita bersatu padu\nTidak mudah goyah apalagi ragu\nMenghargai keberagaman agar tidak berseteru\n \nMaksud dari larik pertama pada puisi di atas adalah…. (pilih dua jawaban benar)",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "BANGSA INDONESIA TETAP BERSATU SEBAGAI SATU KESATUAN, MESKIPUN BERBEDA-BEDA, SETIAP DAERAH MEMILIKI BAHASA DAN BUDAYA, TETAPI TETAP HARUS SALING MENGHARGAI",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964759"
+  },
+  {
+    "uniqueCode": "BIN-Q024",
+    "questionNumber": 24,
+    "questionText": "Bacalah penggalan puisi berikut!\nKetika dia tersenyum\nAku bisa melihat warna-warni dunia, segala irama, juga tawa\nBerhamburan di sekitarnya\n \nPenggalan puisi di atas adalah jenis puisi ….",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Prismatis",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964765"
+  },
+  {
+    "uniqueCode": "BIN-Q025",
+    "questionNumber": 25,
+    "questionText": "Bacalah penggalan puisi berikut!\nAku membeli topi\nPedagangnya sudah tua\nSetiap hari membawa berlusin-lusin topi di keranjang\n \nPenggalan puisi di atas adalah jenis puisi …",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Diafan",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964771"
+  },
+  {
+    "uniqueCode": "BIN-Q026",
+    "questionNumber": 26,
+    "questionText": "Bacalah puisi berikut dengan saksama!\nKALAU, KALAU, KALAU\n \nKalau sopan santun masihlah ada\nTentu orana-orang tahu tata krama\nMembungkuk di depan orang tua\nTidak menyela perkataan siapa saja\nKalau sopan santun masihlah ada\nTak ada kasus norma susila\nHidup juga akan sentosa dan bahagia\nKalau, kalau, kalau masih ada\nTapi kenyataannya?\nBerbalik dengan harapan-harapan kita\n \nPesan yang terkandung dalam puisi di atas adalah ….",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Kita harus menjaga sopan santun dan menghormati orang lain dalam kehidupan sehari-hari",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964776"
+  },
+  {
+    "uniqueCode": "BIN-Q027",
+    "questionNumber": 27,
+    "questionText": "Pasangkan penggalan puisi dengan ekspresi yang sesuai untuk mendeklamasikan puisi tersebut! [Berangkat sekolah bersama teman. Tawa kecil mengisi perjalanan. Belajar bersama di dalam kelas. Hari terasa penuh kehangatan]",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Gembira",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964781"
+  },
+  {
+    "uniqueCode": "BIN-Q028",
+    "questionNumber": 28,
+    "questionText": "Pasangkan penggalan puisi dengan ekspresi yang sesuai untuk mendeklamasikan puisi tersebut! [Sungai mengalir perlahan. Daun jatuh di atas permukaan. Angin lembut menyentuh pepohonan. Hening terasa di seluruh halaman]",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Tenang",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964788"
+  },
+  {
+    "uniqueCode": "BIN-Q029",
+    "questionNumber": 29,
+    "questionText": "angkan pernyataan berikut dengan tujuan pidato yang tepat! [Pada hari Pendidikan, kepala sekolah berpidato mengenai pentignya belajar dan menggali potensi diri sendiri.]",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Memberi Motivasi",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964793"
+  },
+  {
+    "uniqueCode": "BIN-Q030",
+    "questionNumber": 30,
+    "questionText": "angkan pernyataan berikut dengan tujuan pidato yang tepat! [Seorang pelawak terkenal berpidato pada acara tahun baru dan membuat masyarakat tertawa.]",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Menghibur",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964799"
+  },
+  {
+    "uniqueCode": "BIN-Q031",
+    "questionNumber": 31,
+    "questionText": "Perhatikan kutipan teks pidato berikut dengan saksama!\nSampah plastik dan limbah pabrik menjadi penyumbang terbesar dalam penyebab pencemaran tanah. Bakteri yang terdapat dalam sampah dan limbah pabrik menyebabkan tanah tidak bisa ditanami tanaman. Jika ditanami, tanaman tidak bisa tumbuh subur. Bila hal ini tidak ditanggulangi secara cepat maka akan berpengaruh pada produksi pertanian. Untuk itu kita harus melakukan upaya penanggulangan bahaya pencemaran tanah dengan cepat. Kita harus membiasakan membuang sampah pada tempatnya sesuai dengan jenis sampah yaitu sampah organik, sampah anorganik, dan sampah Bahan Berbahaya dan Beracun (B3). Marilah kita lakukan apa yang bisa kita lakukan untuk menjaga lingkungan sekitar kita tetap bersih.\n \nInformasi yang terdapat dalam teks di atas adalah ….",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Sampah plastik dan limbah pabrik dapat menyebabkan pencemaran tanah",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964804"
+  },
+  {
+    "uniqueCode": "BIN-Q032",
+    "questionNumber": 32,
+    "questionText": "Perhatikan kutipan teks pidato berikut dengan saksama!\n[…]\nYang saya hormati Bapak dan Ibu guru,\nserta siswa SMP Pelita Bangsa yang saya banggakan\nPada kesempatan kali ini, saya ingin menyampaikan lomba-lomba untuk memperingati hari ulang tahun SMP Pelita Bangsa\n \nSalam pembuka yang tepat untuk melengkapi kutipan pidato di atas, yaitu ... (pilih dua jawaban benar)",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "ASSALAMUALAIKUM WARAHMATULLAHI WABARAKATU, NAMO BUDHAYA, OM SWASTIASTU, SALAM SEIAHTERA",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964810"
+  },
+  {
+    "uniqueCode": "BIN-Q033",
+    "questionNumber": 33,
+    "questionText": "Perhatikan kutipan teks pidato berikut dengan saksama!\nSelamat pagi dan salam sejahtera bagi kita semua.\nYang terhormat Bapak Kepala Sekolah, Bapak dan Ibu guru, serta teman-teman yang saya banggakan.\nMarilah kita panjatkan puji syukur ke hadirat Tuhan Yang Maha Esa karena atas rahmat-Nya kita dapat berkumpul dalam keadaan sehat.\nPada kesempatan kali ini, saya akan menyampaikan pidato tentang pentingnya menjaga kebersihan lingkungan sekolah.\n \nKutipan pidato tersebut termasuk struktur bagian ....",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Pembuka pidato",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964815"
+  },
+  {
+    "uniqueCode": "BIN-Q034",
+    "questionNumber": 34,
+    "questionText": "Perhatikan kutipan teks pidato berikut dengan saksama!\nIndonesia ingin berkontribusi terhadap perubahan iklim sebagai negara dengan hutan mangrove terluas di dunia, yaitu 3,3 juta hektare. Salah satu contoh sukses, yaitu di Tahura Ngurah Rai bagaimana 1.300 hektare hutan mangrove ditanam, diperbaiki, dan dipelihara. Sebelumnya, daerah tersebut merupakan area tambak ikan yang terabrasi. Sekarang, sudah menjadi rumah bagi 33 spesies mangrove serta rumah bagi lebih dari 300 fauna, seperti ikan, udang, burung, monyet, dan ular.\n \nKutipan pidato tersebut termasuk struktur bagian ....",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Isi pidato",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964822"
+  },
+  {
+    "uniqueCode": "BIN-Q035",
+    "questionNumber": 35,
+    "questionText": "Perhatikan kutipan teks pidato berikut dengan saksama!\nSekian pidato yang dapat saya sampaikan. Semoga apa yang saya sampaikan dapat kita laksanakan, baik di lingkungan sekolah maupun di lingkungan rumah. [....]. Apabila ada kesalahan saya dalam menyampaikan pidato, saya mohon maaf.\nWassalamualaikum warahmatullahi wabarakatuh\n \nKalimat yang tepat untuk melengkapi kutipan teks pidato di atas yaitu ….",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "ATAS PERHATIAN TEMAN-TEMAN, SAYA UCAPKANN TERIMA KASIH.",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964830"
+  },
+  {
+    "uniqueCode": "BIN-Q036",
+    "questionNumber": 36,
+    "questionText": "Perhatikan kutipan teks pidato berikut dengan saksama!\n(1) Indonesia ingin berkontribusi terhadap perubahan iklim sebagai negara dengan hutan mangrove terluas di dunia, yaitu 3,3 juta hektare. (2) Salah satu contoh sukses, yaitu di Tahura Ngurah Rai bagaimana 1.300 hektare hutan mangrove ditanam, diperbaiki, dan dipelihara. (3) Sebelumnya, daerah tersebut merupakan area tambak ikan yang terabrasi. (4) Sekarang, sudah menjadi rumah bagi 33 spesies mangrove serta rumah bagi lebih dari 300 fauna, seperti ikan, udang, burung, monyet, dan ular.\n \nData yang terdapat pada kutipan teks pidato di atas, ditunjukkan kalimat nomor ….",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "(1), (2), DAN (4)",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964835"
+  },
+  {
+    "uniqueCode": "BIN-Q037",
+    "questionNumber": 37,
+    "questionText": "Pernyataan berikut yang termasuk kalimat fakta adalah ….",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Sampah yang menumpuk dapat menimbulkan berbagai penyakit",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964843"
+  },
+  {
+    "uniqueCode": "BIN-Q038",
+    "questionNumber": 38,
+    "questionText": "Perhatikan kutipan teks pidato berikut dengan saksama!\nSeluruh siswa diharapkan menjaga kebersihan lingkungan sekolah. Sampah yang menumpuk dapat menyebabkan berbagai penyakit. Oleh karena itu, kita harus membuang sampah pada tempatnya.\n \nIstilah penyakit dalam kutipan tersebut berkaitan dengan bidang ilmu ....",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Kesehatan",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964850"
+  },
+  {
+    "uniqueCode": "BIN-Q039",
+    "questionNumber": 39,
+    "questionText": "Perhatikan kutipan teks pidato berikut dengan saksama!\nLiterasi sangat penting untuk meningkatkan kualitas pendidikan siswa. Kurikulum yang baik juga membantu proses pembelajaran menjadi lebih terarah. Dengan belajar secara tekun, siswa dapat menambah wawasan.\n \nKata ilmiah bidang pendidikan pada kutipan tersebut adalah .... (pilih dua jawaban benar)",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "KURIKULUM, LITERASI",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964857"
+  },
+  {
+    "uniqueCode": "BIN-Q040",
+    "questionNumber": 40,
+    "questionText": "Perhatikan kutipan teks pidato berikut dengan saksama!\nKetika pulang dari tempat umum, kita sangat ditekankan untuk mandi karena tidak tahu apakah kita sudah terpapar virus di luar sana, oleh karena itu, […].\n \nKalimat persuasif yang tepat untuk melengkapi kutipan di atas yaitu ….",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "mari kita segera mandi agar tubuh bersih dan terhindar dari penyakit",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964864"
+  },
+  {
+    "uniqueCode": "BIN-Q041",
+    "questionNumber": 41,
+    "questionText": "Perhatikan pernyataan berikut!\n“Selamat atas keberhasilanmu menjadi juara kelas!.” [Pernyataan tersebut termasuk ucapan simpati dan peduli.]",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Salah",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964871"
+  },
+  {
+    "uniqueCode": "BIN-Q042",
+    "questionNumber": 42,
+    "questionText": "Perhatikan ilustrasi berikut!\nSeorang guru memberikan contoh berpidato. Beliau membaca teks tersebut di depan para siswanya. \n\nBerdasarkan ilustrasi di atas, metode pidato yang digunakan yaitu …",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Manuskrip",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964876"
+  },
+  {
+    "uniqueCode": "BIN-Q043",
+    "questionNumber": 43,
+    "questionText": "Perhatikan ilustrasi berikut!\nSeorang siswa menghafalkan teks pidato dalam rangka berpidato ketika pemilihan ketua OSIS. \n \nBerdasarkan ilustrasi di atas, metode pidato yang digunakan yaitu …",
+    "subjectId": "f8391d29-1aa2-4c16-a1e6-80f6341d07d2",
+    "materialId": "mat-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "competencyId": "comp-f8391d29-1aa2-4c16-a1e6-80f6341d07d2-default",
+    "correctAnswer": "Memoriter",
+    "options": [
+      {
+        "key": "A",
+        "text": "Pilihan A"
+      },
+      {
+        "key": "B",
+        "text": "Pilihan B"
+      },
+      {
+        "key": "C",
+        "text": "Pilihan C"
+      },
+      {
+        "key": "D",
+        "text": "Pilihan D"
+      },
+      {
+        "key": "E",
+        "text": "Pilihan E"
+      }
+    ],
+    "weight": 1,
+    "status": "ACTIVE",
+    "id": "q-1793766964883"
+  }
+];
 
 export const INITIAL_TRYOUT_QUESTIONS: TryoutQuestion[] = [];
 
@@ -81,6 +5766,5005 @@ export const INITIAL_RESPONSES: Response[] = [];
 
 export const INITIAL_ANSWERS: Answer[] = [];
 
-export const INITIAL_SCORES: Score[] = [];
+export const INITIAL_SCORES: Score[] = [
+  {
+    "id": "score-resp-1793766965288-0",
+    "responseId": "resp-1793775127245-0",
+    "studentId": "ed85d155-539b-4e9f-8af3-a63f253d3bd1",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 95.35
+    },
+    "googleFormScore": 94,
+    "calculatedScore": 95.35,
+    "scoreDifference": 1.35,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 41,
+    "totalIncorrect": 2,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965289-1",
+    "responseId": "resp-1793775127247-1",
+    "studentId": "29578e0a-1f6e-4544-b26b-8ad2b3aaa1f6",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 87,
+    "calculatedScore": 86.05,
+    "scoreDifference": 0.95,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965289-2",
+    "responseId": "resp-1793775127248-2",
+    "studentId": "2a0700c3-1735-455f-b1fb-e16afff679c4",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 79.07
+    },
+    "googleFormScore": 78,
+    "calculatedScore": 79.07,
+    "scoreDifference": 1.07,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 34,
+    "totalIncorrect": 9,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965290-3",
+    "responseId": "resp-1793775127248-3",
+    "studentId": "f8cc0637-dcd7-44ca-8367-45588fa63c3f",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 100
+    },
+    "googleFormScore": 100,
+    "calculatedScore": 100,
+    "scoreDifference": 0,
+    "scoringStatus": "MATCH",
+    "totalCorrect": 43,
+    "totalIncorrect": 0,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965290-4",
+    "responseId": "resp-1793775127249-4",
+    "studentId": "87166c22-79d5-4718-92ad-54445c263efe",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 81.4
+    },
+    "googleFormScore": 83,
+    "calculatedScore": 81.4,
+    "scoreDifference": 1.6,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 35,
+    "totalIncorrect": 8,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965291-5",
+    "responseId": "resp-1793775127249-5",
+    "studentId": "c281f791-110e-4392-8b20-e0be0eb81d50",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 97.67
+    },
+    "googleFormScore": 98,
+    "calculatedScore": 97.67,
+    "scoreDifference": 0.33,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 42,
+    "totalIncorrect": 1,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965291-6",
+    "responseId": "resp-1793775127249-6",
+    "studentId": "2b511077-924c-467c-a781-f0a07e5d08cb",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 83.72
+    },
+    "googleFormScore": 79,
+    "calculatedScore": 83.72,
+    "scoreDifference": 4.72,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 36,
+    "totalIncorrect": 7,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965292-7",
+    "responseId": "resp-1793775127250-7",
+    "studentId": "f9015c0c-c969-4131-8d69-d8d2b480c5da",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 74.42
+    },
+    "googleFormScore": 77,
+    "calculatedScore": 74.42,
+    "scoreDifference": 2.58,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 32,
+    "totalIncorrect": 11,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965292-8",
+    "responseId": "resp-1793775127250-8",
+    "studentId": "b7254a94-f3c8-4aa1-831f-4232d121d87f",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 84,
+    "calculatedScore": 86.05,
+    "scoreDifference": 2.05,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965293-9",
+    "responseId": "resp-1793775127251-9",
+    "studentId": "e0126b94-6f18-4b1c-bba2-2e1b1943a2ab",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 41.86
+    },
+    "googleFormScore": 39,
+    "calculatedScore": 41.86,
+    "scoreDifference": 2.86,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 18,
+    "totalIncorrect": 25,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965293-10",
+    "responseId": "resp-1793775127252-10",
+    "studentId": "9e642359-520f-4ce4-a833-331c280bf266",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 81.4
+    },
+    "googleFormScore": 81,
+    "calculatedScore": 81.4,
+    "scoreDifference": 0.4,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 35,
+    "totalIncorrect": 8,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965294-11",
+    "responseId": "resp-1793775127253-11",
+    "studentId": "79c89dd9-50cc-47ae-ba5a-1ba416334876",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 100
+    },
+    "googleFormScore": 100,
+    "calculatedScore": 100,
+    "scoreDifference": 0,
+    "scoringStatus": "MATCH",
+    "totalCorrect": 43,
+    "totalIncorrect": 0,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965294-12",
+    "responseId": "resp-1793775127253-12",
+    "studentId": "adff9eeb-49b0-4b53-9a89-5d8b6844dfcc",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 55.81
+    },
+    "googleFormScore": 59,
+    "calculatedScore": 55.81,
+    "scoreDifference": 3.19,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 24,
+    "totalIncorrect": 19,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965294-13",
+    "responseId": "resp-1793775127254-13",
+    "studentId": "8ee3387f-c114-4003-b618-968e9c762315",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 85,
+    "calculatedScore": 86.05,
+    "scoreDifference": 1.05,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965295-14",
+    "responseId": "resp-1793775127254-14",
+    "studentId": "67e11609-c43d-4f50-af69-b5470ffea180",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 76.74
+    },
+    "googleFormScore": 76,
+    "calculatedScore": 76.74,
+    "scoreDifference": 0.74,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 33,
+    "totalIncorrect": 10,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965295-15",
+    "responseId": "resp-1793775127254-15",
+    "studentId": "7bff09ef-9a84-41b5-bc10-e63469249206",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 72.09
+    },
+    "googleFormScore": 72,
+    "calculatedScore": 72.09,
+    "scoreDifference": 0.09,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 31,
+    "totalIncorrect": 12,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965295-16",
+    "responseId": "resp-1793775127255-16",
+    "studentId": "41c74230-de17-45cc-a71c-6495b4660d64",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 81.4
+    },
+    "googleFormScore": 82,
+    "calculatedScore": 81.4,
+    "scoreDifference": 0.6,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 35,
+    "totalIncorrect": 8,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965296-17",
+    "responseId": "resp-1793775127255-17",
+    "studentId": "7f64dc8f-f81d-4d59-ba0d-f7b078d296a8",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 88,
+    "calculatedScore": 88.37,
+    "scoreDifference": 0.37,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965296-18",
+    "responseId": "resp-1793775127255-18",
+    "studentId": "806b5343-07bb-4d9d-ac2c-5c64a38acd43",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 90,
+    "calculatedScore": 90.7,
+    "scoreDifference": 0.7,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965296-19",
+    "responseId": "resp-1793775127256-19",
+    "studentId": "4b7d7af6-56f1-45b3-af0d-ca54d98403a5",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 55.81
+    },
+    "googleFormScore": 51,
+    "calculatedScore": 55.81,
+    "scoreDifference": 4.81,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 24,
+    "totalIncorrect": 19,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965297-20",
+    "responseId": "resp-1793775127256-20",
+    "studentId": "93e08726-f1e8-43c5-b879-f2a1c18c985e",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 76.74
+    },
+    "googleFormScore": 75,
+    "calculatedScore": 76.74,
+    "scoreDifference": 1.74,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 33,
+    "totalIncorrect": 10,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965297-21",
+    "responseId": "resp-1793775127257-21",
+    "studentId": "eca31aab-f1d3-4fd8-976e-5e14f8ae7d37",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 83,
+    "calculatedScore": 86.05,
+    "scoreDifference": 3.05,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965297-22",
+    "responseId": "resp-1793775127257-22",
+    "studentId": "4cb0d13e-854f-4574-aa51-83f29ea76471",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 76.74
+    },
+    "googleFormScore": 76,
+    "calculatedScore": 76.74,
+    "scoreDifference": 0.74,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 33,
+    "totalIncorrect": 10,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965297-23",
+    "responseId": "resp-1793775127257-23",
+    "studentId": "0f1169dc-05b9-4c3f-8d12-baec86d9f666",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 72.09
+    },
+    "googleFormScore": 72,
+    "calculatedScore": 72.09,
+    "scoreDifference": 0.09,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 31,
+    "totalIncorrect": 12,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965298-24",
+    "responseId": "resp-1793775127257-24",
+    "studentId": "7183d6aa-743a-4a22-8bea-f0f017a8fcec",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 93.02
+    },
+    "googleFormScore": 94,
+    "calculatedScore": 93.02,
+    "scoreDifference": 0.98,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 40,
+    "totalIncorrect": 3,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965298-25",
+    "responseId": "resp-1793775127258-25",
+    "studentId": "d1274d3a-566b-4943-9dd1-e8c16139fcb7",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 91,
+    "calculatedScore": 90.7,
+    "scoreDifference": 0.3,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965298-26",
+    "responseId": "resp-1793775127258-26",
+    "studentId": "2b2435b5-5963-4562-badb-3927d6d9f45e",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 88,
+    "calculatedScore": 86.05,
+    "scoreDifference": 1.95,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965298-27",
+    "responseId": "resp-1793775127258-27",
+    "studentId": "18779557-5959-4786-8f6e-b4db804a819a",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 79.07
+    },
+    "googleFormScore": 76,
+    "calculatedScore": 79.07,
+    "scoreDifference": 3.07,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 34,
+    "totalIncorrect": 9,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965299-28",
+    "responseId": "resp-1793775127258-28",
+    "studentId": "6280f683-a35f-4b94-884e-435efe687e07",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 83.72
+    },
+    "googleFormScore": 82,
+    "calculatedScore": 83.72,
+    "scoreDifference": 1.72,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 36,
+    "totalIncorrect": 7,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965299-29",
+    "responseId": "resp-1793775127259-29",
+    "studentId": "90687a76-6aa0-43d4-90ae-44ce47e8f132",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 85,
+    "calculatedScore": 88.37,
+    "scoreDifference": 3.37,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965299-30",
+    "responseId": "resp-1793775127259-30",
+    "studentId": "54f8b889-851c-48e3-99b3-73e2a25c09bc",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 83.72
+    },
+    "googleFormScore": 85,
+    "calculatedScore": 83.72,
+    "scoreDifference": 1.28,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 36,
+    "totalIncorrect": 7,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965299-31",
+    "responseId": "resp-1793775127259-31",
+    "studentId": "f9b29598-6f22-469e-85d9-893b237c8d43",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 93.02
+    },
+    "googleFormScore": 93,
+    "calculatedScore": 93.02,
+    "scoreDifference": 0.02,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 40,
+    "totalIncorrect": 3,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965300-32",
+    "responseId": "resp-1793775127260-32",
+    "studentId": "f6c67705-c93c-49a3-8727-863a4757f3a1",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 72.09
+    },
+    "googleFormScore": 71,
+    "calculatedScore": 72.09,
+    "scoreDifference": 1.09,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 31,
+    "totalIncorrect": 12,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965300-33",
+    "responseId": "resp-1793775127260-33",
+    "studentId": "289004d8-e0af-4734-866c-89b760f9ee38",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 93.02
+    },
+    "googleFormScore": 94,
+    "calculatedScore": 93.02,
+    "scoreDifference": 0.98,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 40,
+    "totalIncorrect": 3,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965300-34",
+    "responseId": "resp-1793775127260-34",
+    "studentId": "ecc2acde-b824-40ab-a9f8-01ea402bec65",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 91,
+    "calculatedScore": 90.7,
+    "scoreDifference": 0.3,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965300-35",
+    "responseId": "resp-1793775127260-35",
+    "studentId": "640ae2b5-709f-4b02-ba0c-e4b67541ba1a",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 97.67
+    },
+    "googleFormScore": 97,
+    "calculatedScore": 97.67,
+    "scoreDifference": 0.67,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 42,
+    "totalIncorrect": 1,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965301-36",
+    "responseId": "resp-1793775127261-36",
+    "studentId": "54487f0e-d20f-4760-a316-fd6064dba873",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 72.09
+    },
+    "googleFormScore": 72,
+    "calculatedScore": 72.09,
+    "scoreDifference": 0.09,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 31,
+    "totalIncorrect": 12,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965301-37",
+    "responseId": "resp-1793775127261-37",
+    "studentId": "1fcd6d44-2a56-4b4b-8fa5-dfd520fd25f6",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 72.09
+    },
+    "googleFormScore": 73,
+    "calculatedScore": 72.09,
+    "scoreDifference": 0.91,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 31,
+    "totalIncorrect": 12,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965301-38",
+    "responseId": "resp-1793775127261-38",
+    "studentId": "1b513168-2ee9-408e-ae6b-6c2cb02cbe9a",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 79.07
+    },
+    "googleFormScore": 80,
+    "calculatedScore": 79.07,
+    "scoreDifference": 0.93,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 34,
+    "totalIncorrect": 9,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965301-39",
+    "responseId": "resp-1793775127262-39",
+    "studentId": "31638e51-c8ab-436c-8080-ca78adbc4824",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 90,
+    "calculatedScore": 90.7,
+    "scoreDifference": 0.7,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965302-40",
+    "responseId": "resp-1793775127262-40",
+    "studentId": "add0f8ab-2253-43af-85fc-acf44ac5e60a",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 76.74
+    },
+    "googleFormScore": 79,
+    "calculatedScore": 76.74,
+    "scoreDifference": 2.26,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 33,
+    "totalIncorrect": 10,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965302-41",
+    "responseId": "resp-1793775127262-41",
+    "studentId": "5f4b9622-3d52-4920-b56d-8fdbab2d8ad6",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 86,
+    "calculatedScore": 86.05,
+    "scoreDifference": 0.05,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965302-42",
+    "responseId": "resp-1793775127263-42",
+    "studentId": "95e07688-d8f1-42e6-8541-2961dce1e5d5",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 74.42
+    },
+    "googleFormScore": 77,
+    "calculatedScore": 74.42,
+    "scoreDifference": 2.58,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 32,
+    "totalIncorrect": 11,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965302-43",
+    "responseId": "resp-1793775127263-43",
+    "studentId": "728304da-b049-4f0c-9e93-4a1a692b0117",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 93.02
+    },
+    "googleFormScore": 94,
+    "calculatedScore": 93.02,
+    "scoreDifference": 0.98,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 40,
+    "totalIncorrect": 3,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965303-44",
+    "responseId": "resp-1793775127263-44",
+    "studentId": "5b46700f-0c44-4f4e-9018-6d8059605b1a",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 76.74
+    },
+    "googleFormScore": 74,
+    "calculatedScore": 76.74,
+    "scoreDifference": 2.74,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 33,
+    "totalIncorrect": 10,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965303-45",
+    "responseId": "resp-1793775127263-45",
+    "studentId": "53fc6433-4965-4328-9a9f-927888ed6954",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 74.42
+    },
+    "googleFormScore": 75,
+    "calculatedScore": 74.42,
+    "scoreDifference": 0.58,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 32,
+    "totalIncorrect": 11,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965303-46",
+    "responseId": "resp-1793775127264-46",
+    "studentId": "b642f5a9-577c-4ec4-a007-fce51db1ca65",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 51.16
+    },
+    "googleFormScore": 52,
+    "calculatedScore": 51.16,
+    "scoreDifference": 0.84,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 22,
+    "totalIncorrect": 21,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965303-47",
+    "responseId": "resp-1793775127264-47",
+    "studentId": "5dcd4699-12c6-4dab-8b84-c224fc629f4b",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 67.44
+    },
+    "googleFormScore": 69,
+    "calculatedScore": 67.44,
+    "scoreDifference": 1.56,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 29,
+    "totalIncorrect": 14,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965304-48",
+    "responseId": "resp-1793775127264-48",
+    "studentId": "267beac0-a1b8-4983-9e9a-1411c91e490d",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 90,
+    "calculatedScore": 88.37,
+    "scoreDifference": 1.63,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965304-49",
+    "responseId": "resp-1793775127265-49",
+    "studentId": "6edb2c54-d7ce-4d2a-aa1d-29adf43adb9d",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 91,
+    "calculatedScore": 90.7,
+    "scoreDifference": 0.3,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965304-50",
+    "responseId": "resp-1793775127265-50",
+    "studentId": "12d8f9fd-a894-40a6-890e-0c8a06abae33",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 74.42
+    },
+    "googleFormScore": 74,
+    "calculatedScore": 74.42,
+    "scoreDifference": 0.42,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 32,
+    "totalIncorrect": 11,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965304-51",
+    "responseId": "resp-1793775127265-51",
+    "studentId": "c6b75e69-8beb-4ab2-9556-9c9cd138752d",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 97.67
+    },
+    "googleFormScore": 97,
+    "calculatedScore": 97.67,
+    "scoreDifference": 0.67,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 42,
+    "totalIncorrect": 1,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965305-52",
+    "responseId": "resp-1793775127265-52",
+    "studentId": "8d85d46f-45e0-44e9-9ef0-8aa78aa652fd",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 74.42
+    },
+    "googleFormScore": 75,
+    "calculatedScore": 74.42,
+    "scoreDifference": 0.58,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 32,
+    "totalIncorrect": 11,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965305-53",
+    "responseId": "resp-1793775127265-53",
+    "studentId": "33d9c62c-3d91-4239-9cd5-9e6e3b8b863e",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 89,
+    "calculatedScore": 88.37,
+    "scoreDifference": 0.63,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965305-54",
+    "responseId": "resp-1793775127266-54",
+    "studentId": "0ee4bba2-069f-45cb-81f4-3390b3a94913",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 79.07
+    },
+    "googleFormScore": 79,
+    "calculatedScore": 79.07,
+    "scoreDifference": 0.07,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 34,
+    "totalIncorrect": 9,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965305-55",
+    "responseId": "resp-1793775127266-55",
+    "studentId": "7b977fc6-87d4-4a67-b0f2-7ca9535697c8",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 81.4
+    },
+    "googleFormScore": 83,
+    "calculatedScore": 81.4,
+    "scoreDifference": 1.6,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 35,
+    "totalIncorrect": 8,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965306-56",
+    "responseId": "resp-1793775127267-56",
+    "studentId": "c120a0a2-2563-4400-b24d-f9b676d15d30",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 100
+    },
+    "googleFormScore": 100,
+    "calculatedScore": 100,
+    "scoreDifference": 0,
+    "scoringStatus": "MATCH",
+    "totalCorrect": 43,
+    "totalIncorrect": 0,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965306-57",
+    "responseId": "resp-1793775127267-57",
+    "studentId": "3cd1e3e4-4338-4dca-a55c-1d4551de729c",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 72.09
+    },
+    "googleFormScore": 69,
+    "calculatedScore": 72.09,
+    "scoreDifference": 3.09,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 31,
+    "totalIncorrect": 12,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965306-58",
+    "responseId": "resp-1793775127267-58",
+    "studentId": "9b09c1ec-4551-4068-931f-6a653aebacbf",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 93.02
+    },
+    "googleFormScore": 94,
+    "calculatedScore": 93.02,
+    "scoreDifference": 0.98,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 40,
+    "totalIncorrect": 3,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965306-59",
+    "responseId": "resp-1793775127268-59",
+    "studentId": "bda48920-ba03-4e8c-895b-9757e64ade75",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 69.77
+    },
+    "googleFormScore": 72,
+    "calculatedScore": 69.77,
+    "scoreDifference": 2.23,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 30,
+    "totalIncorrect": 13,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965306-60",
+    "responseId": "resp-1793775127268-60",
+    "studentId": "3f01ed7e-f7c8-4805-bc77-6c7ae0f04c3a",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 81.4
+    },
+    "googleFormScore": 79,
+    "calculatedScore": 81.4,
+    "scoreDifference": 2.4,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 35,
+    "totalIncorrect": 8,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965307-61",
+    "responseId": "resp-1793775127268-61",
+    "studentId": "8dbf38d6-1224-43a8-af9b-572b95fd7ebb",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 76.74
+    },
+    "googleFormScore": 77,
+    "calculatedScore": 76.74,
+    "scoreDifference": 0.26,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 33,
+    "totalIncorrect": 10,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965307-62",
+    "responseId": "resp-1793775127268-62",
+    "studentId": "8050e5a9-5486-4eb4-bac9-f064eac8dc5a",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 76.74
+    },
+    "googleFormScore": 78,
+    "calculatedScore": 76.74,
+    "scoreDifference": 1.26,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 33,
+    "totalIncorrect": 10,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965307-63",
+    "responseId": "resp-1793775127268-63",
+    "studentId": "79efd3ed-5c46-477c-a43e-c603345fdf56",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 95.35
+    },
+    "googleFormScore": 96,
+    "calculatedScore": 95.35,
+    "scoreDifference": 0.65,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 41,
+    "totalIncorrect": 2,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965308-64",
+    "responseId": "resp-1793775127269-64",
+    "studentId": "ad4e286d-c8c6-4028-8044-57235ca497b0",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 69.77
+    },
+    "googleFormScore": 70,
+    "calculatedScore": 69.77,
+    "scoreDifference": 0.23,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 30,
+    "totalIncorrect": 13,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965309-65",
+    "responseId": "resp-1793775127269-65",
+    "studentId": "23881737-9f69-4042-a696-eaa5e4975e2e",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 81.4
+    },
+    "googleFormScore": 84,
+    "calculatedScore": 81.4,
+    "scoreDifference": 2.6,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 35,
+    "totalIncorrect": 8,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965309-66",
+    "responseId": "resp-1793775127269-66",
+    "studentId": "9c9190d3-1472-4f72-8788-da6817ccf168",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 92,
+    "calculatedScore": 90.7,
+    "scoreDifference": 1.3,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965309-67",
+    "responseId": "resp-1793775127269-67",
+    "studentId": "58a5a333-44a6-4358-8b86-ad2b260084b5",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 65.12
+    },
+    "googleFormScore": 60,
+    "calculatedScore": 65.12,
+    "scoreDifference": 5.12,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 28,
+    "totalIncorrect": 15,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965309-68",
+    "responseId": "resp-1793775127270-68",
+    "studentId": "d76ecb9f-8aa9-4ee2-aea6-fa9baf45e336",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 76.74
+    },
+    "googleFormScore": 76,
+    "calculatedScore": 76.74,
+    "scoreDifference": 0.74,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 33,
+    "totalIncorrect": 10,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965309-69",
+    "responseId": "resp-1793775127270-69",
+    "studentId": "8414e829-6333-4ab4-ba60-1fcc64bfe1cd",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 88,
+    "calculatedScore": 86.05,
+    "scoreDifference": 1.95,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965309-70",
+    "responseId": "resp-1793775127270-70",
+    "studentId": "afc6f2dd-3daa-444a-9ad6-ff7df504208d",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 95.35
+    },
+    "googleFormScore": 95,
+    "calculatedScore": 95.35,
+    "scoreDifference": 0.35,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 41,
+    "totalIncorrect": 2,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965309-71",
+    "responseId": "resp-1793775127270-71",
+    "studentId": "d2eebf77-87e3-4e44-9330-2f2a9988393f",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 76.74
+    },
+    "googleFormScore": 78,
+    "calculatedScore": 76.74,
+    "scoreDifference": 1.26,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 33,
+    "totalIncorrect": 10,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965309-72",
+    "responseId": "resp-1793775127270-72",
+    "studentId": "cdab4723-7b37-40a0-b3e7-da3fad57db20",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 62.79
+    },
+    "googleFormScore": 62,
+    "calculatedScore": 62.79,
+    "scoreDifference": 0.79,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 27,
+    "totalIncorrect": 16,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965310-73",
+    "responseId": "resp-1793775127271-73",
+    "studentId": "d49da517-1014-4ee9-b44d-99be9ad321fb",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 81.4
+    },
+    "googleFormScore": 82,
+    "calculatedScore": 81.4,
+    "scoreDifference": 0.6,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 35,
+    "totalIncorrect": 8,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965310-74",
+    "responseId": "resp-1793775127271-74",
+    "studentId": "6aa4f5bd-80a6-499f-9519-9834918da464",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 79.07
+    },
+    "googleFormScore": 80,
+    "calculatedScore": 79.07,
+    "scoreDifference": 0.93,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 34,
+    "totalIncorrect": 9,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965310-75",
+    "responseId": "resp-1793775127271-75",
+    "studentId": "080dd89e-b492-40fd-8e5a-d4b8d31c0d82",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 97.67
+    },
+    "googleFormScore": 96,
+    "calculatedScore": 97.67,
+    "scoreDifference": 1.67,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 42,
+    "totalIncorrect": 1,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965310-76",
+    "responseId": "resp-1793775127271-76",
+    "studentId": "e33d262e-4b25-475d-be6c-6ab3fbe3ca10",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 85,
+    "calculatedScore": 86.05,
+    "scoreDifference": 1.05,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965310-77",
+    "responseId": "resp-1793775127272-77",
+    "studentId": "70e9533c-6e98-43bf-ac8d-aa9ad2174d33",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 89,
+    "calculatedScore": 88.37,
+    "scoreDifference": 0.63,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965310-78",
+    "responseId": "resp-1793775127272-78",
+    "studentId": "11d938d6-d761-4e04-b4a1-97317642f7c7",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 83.72
+    },
+    "googleFormScore": 84,
+    "calculatedScore": 83.72,
+    "scoreDifference": 0.28,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 36,
+    "totalIncorrect": 7,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965310-79",
+    "responseId": "resp-1793775127272-79",
+    "studentId": "642208c1-7e51-46dc-a91e-cd45e237e4d2",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 74.42
+    },
+    "googleFormScore": 75,
+    "calculatedScore": 74.42,
+    "scoreDifference": 0.58,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 32,
+    "totalIncorrect": 11,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965310-80",
+    "responseId": "resp-1793775127272-80",
+    "studentId": "34505a24-55a9-464c-ae38-31b9ddd92297",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 95.35
+    },
+    "googleFormScore": 96,
+    "calculatedScore": 95.35,
+    "scoreDifference": 0.65,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 41,
+    "totalIncorrect": 2,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965310-81",
+    "responseId": "resp-1793775127273-81",
+    "studentId": "f217425d-ca3c-470e-a98a-63bb52dd1176",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 76.74
+    },
+    "googleFormScore": 76,
+    "calculatedScore": 76.74,
+    "scoreDifference": 0.74,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 33,
+    "totalIncorrect": 10,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965311-82",
+    "responseId": "resp-1793775127273-82",
+    "studentId": "3838cf4d-a6c2-46dc-a541-931364b04f6a",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 100
+    },
+    "googleFormScore": 100,
+    "calculatedScore": 100,
+    "scoreDifference": 0,
+    "scoringStatus": "MATCH",
+    "totalCorrect": 43,
+    "totalIncorrect": 0,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965311-83",
+    "responseId": "resp-1793775127273-83",
+    "studentId": "44aafc05-23b7-4595-9945-b73744d9fdd5",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 51.16
+    },
+    "googleFormScore": 53,
+    "calculatedScore": 51.16,
+    "scoreDifference": 1.84,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 22,
+    "totalIncorrect": 21,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965311-84",
+    "responseId": "resp-1793775127275-84",
+    "studentId": "5501b223-a330-43a8-b4d4-6d70134fa1fc",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 48.84
+    },
+    "googleFormScore": 49,
+    "calculatedScore": 48.84,
+    "scoreDifference": 0.16,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 21,
+    "totalIncorrect": 22,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965311-85",
+    "responseId": "resp-1793775127275-85",
+    "studentId": "0f0a2bbf-45b3-4ba1-90cf-8261f0dd0903",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 76.74
+    },
+    "googleFormScore": 77,
+    "calculatedScore": 76.74,
+    "scoreDifference": 0.26,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 33,
+    "totalIncorrect": 10,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965312-86",
+    "responseId": "resp-1793775127276-86",
+    "studentId": "4f2bb4e3-6a74-432a-bb55-39e6a868657a",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 74.42
+    },
+    "googleFormScore": 74,
+    "calculatedScore": 74.42,
+    "scoreDifference": 0.42,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 32,
+    "totalIncorrect": 11,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965312-87",
+    "responseId": "resp-1793775127276-87",
+    "studentId": "4b043781-4d6f-4961-af97-0a3d6668167a",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 93.02
+    },
+    "googleFormScore": 92,
+    "calculatedScore": 93.02,
+    "scoreDifference": 1.02,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 40,
+    "totalIncorrect": 3,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965312-88",
+    "responseId": "resp-1793775127276-88",
+    "studentId": "b1edea25-5ebc-48bc-99c7-8438eea25e0c",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 93.02
+    },
+    "googleFormScore": 92,
+    "calculatedScore": 93.02,
+    "scoreDifference": 1.02,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 40,
+    "totalIncorrect": 3,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965312-89",
+    "responseId": "resp-1793775127276-89",
+    "studentId": "896a34c7-ac8f-4d64-b189-8e5c32963a44",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 79.07
+    },
+    "googleFormScore": 78,
+    "calculatedScore": 79.07,
+    "scoreDifference": 1.07,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 34,
+    "totalIncorrect": 9,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965312-90",
+    "responseId": "resp-1793775127276-90",
+    "studentId": "074a80e2-d310-4ffe-9d54-89806f5af93c",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 79.07
+    },
+    "googleFormScore": 77,
+    "calculatedScore": 79.07,
+    "scoreDifference": 2.07,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 34,
+    "totalIncorrect": 9,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965313-91",
+    "responseId": "resp-1793775127276-91",
+    "studentId": "47543144-c11b-437d-9f28-00525a42d67b",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 72.09
+    },
+    "googleFormScore": 72,
+    "calculatedScore": 72.09,
+    "scoreDifference": 0.09,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 31,
+    "totalIncorrect": 12,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965313-92",
+    "responseId": "resp-1793775127277-92",
+    "studentId": "6b407421-c023-4441-94be-89e82105b9ec",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 83,
+    "calculatedScore": 86.05,
+    "scoreDifference": 3.05,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965313-93",
+    "responseId": "resp-1793775127277-93",
+    "studentId": "eca52351-1c4f-4d53-80c3-ba310b8c61fa",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 95.35
+    },
+    "googleFormScore": 93,
+    "calculatedScore": 95.35,
+    "scoreDifference": 2.35,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 41,
+    "totalIncorrect": 2,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965313-94",
+    "responseId": "resp-1793775127277-94",
+    "studentId": "bc6523c8-60e2-4faf-a8b1-0415d9a17e3d",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 58.14
+    },
+    "googleFormScore": 58,
+    "calculatedScore": 58.14,
+    "scoreDifference": 0.14,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 25,
+    "totalIncorrect": 18,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965314-95",
+    "responseId": "resp-1793775127277-95",
+    "studentId": "2dd4e7b6-73bc-45cb-9712-09f82e3314d7",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 83.72
+    },
+    "googleFormScore": 84,
+    "calculatedScore": 83.72,
+    "scoreDifference": 0.28,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 36,
+    "totalIncorrect": 7,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965314-96",
+    "responseId": "resp-1793775127278-96",
+    "studentId": "0c72c4ec-5a83-4748-9d74-c120fb862e99",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 74.42
+    },
+    "googleFormScore": 72,
+    "calculatedScore": 74.42,
+    "scoreDifference": 2.42,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 32,
+    "totalIncorrect": 11,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965314-97",
+    "responseId": "resp-1793775127278-97",
+    "studentId": "595095dc-e78b-41fa-b64f-c7fedc5c8820",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 69.77
+    },
+    "googleFormScore": 66,
+    "calculatedScore": 69.77,
+    "scoreDifference": 3.77,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 30,
+    "totalIncorrect": 13,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965314-98",
+    "responseId": "resp-1793775127278-98",
+    "studentId": "7bacaa63-bae8-421d-af13-1b85e5d80be7",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 76.74
+    },
+    "googleFormScore": 74,
+    "calculatedScore": 76.74,
+    "scoreDifference": 2.74,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 33,
+    "totalIncorrect": 10,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965314-99",
+    "responseId": "resp-1793775127279-99",
+    "studentId": "5f9bd5fb-3f86-4875-9af5-50269c8085ca",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 95.35
+    },
+    "googleFormScore": 93,
+    "calculatedScore": 95.35,
+    "scoreDifference": 2.35,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 41,
+    "totalIncorrect": 2,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965315-100",
+    "responseId": "resp-1793775127279-100",
+    "studentId": "adefbb5e-80c8-4b8e-a99d-445c597fac50",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 74.42
+    },
+    "googleFormScore": 76,
+    "calculatedScore": 74.42,
+    "scoreDifference": 1.58,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 32,
+    "totalIncorrect": 11,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965315-101",
+    "responseId": "resp-1793775127279-101",
+    "studentId": "39e39ef1-3482-434b-8116-1553e1f95dae",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 69.77
+    },
+    "googleFormScore": 69,
+    "calculatedScore": 69.77,
+    "scoreDifference": 0.77,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 30,
+    "totalIncorrect": 13,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965315-102",
+    "responseId": "resp-1793775127279-102",
+    "studentId": "95ccf840-20b6-4fc4-993b-599ba2d75e74",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 67.44
+    },
+    "googleFormScore": 69,
+    "calculatedScore": 67.44,
+    "scoreDifference": 1.56,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 29,
+    "totalIncorrect": 14,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965315-103",
+    "responseId": "resp-1793775127279-103",
+    "studentId": "c2e077fc-b381-4769-a32b-411d050b8781",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 74.42
+    },
+    "googleFormScore": 71,
+    "calculatedScore": 74.42,
+    "scoreDifference": 3.42,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 32,
+    "totalIncorrect": 11,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965316-104",
+    "responseId": "resp-1793775127280-104",
+    "studentId": "4b4e50c0-a35e-4255-8332-0f4fe4c0feda",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 87,
+    "calculatedScore": 86.05,
+    "scoreDifference": 0.95,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965316-105",
+    "responseId": "resp-1793775127280-105",
+    "studentId": "8d75c986-0f2d-4922-9079-5ebad0148025",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 74.42
+    },
+    "googleFormScore": 75,
+    "calculatedScore": 74.42,
+    "scoreDifference": 0.58,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 32,
+    "totalIncorrect": 11,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965316-106",
+    "responseId": "resp-1793775127280-106",
+    "studentId": "1a64aae2-3f4e-40cf-8784-83f924451571",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 83.72
+    },
+    "googleFormScore": 81,
+    "calculatedScore": 83.72,
+    "scoreDifference": 2.72,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 36,
+    "totalIncorrect": 7,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965316-107",
+    "responseId": "resp-1793775127280-107",
+    "studentId": "b3aeb720-bc1a-4ffc-b6eb-5724d10d0c20",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 67.44
+    },
+    "googleFormScore": 67,
+    "calculatedScore": 67.44,
+    "scoreDifference": 0.44,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 29,
+    "totalIncorrect": 14,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965316-108",
+    "responseId": "resp-1793775127281-108",
+    "studentId": "164fe454-e648-4eaf-8fcd-ad3d737de60b",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 65.12
+    },
+    "googleFormScore": 65,
+    "calculatedScore": 65.12,
+    "scoreDifference": 0.12,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 28,
+    "totalIncorrect": 15,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965317-109",
+    "responseId": "resp-1793775127281-109",
+    "studentId": "8de4d5b5-87e2-4e2b-af24-076acdfd5b05",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 74.42
+    },
+    "googleFormScore": 69,
+    "calculatedScore": 74.42,
+    "scoreDifference": 5.42,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 32,
+    "totalIncorrect": 11,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965317-110",
+    "responseId": "resp-1793775127281-110",
+    "studentId": "87f986eb-159d-4ce0-941a-b57043e964ec",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 83.72
+    },
+    "googleFormScore": 85,
+    "calculatedScore": 83.72,
+    "scoreDifference": 1.28,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 36,
+    "totalIncorrect": 7,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965317-111",
+    "responseId": "resp-1793775127282-111",
+    "studentId": "2a52bcec-ddd1-429a-8050-8405eeaf3b49",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 81.4
+    },
+    "googleFormScore": 83,
+    "calculatedScore": 81.4,
+    "scoreDifference": 1.6,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 35,
+    "totalIncorrect": 8,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965317-112",
+    "responseId": "resp-1793775127282-112",
+    "studentId": "74efa401-f933-4f46-83f3-8c0664ea004b",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 76.74
+    },
+    "googleFormScore": 78,
+    "calculatedScore": 76.74,
+    "scoreDifference": 1.26,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 33,
+    "totalIncorrect": 10,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965318-113",
+    "responseId": "resp-1793775127282-113",
+    "studentId": "651750a8-b00b-4f80-8622-c2ba81acfdb6",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 92,
+    "calculatedScore": 90.7,
+    "scoreDifference": 1.3,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965318-114",
+    "responseId": "resp-1793775127282-114",
+    "studentId": "8a8d5788-1049-4fb5-ad68-2765ac537173",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 93.02
+    },
+    "googleFormScore": 94,
+    "calculatedScore": 93.02,
+    "scoreDifference": 0.98,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 40,
+    "totalIncorrect": 3,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965318-115",
+    "responseId": "resp-1793775127283-115",
+    "studentId": "d0ed9345-cc8c-4dce-b47f-78f7be0733e6",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 92,
+    "calculatedScore": 90.7,
+    "scoreDifference": 1.3,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965318-116",
+    "responseId": "resp-1793775127283-116",
+    "studentId": "aac543c4-c059-4a5e-b487-8f750bf55173",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 51.16
+    },
+    "googleFormScore": 51,
+    "calculatedScore": 51.16,
+    "scoreDifference": 0.16,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 22,
+    "totalIncorrect": 21,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965318-117",
+    "responseId": "resp-1793775127283-117",
+    "studentId": "96aad49d-3b82-457c-80e2-908fcd3b28de",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 79.07
+    },
+    "googleFormScore": 79,
+    "calculatedScore": 79.07,
+    "scoreDifference": 0.07,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 34,
+    "totalIncorrect": 9,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965319-118",
+    "responseId": "resp-1793775127283-118",
+    "studentId": "2d98cbf7-59a0-42cc-9a69-3d537ed1efaf",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 93.02
+    },
+    "googleFormScore": 91,
+    "calculatedScore": 93.02,
+    "scoreDifference": 2.02,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 40,
+    "totalIncorrect": 3,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965319-119",
+    "responseId": "resp-1793775127283-119",
+    "studentId": "4c40fd3e-aef1-4660-b38f-e0accb5c2da6",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 60.47
+    },
+    "googleFormScore": 58,
+    "calculatedScore": 60.47,
+    "scoreDifference": 2.47,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 26,
+    "totalIncorrect": 17,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965319-120",
+    "responseId": "resp-1793775127284-120",
+    "studentId": "80cf69e9-33f0-4b54-8d4b-6eba6d749612",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 79.07
+    },
+    "googleFormScore": 80,
+    "calculatedScore": 79.07,
+    "scoreDifference": 0.93,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 34,
+    "totalIncorrect": 9,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965319-121",
+    "responseId": "resp-1793775127284-121",
+    "studentId": "c4bcfaeb-5716-434f-a608-a261b7eaca60",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 79.07
+    },
+    "googleFormScore": 81,
+    "calculatedScore": 79.07,
+    "scoreDifference": 1.93,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 34,
+    "totalIncorrect": 9,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965320-122",
+    "responseId": "resp-1793775127284-122",
+    "studentId": "dc5147db-5afc-4942-acf9-432919bb44c9",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 74.42
+    },
+    "googleFormScore": 72,
+    "calculatedScore": 74.42,
+    "scoreDifference": 2.42,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 32,
+    "totalIncorrect": 11,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965322-123",
+    "responseId": "resp-1793775127284-123",
+    "studentId": "1ce8b6d1-77f0-4fe6-8788-7db5ae2cb4d6",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 48.84
+    },
+    "googleFormScore": 48,
+    "calculatedScore": 48.84,
+    "scoreDifference": 0.84,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 21,
+    "totalIncorrect": 22,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965322-124",
+    "responseId": "resp-1793775127285-124",
+    "studentId": "31622596-f40b-4b4e-8175-a9fd12fd694c",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 85,
+    "calculatedScore": 86.05,
+    "scoreDifference": 1.05,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965322-125",
+    "responseId": "resp-1793775127285-125",
+    "studentId": "e86033c6-9ed0-461a-b582-e8dfd9e4ea7d",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 87,
+    "calculatedScore": 86.05,
+    "scoreDifference": 0.95,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965322-126",
+    "responseId": "resp-1793775127285-126",
+    "studentId": "b43198da-5d60-4f6b-b882-1957e47da185",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 67.44
+    },
+    "googleFormScore": 66,
+    "calculatedScore": 67.44,
+    "scoreDifference": 1.44,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 29,
+    "totalIncorrect": 14,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965322-127",
+    "responseId": "resp-1793775127285-127",
+    "studentId": "e4075035-d242-4797-8f89-c3fd357ec19a",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 81.4
+    },
+    "googleFormScore": 81,
+    "calculatedScore": 81.4,
+    "scoreDifference": 0.4,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 35,
+    "totalIncorrect": 8,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965322-128",
+    "responseId": "resp-1793775127285-128",
+    "studentId": "1aa78b2b-6c97-48d1-b88b-2ea4720726d6",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 41.86
+    },
+    "googleFormScore": 41,
+    "calculatedScore": 41.86,
+    "scoreDifference": 0.86,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 18,
+    "totalIncorrect": 25,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965323-129",
+    "responseId": "resp-1793775127286-129",
+    "studentId": "a63300f2-4865-42d9-8306-b78208c4ef7d",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 83.72
+    },
+    "googleFormScore": 79,
+    "calculatedScore": 83.72,
+    "scoreDifference": 4.72,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 36,
+    "totalIncorrect": 7,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965323-130",
+    "responseId": "resp-1793775127286-130",
+    "studentId": "e8fcf53c-e057-4389-9940-dc8a18ed7dfd",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 76.74
+    },
+    "googleFormScore": 74,
+    "calculatedScore": 76.74,
+    "scoreDifference": 2.74,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 33,
+    "totalIncorrect": 10,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965323-131",
+    "responseId": "resp-1793775127286-131",
+    "studentId": "41c54e27-f6bf-44c3-b83b-3996a742662d",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 81.4
+    },
+    "googleFormScore": 83,
+    "calculatedScore": 81.4,
+    "scoreDifference": 1.6,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 35,
+    "totalIncorrect": 8,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965323-132",
+    "responseId": "resp-1793775127286-132",
+    "studentId": "bda4ad88-4e67-42d0-8131-7daf480aee06",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 89,
+    "calculatedScore": 88.37,
+    "scoreDifference": 0.63,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965323-133",
+    "responseId": "resp-1793775127287-133",
+    "studentId": "b0dfb2fa-a56c-4e59-9174-63ed463e45fc",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 81.4
+    },
+    "googleFormScore": 82,
+    "calculatedScore": 81.4,
+    "scoreDifference": 0.6,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 35,
+    "totalIncorrect": 8,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965323-134",
+    "responseId": "resp-1793775127287-134",
+    "studentId": "849cc289-399a-40e6-964f-cdf37c0964cd",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 89,
+    "calculatedScore": 90.7,
+    "scoreDifference": 1.7,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965323-135",
+    "responseId": "resp-1793775127287-135",
+    "studentId": "c9fbccee-9caa-41ab-89b7-1da3954e49b0",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 79.07
+    },
+    "googleFormScore": 76,
+    "calculatedScore": 79.07,
+    "scoreDifference": 3.07,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 34,
+    "totalIncorrect": 9,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965323-136",
+    "responseId": "resp-1793775127287-136",
+    "studentId": "b5ba5ca5-9ad0-419a-a50b-f4bd738cc574",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 83.72
+    },
+    "googleFormScore": 86,
+    "calculatedScore": 83.72,
+    "scoreDifference": 2.28,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 36,
+    "totalIncorrect": 7,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965324-137",
+    "responseId": "resp-1793775127287-137",
+    "studentId": "75fdd534-73e8-4339-9b89-77ee8167b0c5",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 53.49
+    },
+    "googleFormScore": 52,
+    "calculatedScore": 53.49,
+    "scoreDifference": 1.49,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 23,
+    "totalIncorrect": 20,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965324-138",
+    "responseId": "resp-1793775127288-138",
+    "studentId": "94f87db6-2f03-476c-9a1a-b6aa34b02031",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 89,
+    "calculatedScore": 88.37,
+    "scoreDifference": 0.63,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965324-139",
+    "responseId": "resp-1793775127288-139",
+    "studentId": "22b19bfb-f273-4585-ad8c-081cd5134925",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 97.67
+    },
+    "googleFormScore": 97,
+    "calculatedScore": 97.67,
+    "scoreDifference": 0.67,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 42,
+    "totalIncorrect": 1,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965324-140",
+    "responseId": "resp-1793775127289-140",
+    "studentId": "3b77df17-cba7-40ff-91fc-d7ce0c331c7f",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 92,
+    "calculatedScore": 90.7,
+    "scoreDifference": 1.3,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965324-141",
+    "responseId": "resp-1793775127290-141",
+    "studentId": "2b49cef8-bc8e-494f-8f2a-a9923c56c67a",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 89,
+    "calculatedScore": 90.7,
+    "scoreDifference": 1.7,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965325-142",
+    "responseId": "resp-1793775127290-142",
+    "studentId": "3bf21090-3a76-48fa-8df7-5f570c8509d8",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 62.79
+    },
+    "googleFormScore": 60,
+    "calculatedScore": 62.79,
+    "scoreDifference": 2.79,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 27,
+    "totalIncorrect": 16,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965325-143",
+    "responseId": "resp-1793775127290-143",
+    "studentId": "6bd94416-3b17-4d69-b7b8-9378a8533654",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 79.07
+    },
+    "googleFormScore": 80,
+    "calculatedScore": 79.07,
+    "scoreDifference": 0.93,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 34,
+    "totalIncorrect": 9,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965325-144",
+    "responseId": "resp-1793775127290-144",
+    "studentId": "8910219a-94a8-43b5-8a70-389b9e6f9240",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 92,
+    "calculatedScore": 90.7,
+    "scoreDifference": 1.3,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965325-145",
+    "responseId": "resp-1793775127290-145",
+    "studentId": "d35a063d-fefd-439d-95d1-d5b34b74594b",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 65.12
+    },
+    "googleFormScore": 62,
+    "calculatedScore": 65.12,
+    "scoreDifference": 3.12,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 28,
+    "totalIncorrect": 15,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965325-146",
+    "responseId": "resp-1793775127291-146",
+    "studentId": "2a522080-6c0f-4668-9f8e-eec3699f68ad",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 79.07
+    },
+    "googleFormScore": 81,
+    "calculatedScore": 79.07,
+    "scoreDifference": 1.93,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 34,
+    "totalIncorrect": 9,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965325-147",
+    "responseId": "resp-1793775127291-147",
+    "studentId": "07cb9cee-e677-4485-86ad-6dc24af2e451",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 74.42
+    },
+    "googleFormScore": 71,
+    "calculatedScore": 74.42,
+    "scoreDifference": 3.42,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 32,
+    "totalIncorrect": 11,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965326-148",
+    "responseId": "resp-1793775127291-148",
+    "studentId": "259e23b2-1b74-4c67-84d8-7a83b9507fc3",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 83.72
+    },
+    "googleFormScore": 84,
+    "calculatedScore": 83.72,
+    "scoreDifference": 0.28,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 36,
+    "totalIncorrect": 7,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965326-149",
+    "responseId": "resp-1793775127291-149",
+    "studentId": "26b7bbef-0ae3-4ebb-8f6e-e6d26d9c50d3",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 97.67
+    },
+    "googleFormScore": 98,
+    "calculatedScore": 97.67,
+    "scoreDifference": 0.33,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 42,
+    "totalIncorrect": 1,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965326-150",
+    "responseId": "resp-1793775127292-150",
+    "studentId": "5cec1bc4-24f2-40a5-843f-4bb9d9d4da8c",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 87,
+    "calculatedScore": 86.05,
+    "scoreDifference": 0.95,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965326-151",
+    "responseId": "resp-1793775127292-151",
+    "studentId": "633ba8d7-0c4a-417c-ab66-06b92e7cf1a0",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 95.35
+    },
+    "googleFormScore": 93,
+    "calculatedScore": 95.35,
+    "scoreDifference": 2.35,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 41,
+    "totalIncorrect": 2,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965326-152",
+    "responseId": "resp-1793775127292-152",
+    "studentId": "1227237c-1908-48f1-94ae-559a0e408eef",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 93.02
+    },
+    "googleFormScore": 92,
+    "calculatedScore": 93.02,
+    "scoreDifference": 1.02,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 40,
+    "totalIncorrect": 3,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965326-153",
+    "responseId": "resp-1793775127292-153",
+    "studentId": "d2fc6b05-f716-48f3-aad5-982d13f99111",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 95.35
+    },
+    "googleFormScore": 96,
+    "calculatedScore": 95.35,
+    "scoreDifference": 0.65,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 41,
+    "totalIncorrect": 2,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965326-154",
+    "responseId": "resp-1793775127292-154",
+    "studentId": "26163a88-1765-4afb-b6a3-ec156c8ebe5d",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 89,
+    "calculatedScore": 88.37,
+    "scoreDifference": 0.63,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965326-155",
+    "responseId": "resp-1793775127293-155",
+    "studentId": "fb1caade-b7a5-4410-9f5e-c6d2efd6bbb7",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 74.42
+    },
+    "googleFormScore": 72,
+    "calculatedScore": 74.42,
+    "scoreDifference": 2.42,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 32,
+    "totalIncorrect": 11,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965326-156",
+    "responseId": "resp-1793775127293-156",
+    "studentId": "71a68f80-b3be-4d43-ba51-186185ebfc1b",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 95.35
+    },
+    "googleFormScore": 94,
+    "calculatedScore": 95.35,
+    "scoreDifference": 1.35,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 41,
+    "totalIncorrect": 2,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965327-157",
+    "responseId": "resp-1793775127293-157",
+    "studentId": "405d3fcb-f66f-4ba1-a8f0-1b972d02a0fd",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 93.02
+    },
+    "googleFormScore": 93,
+    "calculatedScore": 93.02,
+    "scoreDifference": 0.02,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 40,
+    "totalIncorrect": 3,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965327-158",
+    "responseId": "resp-1793775127293-158",
+    "studentId": "afe5da49-a5f3-4f04-897a-8c2733668bab",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 97.67
+    },
+    "googleFormScore": 96,
+    "calculatedScore": 97.67,
+    "scoreDifference": 1.67,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 42,
+    "totalIncorrect": 1,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965327-159",
+    "responseId": "resp-1793775127293-159",
+    "studentId": "8f8217e9-0e64-4ae3-a283-c3a924a58a41",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 72.09
+    },
+    "googleFormScore": 75,
+    "calculatedScore": 72.09,
+    "scoreDifference": 2.91,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 31,
+    "totalIncorrect": 12,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965327-160",
+    "responseId": "resp-1793775127294-160",
+    "studentId": "398c9234-01ba-4668-850b-562a4d637b6d",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 65.12
+    },
+    "googleFormScore": 63,
+    "calculatedScore": 65.12,
+    "scoreDifference": 2.12,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 28,
+    "totalIncorrect": 15,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965327-161",
+    "responseId": "resp-1793775127294-161",
+    "studentId": "9e60d79f-adbf-4bbb-ae99-e262539eecce",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 65.12
+    },
+    "googleFormScore": 61,
+    "calculatedScore": 65.12,
+    "scoreDifference": 4.12,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 28,
+    "totalIncorrect": 15,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965327-162",
+    "responseId": "resp-1793775127294-162",
+    "studentId": "c0dea493-6c71-4c68-9033-3a58498d5a8e",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 65.12
+    },
+    "googleFormScore": 64,
+    "calculatedScore": 65.12,
+    "scoreDifference": 1.12,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 28,
+    "totalIncorrect": 15,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965328-163",
+    "responseId": "resp-1793775127294-163",
+    "studentId": "eee9d9cd-318b-4877-bcd8-151182c7076b",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 95.35
+    },
+    "googleFormScore": 95,
+    "calculatedScore": 95.35,
+    "scoreDifference": 0.35,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 41,
+    "totalIncorrect": 2,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965328-164",
+    "responseId": "resp-1793775127295-164",
+    "studentId": "15a2596f-7150-4631-957f-2d3f3c3f3035",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 92,
+    "calculatedScore": 90.7,
+    "scoreDifference": 1.3,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965328-165",
+    "responseId": "resp-1793775127295-165",
+    "studentId": "ce722ffa-4218-4d7e-8d35-4e230632eb5c",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 93.02
+    },
+    "googleFormScore": 93,
+    "calculatedScore": 93.02,
+    "scoreDifference": 0.02,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 40,
+    "totalIncorrect": 3,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965328-166",
+    "responseId": "resp-1793775127295-166",
+    "studentId": "146d12e9-c755-4b2f-9de5-973a9722f493",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 79.07
+    },
+    "googleFormScore": 79,
+    "calculatedScore": 79.07,
+    "scoreDifference": 0.07,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 34,
+    "totalIncorrect": 9,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965328-167",
+    "responseId": "resp-1793775127296-167",
+    "studentId": "4ee2ec1c-7b17-4972-b92d-3ddf21eb9a10",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 69.77
+    },
+    "googleFormScore": 70,
+    "calculatedScore": 69.77,
+    "scoreDifference": 0.23,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 30,
+    "totalIncorrect": 13,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965328-168",
+    "responseId": "resp-1793775127296-168",
+    "studentId": "fb2a5856-f2a9-4f19-81db-f3d90fa47dd0",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 81.4
+    },
+    "googleFormScore": 83,
+    "calculatedScore": 81.4,
+    "scoreDifference": 1.6,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 35,
+    "totalIncorrect": 8,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965328-169",
+    "responseId": "resp-1793775127297-169",
+    "studentId": "6da391cb-3176-472b-b0a9-0cea2c22f77f",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 88,
+    "calculatedScore": 88.37,
+    "scoreDifference": 0.37,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965328-170",
+    "responseId": "resp-1793775127297-170",
+    "studentId": "3c9e7623-670e-452f-a7a5-5b84387430d8",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 60.47
+    },
+    "googleFormScore": 60,
+    "calculatedScore": 60.47,
+    "scoreDifference": 0.47,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 26,
+    "totalIncorrect": 17,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965328-171",
+    "responseId": "resp-1793775127298-171",
+    "studentId": "a0f803dc-5c80-416c-92ed-3afda2a36596",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 88,
+    "calculatedScore": 88.37,
+    "scoreDifference": 0.37,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965328-172",
+    "responseId": "resp-1793775127298-172",
+    "studentId": "980e50d1-2d35-4914-af25-d7c564cf7d46",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 69.77
+    },
+    "googleFormScore": 69,
+    "calculatedScore": 69.77,
+    "scoreDifference": 0.77,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 30,
+    "totalIncorrect": 13,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965329-173",
+    "responseId": "resp-1793775127298-173",
+    "studentId": "b7e4ac81-0511-4a49-ae3e-625e20573a55",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 88,
+    "calculatedScore": 88.37,
+    "scoreDifference": 0.37,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965329-174",
+    "responseId": "resp-1793775127298-174",
+    "studentId": "f08ada4e-6016-4200-9997-5c258a6eff41",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 53.49
+    },
+    "googleFormScore": 51,
+    "calculatedScore": 53.49,
+    "scoreDifference": 2.49,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 23,
+    "totalIncorrect": 20,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965329-175",
+    "responseId": "resp-1793775127298-175",
+    "studentId": "da5e8078-7769-40fd-bfb4-87b212368331",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 69.77
+    },
+    "googleFormScore": 70,
+    "calculatedScore": 69.77,
+    "scoreDifference": 0.23,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 30,
+    "totalIncorrect": 13,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965329-176",
+    "responseId": "resp-1793775127299-176",
+    "studentId": "ece6e3a7-9862-4f7f-b912-298c3ec8a21e",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 65.12
+    },
+    "googleFormScore": 67,
+    "calculatedScore": 65.12,
+    "scoreDifference": 1.88,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 28,
+    "totalIncorrect": 15,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965329-177",
+    "responseId": "resp-1793775127299-177",
+    "studentId": "266679fa-3196-4d53-b3a7-2c64f7cc1eb1",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 81.4
+    },
+    "googleFormScore": 82,
+    "calculatedScore": 81.4,
+    "scoreDifference": 0.6,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 35,
+    "totalIncorrect": 8,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965330-178",
+    "responseId": "resp-1793775127299-178",
+    "studentId": "1211135a-7fca-494c-9b75-edf819a12ff7",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 58.14
+    },
+    "googleFormScore": 56,
+    "calculatedScore": 58.14,
+    "scoreDifference": 2.14,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 25,
+    "totalIncorrect": 18,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965330-179",
+    "responseId": "resp-1793775127300-179",
+    "studentId": "54ced514-589b-415e-917a-a68d6b8ddb85",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 87,
+    "calculatedScore": 88.37,
+    "scoreDifference": 1.37,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965330-180",
+    "responseId": "resp-1793775127300-180",
+    "studentId": "2bfa2302-847d-4984-bcc1-6c9f2ed3c63c",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 90,
+    "calculatedScore": 90.7,
+    "scoreDifference": 0.7,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965330-181",
+    "responseId": "resp-1793775127300-181",
+    "studentId": "32d5ad2f-5061-4e6e-9ce2-b299d111ec23",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 90,
+    "calculatedScore": 90.7,
+    "scoreDifference": 0.7,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965330-182",
+    "responseId": "resp-1793775127300-182",
+    "studentId": "c45beb68-ed4a-4f7e-ac2f-4c4819cb1777",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 87,
+    "calculatedScore": 88.37,
+    "scoreDifference": 1.37,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965331-183",
+    "responseId": "resp-1793775127300-183",
+    "studentId": "0b47e676-8981-47e6-b488-3e7de27fe1e4",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 76.74
+    },
+    "googleFormScore": 76,
+    "calculatedScore": 76.74,
+    "scoreDifference": 0.74,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 33,
+    "totalIncorrect": 10,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965331-184",
+    "responseId": "resp-1793775127301-184",
+    "studentId": "fcbac08f-a3e5-4c5b-8bfa-d40de1a2eb8f",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 89,
+    "calculatedScore": 88.37,
+    "scoreDifference": 0.63,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965331-185",
+    "responseId": "resp-1793775127301-185",
+    "studentId": "dfb2e979-9fdb-41b5-807c-dbbaa003ab79",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 79.07
+    },
+    "googleFormScore": 79,
+    "calculatedScore": 79.07,
+    "scoreDifference": 0.07,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 34,
+    "totalIncorrect": 9,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965331-186",
+    "responseId": "resp-1793775127301-186",
+    "studentId": "0be0a859-7d39-4184-92d2-268a302cbbf2",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 74.42
+    },
+    "googleFormScore": 76,
+    "calculatedScore": 74.42,
+    "scoreDifference": 1.58,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 32,
+    "totalIncorrect": 11,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965332-187",
+    "responseId": "resp-1793775127301-187",
+    "studentId": "1c409867-818b-4775-b236-715a0076f32f",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 76.74
+    },
+    "googleFormScore": 78,
+    "calculatedScore": 76.74,
+    "scoreDifference": 1.26,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 33,
+    "totalIncorrect": 10,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965332-188",
+    "responseId": "resp-1793775127302-188",
+    "studentId": "8b58d26b-4e83-4d34-98a9-f05f4fd9e748",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 89,
+    "calculatedScore": 90.7,
+    "scoreDifference": 1.7,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965332-189",
+    "responseId": "resp-1793775127302-189",
+    "studentId": "779bad13-f01f-4c0f-aa40-c48eace020df",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 76.74
+    },
+    "googleFormScore": 76,
+    "calculatedScore": 76.74,
+    "scoreDifference": 0.74,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 33,
+    "totalIncorrect": 10,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965333-190",
+    "responseId": "resp-1793775127302-190",
+    "studentId": "dc621a8e-0647-4fca-83cf-b7e2b6168c71",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 79.07
+    },
+    "googleFormScore": 78,
+    "calculatedScore": 79.07,
+    "scoreDifference": 1.07,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 34,
+    "totalIncorrect": 9,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965333-191",
+    "responseId": "resp-1793775127302-191",
+    "studentId": "7cded2dc-c4bd-4432-95fc-22f7182187a0",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 67.44
+    },
+    "googleFormScore": 71,
+    "calculatedScore": 67.44,
+    "scoreDifference": 3.56,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 29,
+    "totalIncorrect": 14,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965333-192",
+    "responseId": "resp-1793775127302-192",
+    "studentId": "b7cacedf-3632-446d-bef8-b38b87cb881a",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 83,
+    "calculatedScore": 86.05,
+    "scoreDifference": 3.05,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965333-193",
+    "responseId": "resp-1793775127303-193",
+    "studentId": "9127c63b-a441-4792-8035-040eb9f7783f",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 87,
+    "calculatedScore": 86.05,
+    "scoreDifference": 0.95,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965334-194",
+    "responseId": "resp-1793775127304-194",
+    "studentId": "275ccb3e-47d8-4960-9ac6-42ad5babc5a4",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 62.79
+    },
+    "googleFormScore": 60,
+    "calculatedScore": 62.79,
+    "scoreDifference": 2.79,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 27,
+    "totalIncorrect": 16,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965334-195",
+    "responseId": "resp-1793775127304-195",
+    "studentId": "790f5248-ffa4-4468-b31f-95f308da9eed",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 81.4
+    },
+    "googleFormScore": 78,
+    "calculatedScore": 81.4,
+    "scoreDifference": 3.4,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 35,
+    "totalIncorrect": 8,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965334-196",
+    "responseId": "resp-1793775127304-196",
+    "studentId": "f694e0c9-edaa-4da5-b8e0-cfa80c508040",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 81.4
+    },
+    "googleFormScore": 82,
+    "calculatedScore": 81.4,
+    "scoreDifference": 0.6,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 35,
+    "totalIncorrect": 8,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965334-197",
+    "responseId": "resp-1793775127304-197",
+    "studentId": "24775735-393b-426a-a80e-b74d39f06dbe",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 93.02
+    },
+    "googleFormScore": 93,
+    "calculatedScore": 93.02,
+    "scoreDifference": 0.02,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 40,
+    "totalIncorrect": 3,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965335-198",
+    "responseId": "resp-1793775127305-198",
+    "studentId": "6cc9290d-f216-4778-bc62-5d1ec81f5fcd",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 55.81
+    },
+    "googleFormScore": 55,
+    "calculatedScore": 55.81,
+    "scoreDifference": 0.81,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 24,
+    "totalIncorrect": 19,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965335-199",
+    "responseId": "resp-1793775127305-199",
+    "studentId": "4e18dad1-de23-4b74-af35-b94357b6986b",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 89,
+    "calculatedScore": 90.7,
+    "scoreDifference": 1.7,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965335-200",
+    "responseId": "resp-1793775127305-200",
+    "studentId": "8721c75d-91d5-4c57-b80c-9a47fc7a83f7",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 87,
+    "calculatedScore": 90.7,
+    "scoreDifference": 3.7,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965335-201",
+    "responseId": "resp-1793775127305-201",
+    "studentId": "f8679556-99c0-45b2-8369-837e3f8120d1",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 87,
+    "calculatedScore": 88.37,
+    "scoreDifference": 1.37,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965336-202",
+    "responseId": "resp-1793775127306-202",
+    "studentId": "01b776ec-a944-43b9-9d99-785eec098aae",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 86,
+    "calculatedScore": 86.05,
+    "scoreDifference": 0.05,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965336-203",
+    "responseId": "resp-1793775127306-203",
+    "studentId": "e47dd4b4-454b-4063-88d5-c057c94fc3d3",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 89,
+    "calculatedScore": 90.7,
+    "scoreDifference": 1.7,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965336-204",
+    "responseId": "resp-1793775127306-204",
+    "studentId": "43bba59a-fb7d-4776-9568-a80693c9b9ce",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 89,
+    "calculatedScore": 88.37,
+    "scoreDifference": 0.63,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965336-205",
+    "responseId": "resp-1793775127306-205",
+    "studentId": "b982cc11-ee53-4e12-8ed9-02dbdfc208df",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 87,
+    "calculatedScore": 88.37,
+    "scoreDifference": 1.37,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965337-206",
+    "responseId": "resp-1793775127307-206",
+    "studentId": "13be912b-7878-4dcb-b8e0-001fb8200c91",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 69.77
+    },
+    "googleFormScore": 70,
+    "calculatedScore": 69.77,
+    "scoreDifference": 0.23,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 30,
+    "totalIncorrect": 13,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965337-207",
+    "responseId": "resp-1793775127307-207",
+    "studentId": "28ac8d76-d487-4320-9112-e4701db8b305",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 87,
+    "calculatedScore": 86.05,
+    "scoreDifference": 0.95,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965337-208",
+    "responseId": "resp-1793775127309-208",
+    "studentId": "3a1044e1-d273-4545-82b8-763822c67624",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 83.72
+    },
+    "googleFormScore": 82,
+    "calculatedScore": 83.72,
+    "scoreDifference": 1.72,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 36,
+    "totalIncorrect": 7,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965337-209",
+    "responseId": "resp-1793775127309-209",
+    "studentId": "160e9b1a-112b-4ae4-b90a-cc889c1fb1e9",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 93.02
+    },
+    "googleFormScore": 93,
+    "calculatedScore": 93.02,
+    "scoreDifference": 0.02,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 40,
+    "totalIncorrect": 3,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965338-210",
+    "responseId": "resp-1793775127310-210",
+    "studentId": "140f6719-b232-48ac-bc7f-0db370aee003",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 55.81
+    },
+    "googleFormScore": 56,
+    "calculatedScore": 55.81,
+    "scoreDifference": 0.19,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 24,
+    "totalIncorrect": 19,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965338-211",
+    "responseId": "resp-1793775127310-211",
+    "studentId": "a09cdd60-17ef-4a43-a505-12ee4494b9bc",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 91,
+    "calculatedScore": 90.7,
+    "scoreDifference": 0.3,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965338-212",
+    "responseId": "resp-1793775127310-212",
+    "studentId": "227d6880-146f-4887-88a8-2643c0a8c1dc",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 67.44
+    },
+    "googleFormScore": 71,
+    "calculatedScore": 67.44,
+    "scoreDifference": 3.56,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 29,
+    "totalIncorrect": 14,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965339-213",
+    "responseId": "resp-1793775127312-213",
+    "studentId": "4a0fbefc-a2de-4a5c-8fe5-06b272812caa",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 97.67
+    },
+    "googleFormScore": 96,
+    "calculatedScore": 97.67,
+    "scoreDifference": 1.67,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 42,
+    "totalIncorrect": 1,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965339-214",
+    "responseId": "resp-1793775127312-214",
+    "studentId": "8d4c946b-e5a6-4b0e-a424-6747034adeb1",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 97.67
+    },
+    "googleFormScore": 98,
+    "calculatedScore": 97.67,
+    "scoreDifference": 0.33,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 42,
+    "totalIncorrect": 1,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965339-215",
+    "responseId": "resp-1793775127312-215",
+    "studentId": "214587c8-cba7-478e-a8e6-d93a885d32cb",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 95.35
+    },
+    "googleFormScore": 93,
+    "calculatedScore": 95.35,
+    "scoreDifference": 2.35,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 41,
+    "totalIncorrect": 2,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965339-216",
+    "responseId": "resp-1793775127313-216",
+    "studentId": "c68e3875-1179-4d91-a5ee-4aade57f681a",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 85,
+    "calculatedScore": 86.05,
+    "scoreDifference": 1.05,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965339-217",
+    "responseId": "resp-1793775127313-217",
+    "studentId": "51fad1a5-7803-4aef-b6e0-0c88585c70ee",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 87,
+    "calculatedScore": 86.05,
+    "scoreDifference": 0.95,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965340-218",
+    "responseId": "resp-1793775127313-218",
+    "studentId": "14762bf5-3606-4856-8dcb-6d7bd607b558",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 93.02
+    },
+    "googleFormScore": 93,
+    "calculatedScore": 93.02,
+    "scoreDifference": 0.02,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 40,
+    "totalIncorrect": 3,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965340-219",
+    "responseId": "resp-1793775127313-219",
+    "studentId": "ee755acc-9031-4ebd-80bd-c620c48e98b1",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 72.09
+    },
+    "googleFormScore": 71,
+    "calculatedScore": 72.09,
+    "scoreDifference": 1.09,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 31,
+    "totalIncorrect": 12,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965340-220",
+    "responseId": "resp-1793775127314-220",
+    "studentId": "eae102d9-687c-4ec3-bf8b-eae16509bbda",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 79.07
+    },
+    "googleFormScore": 79,
+    "calculatedScore": 79.07,
+    "scoreDifference": 0.07,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 34,
+    "totalIncorrect": 9,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965340-221",
+    "responseId": "resp-1793775127314-221",
+    "studentId": "6b55d122-640f-45cc-a394-e08ad9745ce2",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 41.86
+    },
+    "googleFormScore": 42,
+    "calculatedScore": 41.86,
+    "scoreDifference": 0.14,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 18,
+    "totalIncorrect": 25,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965341-222",
+    "responseId": "resp-1793775127314-222",
+    "studentId": "4dfc9a9d-2288-4d67-84f2-99ac4ced7239",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 91,
+    "calculatedScore": 90.7,
+    "scoreDifference": 0.3,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965341-223",
+    "responseId": "resp-1793775127314-223",
+    "studentId": "0018c564-c5b0-4948-bf23-cb1c8c8d6488",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 79.07
+    },
+    "googleFormScore": 76,
+    "calculatedScore": 79.07,
+    "scoreDifference": 3.07,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 34,
+    "totalIncorrect": 9,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965341-224",
+    "responseId": "resp-1793775127314-224",
+    "studentId": "5d5b21ed-18ef-44fa-9d74-9d6f3dc332b3",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 89,
+    "calculatedScore": 88.37,
+    "scoreDifference": 0.63,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965342-225",
+    "responseId": "resp-1793775127315-225",
+    "studentId": "5b05a210-38d6-43f1-8082-2fe9dafdea69",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 97.67
+    },
+    "googleFormScore": 96,
+    "calculatedScore": 97.67,
+    "scoreDifference": 1.67,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 42,
+    "totalIncorrect": 1,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965342-226",
+    "responseId": "resp-1793775127315-226",
+    "studentId": "d26e5055-2231-4d50-9b87-3c49d86f83ef",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 76.74
+    },
+    "googleFormScore": 78,
+    "calculatedScore": 76.74,
+    "scoreDifference": 1.26,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 33,
+    "totalIncorrect": 10,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965342-227",
+    "responseId": "resp-1793775127315-227",
+    "studentId": "06f88468-7f9f-4f6f-b5a6-6397a4c96102",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 85,
+    "calculatedScore": 86.05,
+    "scoreDifference": 1.05,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965342-228",
+    "responseId": "resp-1793775127315-228",
+    "studentId": "0df16c26-335a-40d4-9bbd-220f7016c3a2",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 83.72
+    },
+    "googleFormScore": 84,
+    "calculatedScore": 83.72,
+    "scoreDifference": 0.28,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 36,
+    "totalIncorrect": 7,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965343-229",
+    "responseId": "resp-1793775127316-229",
+    "studentId": "e8a51725-6dbd-4886-bf81-f0d38492b775",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 74.42
+    },
+    "googleFormScore": 76,
+    "calculatedScore": 74.42,
+    "scoreDifference": 1.58,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 32,
+    "totalIncorrect": 11,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965343-230",
+    "responseId": "resp-1793775127316-230",
+    "studentId": "d179fd3b-fa2a-44b5-a058-6414502aa166",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 83.72
+    },
+    "googleFormScore": 84,
+    "calculatedScore": 83.72,
+    "scoreDifference": 0.28,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 36,
+    "totalIncorrect": 7,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965343-231",
+    "responseId": "resp-1793775127316-231",
+    "studentId": "b18c7550-7e40-4414-8e90-1cb2e3a67dfd",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 93.02
+    },
+    "googleFormScore": 90,
+    "calculatedScore": 93.02,
+    "scoreDifference": 3.02,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 40,
+    "totalIncorrect": 3,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965343-232",
+    "responseId": "resp-1793775127316-232",
+    "studentId": "8fa8ed3e-1786-4eec-96fe-bb73999484d3",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 81.4
+    },
+    "googleFormScore": 81,
+    "calculatedScore": 81.4,
+    "scoreDifference": 0.4,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 35,
+    "totalIncorrect": 8,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965344-233",
+    "responseId": "resp-1793775127317-233",
+    "studentId": "9383fc09-e28e-48c5-9aa0-27d5a20ed178",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 81.4
+    },
+    "googleFormScore": 81,
+    "calculatedScore": 81.4,
+    "scoreDifference": 0.4,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 35,
+    "totalIncorrect": 8,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965344-234",
+    "responseId": "resp-1793775127317-234",
+    "studentId": "4bf59e15-a2c3-489b-924d-ebae42010eb2",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 76.74
+    },
+    "googleFormScore": 78,
+    "calculatedScore": 76.74,
+    "scoreDifference": 1.26,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 33,
+    "totalIncorrect": 10,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965344-235",
+    "responseId": "resp-1793775127317-235",
+    "studentId": "143e8e19-9bf7-4fb0-8cbd-563f090a8738",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 81.4
+    },
+    "googleFormScore": 82,
+    "calculatedScore": 81.4,
+    "scoreDifference": 0.6,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 35,
+    "totalIncorrect": 8,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965344-236",
+    "responseId": "resp-1793775127317-236",
+    "studentId": "bc955a16-0619-4137-bdbe-72e8ab4464ba",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 88,
+    "calculatedScore": 86.05,
+    "scoreDifference": 1.95,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965345-237",
+    "responseId": "resp-1793775127317-237",
+    "studentId": "08f3bc5c-3304-47e9-b52e-31c4cb562ef1",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 74.42
+    },
+    "googleFormScore": 72,
+    "calculatedScore": 74.42,
+    "scoreDifference": 2.42,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 32,
+    "totalIncorrect": 11,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965345-238",
+    "responseId": "resp-1793775127318-238",
+    "studentId": "76261f66-25a7-4ba7-b3f0-a13c27214923",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 83.72
+    },
+    "googleFormScore": 84,
+    "calculatedScore": 83.72,
+    "scoreDifference": 0.28,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 36,
+    "totalIncorrect": 7,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965345-239",
+    "responseId": "resp-1793775127318-239",
+    "studentId": "6870e2dc-d8a6-49d1-a0ae-be4824782ddb",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 79.07
+    },
+    "googleFormScore": 81,
+    "calculatedScore": 79.07,
+    "scoreDifference": 1.93,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 34,
+    "totalIncorrect": 9,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965345-240",
+    "responseId": "resp-1793775127318-240",
+    "studentId": "862a6749-bf66-430b-b0cb-e53cfba2f16f",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 76.74
+    },
+    "googleFormScore": 77,
+    "calculatedScore": 76.74,
+    "scoreDifference": 0.26,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 33,
+    "totalIncorrect": 10,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965346-241",
+    "responseId": "resp-1793775127319-241",
+    "studentId": "1443e64a-b561-4aec-8fa5-987a9b74da6e",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 65.12
+    },
+    "googleFormScore": 63,
+    "calculatedScore": 65.12,
+    "scoreDifference": 2.12,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 28,
+    "totalIncorrect": 15,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965346-242",
+    "responseId": "resp-1793775127319-242",
+    "studentId": "d21034c2-66a9-48fc-a777-2f503ac0f501",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 89,
+    "calculatedScore": 88.37,
+    "scoreDifference": 0.63,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965346-243",
+    "responseId": "resp-1793775127319-243",
+    "studentId": "f876197e-94d4-4bf6-b7c6-c7292d18ee2d",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 83.72
+    },
+    "googleFormScore": 82,
+    "calculatedScore": 83.72,
+    "scoreDifference": 1.72,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 36,
+    "totalIncorrect": 7,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965346-244",
+    "responseId": "resp-1793775127319-244",
+    "studentId": "699fc7ec-b1a2-4954-8acd-cffdfedb956e",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 86,
+    "calculatedScore": 86.05,
+    "scoreDifference": 0.05,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965347-245",
+    "responseId": "resp-1793775127320-245",
+    "studentId": "cc5f7b0b-9e4d-4f34-ad33-4a136ccf1368",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 95.35
+    },
+    "googleFormScore": 95,
+    "calculatedScore": 95.35,
+    "scoreDifference": 0.35,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 41,
+    "totalIncorrect": 2,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965347-246",
+    "responseId": "resp-1793775127320-246",
+    "studentId": "f5846a37-134e-4d97-bb86-6184aeed15fe",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 91,
+    "calculatedScore": 90.7,
+    "scoreDifference": 0.3,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965347-247",
+    "responseId": "resp-1793775127320-247",
+    "studentId": "35cfce7b-62a0-42c7-8eb0-450e2b18a1b5",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 91,
+    "calculatedScore": 90.7,
+    "scoreDifference": 0.3,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965347-248",
+    "responseId": "resp-1793775127320-248",
+    "studentId": "7e3c6564-feff-4ce6-a5f3-7a40d72155b2",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 88,
+    "calculatedScore": 88.37,
+    "scoreDifference": 0.37,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965347-249",
+    "responseId": "resp-1793775127320-249",
+    "studentId": "a1d0fe1a-501a-42e2-bae4-1bd31a27e09b",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 67.44
+    },
+    "googleFormScore": 69,
+    "calculatedScore": 67.44,
+    "scoreDifference": 1.56,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 29,
+    "totalIncorrect": 14,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965348-250",
+    "responseId": "resp-1793775127321-250",
+    "studentId": "e781ebdd-ba02-4bf5-9de6-1a1fd8b8a21b",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 90.7
+    },
+    "googleFormScore": 91,
+    "calculatedScore": 90.7,
+    "scoreDifference": 0.3,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 39,
+    "totalIncorrect": 4,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965348-251",
+    "responseId": "resp-1793775127321-251",
+    "studentId": "6ccdf955-9512-4b85-aa73-34f2b640064d",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 72.09
+    },
+    "googleFormScore": 73,
+    "calculatedScore": 72.09,
+    "scoreDifference": 0.91,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 31,
+    "totalIncorrect": 12,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965348-252",
+    "responseId": "resp-1793775127321-252",
+    "studentId": "4193be9d-6d8e-40b2-b558-05f6423e2e9d",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 69.77
+    },
+    "googleFormScore": 68,
+    "calculatedScore": 69.77,
+    "scoreDifference": 1.77,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 30,
+    "totalIncorrect": 13,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965348-253",
+    "responseId": "resp-1793775127321-253",
+    "studentId": "e712f340-1a61-4cf6-a18e-dba9a918cdea",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 83.72
+    },
+    "googleFormScore": 82,
+    "calculatedScore": 83.72,
+    "scoreDifference": 1.72,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 36,
+    "totalIncorrect": 7,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965349-254",
+    "responseId": "resp-1793775127322-254",
+    "studentId": "f0ead7c4-6cd0-4ed9-b58b-5aefadcdf1b7",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 86,
+    "calculatedScore": 86.05,
+    "scoreDifference": 0.05,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965349-255",
+    "responseId": "resp-1793775127322-255",
+    "studentId": "b782810e-41c3-4eaa-aa32-17ea34edbaa1",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 62.79
+    },
+    "googleFormScore": 62,
+    "calculatedScore": 62.79,
+    "scoreDifference": 0.79,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 27,
+    "totalIncorrect": 16,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965349-256",
+    "responseId": "resp-1793775127322-256",
+    "studentId": "b2265487-0060-4e71-96b0-9586d374a140",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 81.4
+    },
+    "googleFormScore": 78,
+    "calculatedScore": 81.4,
+    "scoreDifference": 3.4,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 35,
+    "totalIncorrect": 8,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965349-257",
+    "responseId": "resp-1793775127322-257",
+    "studentId": "62f0cb54-d4cc-42cd-a77c-6566f46e028f",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 86,
+    "calculatedScore": 86.05,
+    "scoreDifference": 0.05,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965352-258",
+    "responseId": "resp-1793775127322-258",
+    "studentId": "c1495d34-7263-4045-8d83-1ff3aadf1a79",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 81.4
+    },
+    "googleFormScore": 83,
+    "calculatedScore": 81.4,
+    "scoreDifference": 1.6,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 35,
+    "totalIncorrect": 8,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965352-259",
+    "responseId": "resp-1793775127323-259",
+    "studentId": "d783864e-91a0-45cb-9963-4aa80c468015",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 48.84
+    },
+    "googleFormScore": 45,
+    "calculatedScore": 48.84,
+    "scoreDifference": 3.84,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 21,
+    "totalIncorrect": 22,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965352-260",
+    "responseId": "resp-1793775127323-260",
+    "studentId": "cf8a9ae7-568a-4b89-8d41-ab62909c80ea",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 84,
+    "calculatedScore": 86.05,
+    "scoreDifference": 2.05,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965352-261",
+    "responseId": "resp-1793775127323-261",
+    "studentId": "31c04c9b-3b7d-40b4-8d3b-3965e3a54e0f",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 83.72
+    },
+    "googleFormScore": 84,
+    "calculatedScore": 83.72,
+    "scoreDifference": 0.28,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 36,
+    "totalIncorrect": 7,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965353-262",
+    "responseId": "resp-1793775127323-262",
+    "studentId": "1bdcfd95-665a-426c-924a-fd4cd7a79809",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 93.02
+    },
+    "googleFormScore": 90,
+    "calculatedScore": 93.02,
+    "scoreDifference": 3.02,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 40,
+    "totalIncorrect": 3,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965353-263",
+    "responseId": "resp-1793775127324-263",
+    "studentId": "74f3dd2b-e083-4d34-a1fa-c0c4cc737345",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 95.35
+    },
+    "googleFormScore": 93,
+    "calculatedScore": 95.35,
+    "scoreDifference": 2.35,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 41,
+    "totalIncorrect": 2,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965353-264",
+    "responseId": "resp-1793775127324-264",
+    "studentId": "7ebe298b-37f4-49fa-9c12-297d57a57b7d",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 86,
+    "calculatedScore": 86.05,
+    "scoreDifference": 0.05,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965353-265",
+    "responseId": "resp-1793775127324-265",
+    "studentId": "a155e637-c29d-4138-98fb-c838297d4de4",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 67.44
+    },
+    "googleFormScore": 67,
+    "calculatedScore": 67.44,
+    "scoreDifference": 0.44,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 29,
+    "totalIncorrect": 14,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965353-266",
+    "responseId": "resp-1793775127324-266",
+    "studentId": "e53083b7-2aaa-461c-8b20-b17db9906a0d",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 81.4
+    },
+    "googleFormScore": 79,
+    "calculatedScore": 81.4,
+    "scoreDifference": 2.4,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 35,
+    "totalIncorrect": 8,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965353-267",
+    "responseId": "resp-1793775127325-267",
+    "studentId": "fc454af4-05d7-474b-babb-fc7958d113db",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 53.49
+    },
+    "googleFormScore": 53,
+    "calculatedScore": 53.49,
+    "scoreDifference": 0.49,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 23,
+    "totalIncorrect": 20,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965353-268",
+    "responseId": "resp-1793775127325-268",
+    "studentId": "5c2305b1-00b5-45ac-992f-41f443c14f3b",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 65.12
+    },
+    "googleFormScore": 66,
+    "calculatedScore": 65.12,
+    "scoreDifference": 0.88,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 28,
+    "totalIncorrect": 15,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965354-269",
+    "responseId": "resp-1793775127327-269",
+    "studentId": "a03ecb69-1c15-4e25-8cdc-80c9067484a6",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 69.77
+    },
+    "googleFormScore": 69,
+    "calculatedScore": 69.77,
+    "scoreDifference": 0.77,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 30,
+    "totalIncorrect": 13,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965354-270",
+    "responseId": "resp-1793775127328-270",
+    "studentId": "c7c7ed70-13d8-4b2c-b478-6c9707dc2285",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 85,
+    "calculatedScore": 86.05,
+    "scoreDifference": 1.05,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965354-271",
+    "responseId": "resp-1793775127328-271",
+    "studentId": "c86a4bd0-0370-4f9b-b5c5-4e2d87219968",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 74.42
+    },
+    "googleFormScore": 75,
+    "calculatedScore": 74.42,
+    "scoreDifference": 0.58,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 32,
+    "totalIncorrect": 11,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965354-272",
+    "responseId": "resp-1793775127329-272",
+    "studentId": "486b713f-7ad7-417e-8870-f7a41b5cf1e2",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 67.44
+    },
+    "googleFormScore": 69,
+    "calculatedScore": 67.44,
+    "scoreDifference": 1.56,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 29,
+    "totalIncorrect": 14,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965355-273",
+    "responseId": "resp-1793775127329-273",
+    "studentId": "368bfafa-3111-4838-97f8-a8374f1e5158",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 95.35
+    },
+    "googleFormScore": 94,
+    "calculatedScore": 95.35,
+    "scoreDifference": 1.35,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 41,
+    "totalIncorrect": 2,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965355-274",
+    "responseId": "resp-1793775127329-274",
+    "studentId": "5ec2077d-ceb0-4ba7-8a25-74965cb72fab",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 88,
+    "calculatedScore": 88.37,
+    "scoreDifference": 0.37,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965355-275",
+    "responseId": "resp-1793775127329-275",
+    "studentId": "86e802a3-9858-4c1a-8ebe-d86a970a0a47",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 83.72
+    },
+    "googleFormScore": 85,
+    "calculatedScore": 83.72,
+    "scoreDifference": 1.28,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 36,
+    "totalIncorrect": 7,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965355-276",
+    "responseId": "resp-1793775127329-276",
+    "studentId": "e44dbe18-3c82-4971-8d39-908a35d2832e",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 79.07
+    },
+    "googleFormScore": 80,
+    "calculatedScore": 79.07,
+    "scoreDifference": 0.93,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 34,
+    "totalIncorrect": 9,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965355-277",
+    "responseId": "resp-1793775127330-277",
+    "studentId": "d231fc32-7eaf-4669-8acf-363f340b720b",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 95.35
+    },
+    "googleFormScore": 95,
+    "calculatedScore": 95.35,
+    "scoreDifference": 0.35,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 41,
+    "totalIncorrect": 2,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965355-278",
+    "responseId": "resp-1793775127330-278",
+    "studentId": "def5534b-2365-4a6a-a85d-b1cac1bb05ca",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 93.02
+    },
+    "googleFormScore": 92,
+    "calculatedScore": 93.02,
+    "scoreDifference": 1.02,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 40,
+    "totalIncorrect": 3,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965355-279",
+    "responseId": "resp-1793775127330-279",
+    "studentId": "b09212e8-f109-4971-bcf7-e88da233972c",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 95.35
+    },
+    "googleFormScore": 95,
+    "calculatedScore": 95.35,
+    "scoreDifference": 0.35,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 41,
+    "totalIncorrect": 2,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965355-280",
+    "responseId": "resp-1793775127330-280",
+    "studentId": "000cb57c-6730-4671-a7b9-dd35023975e9",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 46.51
+    },
+    "googleFormScore": 44,
+    "calculatedScore": 46.51,
+    "scoreDifference": 2.51,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 20,
+    "totalIncorrect": 23,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965355-281",
+    "responseId": "resp-1793775127331-281",
+    "studentId": "aa3aa6b4-738e-425b-bbf6-75b2675116a3",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 67.44
+    },
+    "googleFormScore": 66,
+    "calculatedScore": 67.44,
+    "scoreDifference": 1.44,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 29,
+    "totalIncorrect": 14,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965355-282",
+    "responseId": "resp-1793775127331-282",
+    "studentId": "bd2cb9b0-7a5d-4744-800e-c1d1afc2594b",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 32.56
+    },
+    "googleFormScore": 35,
+    "calculatedScore": 32.56,
+    "scoreDifference": 2.44,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 14,
+    "totalIncorrect": 29,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965356-283",
+    "responseId": "resp-1793775127331-283",
+    "studentId": "cac5b935-b16a-4aa8-bc29-2dd9f0dd4b57",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 72.09
+    },
+    "googleFormScore": 71,
+    "calculatedScore": 72.09,
+    "scoreDifference": 1.09,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 31,
+    "totalIncorrect": 12,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965356-284",
+    "responseId": "resp-1793775127332-284",
+    "studentId": "22ec8265-e08e-408d-b310-7e3abf55c6f8",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 81.4
+    },
+    "googleFormScore": 78,
+    "calculatedScore": 81.4,
+    "scoreDifference": 3.4,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 35,
+    "totalIncorrect": 8,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965356-285",
+    "responseId": "resp-1793775127332-285",
+    "studentId": "2ecfad55-4898-4499-b2ec-c5191d59b542",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 86,
+    "calculatedScore": 86.05,
+    "scoreDifference": 0.05,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965356-286",
+    "responseId": "resp-1793775127332-286",
+    "studentId": "237d9e4e-813f-4ed7-a3a6-81cf1fb7739f",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 86.05
+    },
+    "googleFormScore": 85,
+    "calculatedScore": 86.05,
+    "scoreDifference": 1.05,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 37,
+    "totalIncorrect": 6,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965356-287",
+    "responseId": "resp-1793775127332-287",
+    "studentId": "8148d48c-4ee9-47ef-adfe-e49a7fed2499",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 83.72
+    },
+    "googleFormScore": 84,
+    "calculatedScore": 83.72,
+    "scoreDifference": 0.28,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 36,
+    "totalIncorrect": 7,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965356-288",
+    "responseId": "resp-1793775127344-288",
+    "studentId": "04e7db63-2fbe-489f-a125-84a6a48acb1d",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 93.02
+    },
+    "googleFormScore": 93,
+    "calculatedScore": 93.02,
+    "scoreDifference": 0.02,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 40,
+    "totalIncorrect": 3,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965356-289",
+    "responseId": "resp-1793775127344-289",
+    "studentId": "8556837e-5708-41f2-a950-11c7eaf7ea39",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 87,
+    "calculatedScore": 88.37,
+    "scoreDifference": 1.37,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965356-290",
+    "responseId": "resp-1793775127345-290",
+    "studentId": "1e22f22e-a088-4b39-96df-dde14a897f78",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 65.12
+    },
+    "googleFormScore": 61,
+    "calculatedScore": 65.12,
+    "scoreDifference": 4.12,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 28,
+    "totalIncorrect": 15,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965357-291",
+    "responseId": "resp-1793775127346-291",
+    "studentId": "6084a6d5-d925-488d-9486-6bbcb9490ddb",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 88.37
+    },
+    "googleFormScore": 89,
+    "calculatedScore": 88.37,
+    "scoreDifference": 0.63,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 38,
+    "totalIncorrect": 5,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965357-292",
+    "responseId": "resp-1793775127346-292",
+    "studentId": "82fc4308-ae32-4ced-92cf-3afd2c1180f5",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 76.74
+    },
+    "googleFormScore": 76,
+    "calculatedScore": 76.74,
+    "scoreDifference": 0.74,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 33,
+    "totalIncorrect": 10,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  },
+  {
+    "id": "score-resp-1793766965357-293",
+    "responseId": "resp-1793775127346-293",
+    "studentId": "9079a224-0376-4aef-947c-78f44c02bdff",
+    "tryoutId": "016a0bc4-aefb-4d85-9539-48f3bb3f383b",
+    "subjectScores": {
+      "f8391d29-1aa2-4c16-a1e6-80f6341d07d2": 48.84
+    },
+    "googleFormScore": 44,
+    "calculatedScore": 48.84,
+    "scoreDifference": 4.84,
+    "scoringStatus": "SCORING_MISMATCH",
+    "totalCorrect": 21,
+    "totalIncorrect": 22,
+    "totalUnanswered": 0,
+    "createdAt": "2026-11-04T04:36:05.288Z"
+  }
+];
 
 export const INITIAL_AUDIT_LOGS: AuditLog[] = [];
