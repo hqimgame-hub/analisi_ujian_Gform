@@ -1639,12 +1639,13 @@ export class DatabaseService {
         document.addEventListener('visibilitychange', this.visibilitySyncHandler);
       }
 
-      // 4. Polling fallback setiap 8 detik
+      // 4. Polling fallback hemat kuota (setiap 5 menit sebagai jaring pengaman, bukan 8 detik)
+      // Pembaruan data instan tetap ditangani 100% oleh Supabase Realtime WebSocket di atas
       this.syncInterval = setInterval(() => {
-        if (!this.isPushingCloud) {
+        if (!this.isPushingCloud && document.visibilityState === 'visible') {
           this.pullFromCloud();
         }
-      }, 8_000);
+      }, 300_000);
     }
 
     // Return cleanup function
