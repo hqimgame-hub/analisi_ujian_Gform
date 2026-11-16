@@ -357,8 +357,6 @@ export class AnalyticsService {
 
       // Build smart option mapper for this question (handles A..E, explicit prefixes, q.options text, and legacy unmapped full-text answers)
       const textToOptionKey = new Map<string, 'A' | 'B' | 'C' | 'D' | 'E'>();
-      // usedOptionKeys hanya untuk tracking teks yang sudah dipetakan ke opsi tertentu
-      // TIDAK digunakan untuk dynamic fallback agar distribusi tidak bergeser
       const textMappedOptionKeys = new Set<'A' | 'B' | 'C' | 'D' | 'E'>();
 
       if (Array.isArray(q.options)) {
@@ -373,6 +371,113 @@ export class AnalyticsService {
           }
         });
       }
+
+      // Pre-scan respon nyata siswa dari qAnswers untuk mendeteksi apakah q.options kadaluarsa/mismatched (misal "3° C" pada soal sisi bangun)
+      const distinctStudentAnswers: string[] = [];
+      const distinctAnswerFrequencies = new Map<string, number>();
+
+      qAnswers.forEach(ans => {
+        const raw = cleanText(ans.studentAnswer).replace(/^["'“”‘’]+|["'“”‘’]+$/g, '');
+        if (!raw) return;
+        const up = raw.toUpperCase();
+        if (['-', 'KOSONG', 'NULL', 'N/A', 'TIDAK DIJAWAB', 'BELUM DIJAWAB', 'TIDAK MENJAWAB'].includes(up)) return;
+        distinctAnswerFrequencies.set(up, (distinctAnswerFrequencies.get(up) || 0) + 1);
+        if (!distinctStudentAnswers.some(x => x.toUpperCase() === up)) {
+          distinctStudentAnswers.push(raw);
+        }
+      });
+
+      // Cek apakah q.options yang tersimpan di DB cocok dengan variasi respon siswa
+      const nonLetterStudentAnswers = distinctStudentAnswers.filter(ans => !activeOptionKeys.includes(ans.toUpperCase() as any));
+      const matchedOptionsCount = nonLetterStudentAnswers.filter(ans => {
+        const u = ans.toUpperCase();
+        return textToOptionKey.has(u) || textToOptionKey.has(stripPrefix(u));
+      }).length;
+
+      const parseExplicitPrefix = (str: string): { letter: 'A' | 'B' | 'C' | 'D' | 'E'; text: string } | null => {
+        const cleaned = cleanText(str).replace(/^["'“”‘’]+|["'“”‘’]+$/g, '');
+        if (!cleaned) return null;
+        if (!/^A(?:\s+(?:dan|atau|serta|&)|\s*\/)/i.test(cleaned)) {
+          const m = cleaned.match(/^\s*(?:\[([A-Ea-e])\]|\(([A-Ea-e])\)|(?:opsi|pilihan|jawaban)\s+([A-Ea-e])(?:[\.\)\:\-\s]|$)|([A-Ea-e])[\.\)\:\-\/]\s*)(.*)$/i);
+          if (m) {
+            const letter = (m[1] || m[2] || m[3] || m[4]).toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
+            const text = (m[5] || '').trim();
+            return { letter, text };
+          }
+        }
+        return null;
+      };
+
+      // Jika ada respon nyata berupa teks (misal "12", "8", "6", "10" atau "6 cm"), tetapi 0 cocok dengan q.options yang lama (misal "3° C"):
+      // Reset textToOptionKey dan petakan variasi teks nyata siswa langsung ke opsi A..E secara deterministik!
+      const isOptionsOutOfSync = nonLetterStudentAnswers.length > 0 && matchedOptionsCount === 0;
+      if (isOptionsOutOfSync) {
+        textToOptionKey.clear();
+        textMappedOptionKeys.clear();
+
+        // 1. Tangkap prefix eksplisit
+        nonLetterStudentAnswers.forEach(ans => {
+          const explicit = parseExplicitPrefix(ans);
+          if (explicit && activeOptionKeys.includes(explicit.letter)) {
+            textToOptionKey.set(ans.toUpperCase(), explicit.letter);
+            if (explicit.text) textToOptionKey.set(explicit.text.toUpperCase(), explicit.letter);
+            textMappedOptionKeys.add(explicit.letter);
+          }
+        });
+
+        // 2. Tangkap Benar / Salah
+        nonLetterStudentAnswers.forEach(ans => {
+          const u = ans.toUpperCase();
+          if (['BENAR', 'TRUE', 'YA', 'SETUJU'].includes(u) && activeOptionKeys.includes('A')) {
+            textToOptionKey.set(u, 'A');
+            textMappedOptionKeys.add('A');
+          } else if (['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU'].includes(u) && activeOptionKeys.includes('B')) {
+            textToOptionKey.set(u, 'B');
+            textMappedOptionKeys.add('B');
+          }
+        });
+
+        // 3. Alokasikan teks jawaban siswa tanpa prefix berdasarkan urutan frekuensi pemilih
+        const sortedByFreq = [...nonLetterStudentAnswers].sort((a, b) => {
+          const freqA = distinctAnswerFrequencies.get(a.toUpperCase()) || 0;
+          const freqB = distinctAnswerFrequencies.get(b.toUpperCase()) || 0;
+          return freqB - freqA;
+        });
+
+        sortedByFreq.forEach(ans => {
+          const u = ans.toUpperCase();
+          if (textToOptionKey.has(u)) return;
+          const targetKey = activeOptionKeys.find(k => !textMappedOptionKeys.has(k));
+          if (targetKey) {
+            textToOptionKey.set(u, targetKey);
+            const stripped = stripPrefix(u);
+            if (stripped) textToOptionKey.set(stripped, targetKey);
+            textMappedOptionKeys.add(targetKey);
+          }
+        });
+      }
+
+      // Bentuk effectiveOptions yang selalu selaras dengan data pilihan aktual siswa
+      const effectiveOptions = activeOptionKeys.map(k => {
+        // Cari teks yang terpetakan ke kunci k
+        let optText = '';
+        for (const [txt, optK] of textToOptionKey.entries()) {
+          if (optK === k && txt && !txt.startsWith('PILIHAN ') && !txt.startsWith('OPSI ') && txt !== k) {
+            optText = txt;
+            break;
+          }
+        }
+        if (!optText && Array.isArray(q.options) && !isOptionsOutOfSync) {
+          const original = q.options.find(o => (o.key || '').trim().toUpperCase() === k);
+          if (original?.text && !original.text.toUpperCase().startsWith('PILIHAN ')) {
+            optText = original.text;
+          }
+        }
+        return {
+          key: k,
+          text: optText || `Pilihan ${k}`,
+        };
+      });
 
       const resolveToOptionKey = (rawVal: string | undefined | null): 'A' | 'B' | 'C' | 'D' | 'E' | '' => {
         const cleaned = cleanText(rawVal).replace(/^["'“”‘’]+|["'“”‘’]+$/g, '');
@@ -673,7 +778,7 @@ export class AnalyticsService {
         discriminationStatus,
         reviewRecommendation,
         reviewReasons,
-        options: q.options,
+        options: effectiveOptions,
         pedagogicalNote: AnalyticsService.PEDAGOGICAL_DISCLAIMER,
       };
     });

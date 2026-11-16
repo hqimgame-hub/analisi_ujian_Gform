@@ -5529,7 +5529,7 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
 
                                         return renderKeys.map((opt: string) => {
                                           const stat = qa.distractorStats?.[opt];
-                                          const isKey = opt === qa.correctAnswer.toUpperCase();
+                                          const isKey = (qa.correctAnswer || '').split(',').map(s => s.trim().toUpperCase()).includes(opt);
                                           const optText = (qa as any).options?.find((o: any) => o.key === opt)?.text;
                                           const hasText = optText && !optText.toLowerCase().startsWith('pilihan');
                                           return (

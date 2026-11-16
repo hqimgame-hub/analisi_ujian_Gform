@@ -608,81 +608,102 @@ export class GoogleIntegrationService {
     // Peta opsi A..E saat ini
     const keyToText = new Map<'A' | 'B' | 'C' | 'D' | 'E', string>();
 
-    // Cek apakah existingOptions relevan dengan data sheet saat ini
-    if (Array.isArray(existingOptions)) {
-      const existingNonPlaceholder = existingOptions.filter(opt => {
-        const k = (opt.key || '').trim().toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
-        return optionKeys.includes(k) && !isPlaceholderText(opt.text, k);
-      });
-
-      // Jika ada rawValues, periksa apakah ada setidaknya satu nilai yang cocok dengan existingOptions
-      const hasAnyMatch = rawValues.length === 0 || existingNonPlaceholder.some(opt => {
-        const optNorm = opt.text.replace(/\s+/g, ' ').trim().toUpperCase();
-        return rawValues.some(rv => {
-          const rvNorm = rv.replace(/\s+/g, ' ').trim().toUpperCase();
-          return rvNorm === optNorm || rvNorm.includes(optNorm) || optNorm.includes(rvNorm);
-        });
-      });
-
-      // Hanya gunakan existingOptions jika masih relevan atau belum ada data baris sheet
-      if (hasAnyMatch) {
-        existingNonPlaceholder.forEach(opt => {
-          const k = (opt.key || '').trim().toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
-          keyToText.set(k, opt.text.trim());
-        });
-      }
-    }
-
     // 1. Tangkap opsi yang memiliki prefix huruf eksplisit (misal "A. Fotosintesis" atau "(A) Fotosintesis")
-    const unprefixedTexts: string[] = [];
-    const seenNormTexts = new Set<string>();
+    // serta kumpulkan teks jawaban tanpa prefix yang unik dari spreadsheet
+    const explicitPrefixMatches = new Map<'A' | 'B' | 'C' | 'D' | 'E', string>();
+    const unprefixedSpreadsheetTexts: string[] = [];
+    const seenSpreadsheetTexts = new Set<string>();
 
-    // Daftarkan teks yang sudah ada di keyToText agar tidak terduplikasi
-    keyToText.forEach(txt => {
-      seenNormTexts.add(txt.toUpperCase());
-    });
+    // Prioritaskan kunci jawaban resmi jika ada di posisi terdepan
+    const rawCandidates = rawKeyCell
+      ? [rawKeyCell, ...rawValues.filter(v => v !== rawKeyCell)]
+      : rawValues;
 
-    rawValues.forEach(val => {
-      const multi = this.extractMultiSelectLetters(val);
-      if (multi) return;
+    rawCandidates.forEach(val => {
+      const trimmedVal = val.trim();
+      if (!trimmedVal || ['-', 'KOSONG', 'NULL', 'N/A', 'TIDAK DIJAWAB', 'BELUM DIJAWAB'].includes(trimmedVal.toUpperCase())) {
+        return;
+      }
+      if (this.extractMultiSelectLetters(trimmedVal)) return;
 
-      const explicit = this.extractExplicitOptionPrefix(val);
+      const explicit = this.extractExplicitOptionPrefix(trimmedVal);
       if (explicit) {
         if (explicit.text && explicit.text.toUpperCase() !== explicit.letter) {
-          keyToText.set(explicit.letter, explicit.text);
-          seenNormTexts.add(explicit.text.toUpperCase());
-        } else if (!keyToText.has(explicit.letter)) {
-          keyToText.set(explicit.letter, `Pilihan ${explicit.letter}`);
+          if (!explicitPrefixMatches.has(explicit.letter)) {
+            explicitPrefixMatches.set(explicit.letter, explicit.text);
+          }
+        } else if (!explicitPrefixMatches.has(explicit.letter)) {
+          explicitPrefixMatches.set(explicit.letter, `Pilihan ${explicit.letter}`);
         }
         return;
       }
 
-      const upper = val.toUpperCase();
-      if (['BENAR', 'TRUE'].includes(upper)) {
-        if (!keyToText.has('A')) keyToText.set('A', val);
-        seenNormTexts.add(upper);
+      const upper = trimmedVal.toUpperCase();
+      if (['BENAR', 'TRUE', 'YA', 'SETUJU'].includes(upper)) {
+        if (!explicitPrefixMatches.has('A')) explicitPrefixMatches.set('A', 'Benar');
         return;
       }
-      if (['SALAH', 'FALSE'].includes(upper)) {
-        if (!keyToText.has('B')) keyToText.set('B', val);
-        seenNormTexts.add(upper);
+      if (['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU'].includes(upper)) {
+        if (!explicitPrefixMatches.has('B')) explicitPrefixMatches.set('B', 'Salah');
         return;
       }
 
-      if (!seenNormTexts.has(upper)) {
-        seenNormTexts.add(upper);
-        unprefixedTexts.push(val);
+      // Jika hanya huruf tunggal A-E, jangan masukkan ke unprefixedSpreadsheetTexts
+      if (optionKeys.includes(upper as any)) {
+        return;
+      }
+
+      if (!seenSpreadsheetTexts.has(upper)) {
+        seenSpreadsheetTexts.add(upper);
+        unprefixedSpreadsheetTexts.push(trimmedVal);
       }
     });
 
-    // 2. Alokasikan teks jawaban Google Form tanpa prefix huruf sesuai urutan kemunculan alaminya di sheet
-    // JANGAN lakukan sorting alfabetis agar urutan pilihan ganda asli guru di Google Form tidak teracak
-    unprefixedTexts.forEach(txt => {
-      const emptyKey = optionKeys.find(k => !keyToText.has(k));
-      if (emptyKey) {
-        keyToText.set(emptyKey, txt);
-      }
+    // Masukkan seluruh opsi eksplisit dari prefix sheet
+    explicitPrefixMatches.forEach((txt, letter) => {
+      keyToText.set(letter, txt);
     });
+
+    const hasSpreadsheetOptionTexts = explicitPrefixMatches.size > 0 || unprefixedSpreadsheetTexts.length > 0;
+
+    // Jika spreadsheet memiliki teks opsi nyata (misal "12", "8", "6", "10" atau "6 cm"):
+    // JANGAN biarkan opsi lama dari bank soal lain (seperti "3° C") menimpa atau memblokir opsi nyata sheet!
+    if (hasSpreadsheetOptionTexts) {
+      // 2a. Alokasikan teks opsi tanpa prefix dari spreadsheet ke huruf opsi A..E
+      unprefixedSpreadsheetTexts.forEach(txt => {
+        const txtUpper = txt.toUpperCase();
+        // Cek apakah ada existingOption yang teksnya persis sama dengan opsi sheet ini
+        let matchedKey: 'A' | 'B' | 'C' | 'D' | 'E' | undefined = undefined;
+        if (Array.isArray(existingOptions)) {
+          const matchOpt = existingOptions.find(o => {
+            const k = (o.key || '').trim().toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
+            if (!optionKeys.includes(k) || isPlaceholderText(o.text, k)) return false;
+            return o.text.trim().toUpperCase() === txtUpper;
+          });
+          if (matchOpt) {
+            const k = matchOpt.key.toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
+            if (!keyToText.has(k)) {
+              matchedKey = k;
+            }
+          }
+        }
+
+        const targetKey = matchedKey || optionKeys.find(k => !keyToText.has(k));
+        if (targetKey) {
+          keyToText.set(targetKey, txt);
+        }
+      });
+    } else if (Array.isArray(existingOptions)) {
+      // 2b. Spreadsheet hanya memuat huruf murni A-E atau belum ada respon: gunakan existingOptions
+      const existingNonPlaceholder = existingOptions.filter(opt => {
+        const k = (opt.key || '').trim().toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
+        return optionKeys.includes(k) && !isPlaceholderText(opt.text, k);
+      });
+      existingNonPlaceholder.forEach(opt => {
+        const k = (opt.key || '').trim().toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
+        keyToText.set(k, opt.text.trim());
+      });
+    }
 
     // 3. Tentukan jumlah opsi aktif secara dinamis:
     // Jika soal di Google Form hanya memiliki 4 pilihan (A..D, standar SMP/MTs), JANGAN buat opsi E dummy!
@@ -932,9 +953,22 @@ export class GoogleIntegrationService {
 
       // Prioritas 1: Cari soal yang sudah terikat langsung dengan tryout ini
       let existing = tryoutSpecificQuestions.find(q => q.questionNumber === qNum);
-      // Prioritas 2: Jika tryout belum memiliki soal sendiri, cari soal umum yang nomornya cocok
-      if (!existing && (!tryout || tryoutSpecificQuestions.length === 0)) {
+      // Prioritas 2: HANYA jika TIDAK ada konteks tryout spesifik (impor bank soal umum mandiri), baru gunakan remainingQuestions
+      if (!existing && !tryout?.id) {
         existing = remainingQuestions.find(q => q.questionNumber === qNum);
+      }
+
+      const codePrefix = tryout?.code ? tryout.code.replace(/[^a-zA-Z0-9_-]/g, '') : (subject.code || 'SOAL');
+      const expectedCodePrefix = `${codePrefix}-Q`;
+
+      // Jika soal terikat pada paket lain atau memiliki kode paket berbeda, putuskan keterkaitan agar tidak merusak paket lain
+      if (existing && tryout?.id) {
+        const isLinkedToOtherTryout = (dbService.getState().tryoutQuestions || [])
+          .filter((tq: any) => tq.questionId === existing!.id && tq.tryoutId !== tryout.id).length > 0;
+        const codeMismatch = existing.uniqueCode && !existing.uniqueCode.startsWith(expectedCodePrefix);
+        if (isLinkedToOtherTryout && codeMismatch) {
+          existing = undefined;
+        }
       }
 
       const enriched = this.enrichQuestionOptionsFromRows(

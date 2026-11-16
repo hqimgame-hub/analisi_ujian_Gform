@@ -12,6 +12,7 @@ import { SumatifAnalyticsService, TeacherSumatifAnalytics } from '../../services
 import { AnalyticsService, QuestionAnalysisResult } from '../../services/analytics';
 import { ExportService } from '../../services/export';
 import { DatabaseService } from '../../services/database';
+import { GoogleIntegrationService } from '../../services/googleIntegration';
 
 interface GuruSumatifAnalyticsSectionProps {
   packages: ExamPackage[];
@@ -438,7 +439,7 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
     return (
       effectiveTryouts.find(t =>
         (t.packageId === activePackage.id || (pkgCode && t.code.toLowerCase().startsWith(pkgCode))) &&
-        t.subjectId === effectiveSubject.id
+        (t.subjectId === effectiveSubject.id || (effectiveSubject.name && t.title.toLowerCase().includes(effectiveSubject.name.toLowerCase())))
       ) || null
     );
   }, [effectiveTryouts, activePackage, effectiveSubject]);
@@ -538,11 +539,22 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
             optKeys.forEach(k => { distCounts[k] = 0; });
             distCounts['KOSONG'] = 0;
             qAnswers.forEach(a => {
-              const ans = (a.studentAnswer || '').trim().toUpperCase();
-              if (!ans || ['-', 'KOSONG', 'NULL', 'N/A'].includes(ans)) {
+              const rawAns = (a.studentAnswer || '').trim();
+              const upper = rawAns.toUpperCase();
+              if (!rawAns || ['-', 'KOSONG', 'NULL', 'N/A', 'TIDAK DIJAWAB', 'BELUM DIJAWAB'].includes(upper)) {
                 distCounts['KOSONG'] = (distCounts['KOSONG'] || 0) + 1;
-              } else if (optKeys.includes(ans)) {
-                distCounts[ans] = (distCounts[ans] || 0) + 1;
+              } else if (optKeys.includes(upper)) {
+                distCounts[upper] = (distCounts[upper] || 0) + 1;
+              } else if (matchingQ) {
+                const norm = GoogleIntegrationService.normalizeAnswerToOptionKey(rawAns, matchingQ);
+                if (norm && optKeys.includes(norm)) {
+                  distCounts[norm] = (distCounts[norm] || 0) + 1;
+                } else if (a.isCorrect && optKeys.includes(correctKey)) {
+                  distCounts[correctKey] = (distCounts[correctKey] || 0) + 1;
+                } else {
+                  const unassigned = otherKeys.find(k => (distCounts[k] || 0) === 0) || otherKeys[0] || 'A';
+                  distCounts[unassigned] = (distCounts[unassigned] || 0) + 1;
+                }
               }
             });
             optKeys.forEach(k => {
