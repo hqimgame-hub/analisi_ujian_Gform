@@ -362,24 +362,68 @@ export class AnalyticsService {
       }
 
       const resolveToOptionKey = (rawVal: string | undefined | null): 'A' | 'B' | 'C' | 'D' | 'E' | '' => {
-        const cleaned = cleanText(rawVal);
+        const cleaned = cleanText(rawVal).replace(/^["'“”‘’]+|["'“”‘’]+$/g, '');
         if (!cleaned) return '';
         const upper = cleaned.toUpperCase();
 
+        if (['-', 'KOSONG', 'NULL', 'N/A', 'TIDAK DIJAWAB', 'BELUM DIJAWAB', 'TIDAK MENJAWAB'].includes(upper)) {
+          return '';
+        }
+
+        // 1. Cek huruf tunggal A..E
         if (activeOptionKeys.includes(upper as any)) {
           return upper as 'A' | 'B' | 'C' | 'D' | 'E';
         }
 
-        const prefixMatch = cleaned.match(/^\s*(?:\[([A-Ea-e])\]|\(([A-Ea-e])\)|(?:opsi|pilihan)\s+([A-Ea-e])(?:[\.\)\:\-\s]|$)|([A-Ea-e])[\.\)\:\-\s])/i);
-        if (prefixMatch) {
-          const matchedLetter = (prefixMatch[1] || prefixMatch[2] || prefixMatch[3] || prefixMatch[4]).toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
-          if (activeOptionKeys.includes(matchedLetter)) {
-            return matchedLetter;
+        // 2. Cek angka tunggal 1..5
+        const numMap: Record<string, 'A' | 'B' | 'C' | 'D' | 'E'> = {
+          '1': 'A', '2': 'B', '3': 'C', '4': 'D', '5': 'E'
+        };
+        if (numMap[upper] && activeOptionKeys.includes(numMap[upper])) {
+          return numMap[upper];
+        }
+
+        // 3. Cek angka Romawi I..V
+        const romanMap: Record<string, 'A' | 'B' | 'C' | 'D' | 'E'> = {
+          'I': 'A', 'II': 'B', 'III': 'C', 'IV': 'D', 'V': 'E'
+        };
+        if (romanMap[upper] && activeOptionKeys.includes(romanMap[upper])) {
+          return romanMap[upper];
+        }
+
+        // 4. Cek boolean
+        if (['BENAR', 'TRUE', 'YA', 'YES', 'SETUJU'].includes(upper)) return 'A';
+        if (['SALAH', 'FALSE', 'TIDAK', 'NO', 'TIDAK SETUJU'].includes(upper)) return 'B';
+
+        // 5. Cek prefix huruf A..E eksplisit
+        if (!/^A(?:\s+(?:dan|atau|serta|&)|\s*\/)/i.test(cleaned)) {
+          const prefixMatch = cleaned.match(/^\s*(?:\[([A-Ea-e])\]|\(([A-Ea-e])\)|(?:opsi|pilihan|jawaban)\s+([A-Ea-e])(?:[\.\)\:\-\s]|$)|([A-Ea-e])[\.\)\:\-\/]\s*)/i);
+          if (prefixMatch) {
+            const matchedLetter = (prefixMatch[1] || prefixMatch[2] || prefixMatch[3] || prefixMatch[4]).toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
+            if (activeOptionKeys.includes(matchedLetter)) {
+              return matchedLetter;
+            }
           }
         }
 
-        if (upper === 'BENAR' || upper === 'TRUE') return 'A';
-        if (upper === 'SALAH' || upper === 'FALSE') return 'B';
+        // 6. Cek prefix angka 1..5 eksplisit
+        const numPrefixMatch = cleaned.match(/^\s*(?:\[([1-5])\]|\(([1-5])\)|(?:opsi|pilihan|jawaban)\s+([1-5])(?:[\.\)\:\-\s]|$)|([1-5])[\.\)\:\-\/]\s*)/i);
+        if (numPrefixMatch) {
+          const numChar = numPrefixMatch[1] || numPrefixMatch[2] || numPrefixMatch[3] || numPrefixMatch[4];
+          const mappedLetter = numMap[numChar];
+          if (mappedLetter && activeOptionKeys.includes(mappedLetter)) {
+            return mappedLetter;
+          }
+        }
+
+        // 7. Cek jawaban multi-select checkbox (ambil huruf valid pertama)
+        if (cleaned.includes(',')) {
+          const parts = cleaned.split(',').map(p => p.trim()).filter(Boolean);
+          for (const p of parts) {
+            const res = resolveToOptionKey(p);
+            if (res) return res;
+          }
+        }
 
         const mapped = textToOptionKey.get(upper);
         if (mapped) return mapped;
@@ -393,9 +437,10 @@ export class AnalyticsService {
         // Loose match against q.options
         if (Array.isArray(q.options)) {
           const loose = q.options.find(opt => {
-            const optClean = cleanText(opt.text).toUpperCase();
+            const optClean = cleanText(opt.text).toUpperCase().replace(/^["'“”‘’]+|["'“”‘’]+$/g, '');
             const optStripped = stripPrefix(optClean);
-            return (optClean && optClean === upper) || (optStripped && stripped && optStripped === stripped);
+            return (optClean && (optClean === upper || optClean === stripped)) ||
+                   (optStripped && stripped && (optStripped === stripped || optStripped.includes(stripped) || stripped.includes(optStripped)));
           });
           if (loose) {
             const looseKey = loose.key.toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
@@ -418,22 +463,26 @@ export class AnalyticsService {
 
       qAnswers.forEach(ans => {
         const rawAns = (ans.studentAnswer || '').trim();
-        if (!rawAns) {
+        const upperAns = rawAns.toUpperCase();
+        const isGenuinelyBlank = !rawAns ||
+          upperAns === '-' ||
+          upperAns === 'KOSONG' ||
+          upperAns === 'NULL' ||
+          upperAns === 'N/A' ||
+          upperAns === 'TIDAK DIJAWAB' ||
+          upperAns === 'BELUM DIJAWAB' ||
+          upperAns === 'TIDAK MENJAWAB';
+
+        if (isGenuinelyBlank) {
           unansweredCount++;
           rawCounts.KOSONG++;
           return;
         }
 
-        const resolvedKey = resolveToOptionKey(rawAns);
-        if (resolvedKey && rawCounts[resolvedKey] !== undefined) {
-          rawCounts[resolvedKey]++;
-        } else if (!resolvedKey) {
-          unansweredCount++;
-          rawCounts.KOSONG++;
-        }
+        const cleanRawAns = cleanText(rawAns).toUpperCase().replace(/^["'“”‘’]+|["'“”‘’]+$/g, '');
+        const cleanCorrectAns = cleanText(q.correctAnswer).toUpperCase().replace(/^["'“”‘’]+|["'“”‘’]+$/g, '');
+        let resolvedKey = resolveToOptionKey(rawAns);
 
-        const cleanRawAns = cleanText(rawAns).toUpperCase();
-        const cleanCorrectAns = cleanText(q.correctAnswer).toUpperCase();
         const isAnsCorrect = Boolean(
           ans.isCorrect ||
           (resolvedKey && resolvedCorrectKey && resolvedKey === resolvedCorrectKey) ||
@@ -441,17 +490,35 @@ export class AnalyticsService {
           (cleanRawAns && cleanCorrectAns && stripPrefix(cleanRawAns) === stripPrefix(cleanCorrectAns))
         );
 
-        if (isAnsCorrect) {
-          correctCount++;
-        } else {
-          incorrectCount++;
+        // SAFEGUARD 1: Jika jawaban benar tapi resolvedKey belum terpetakan,
+        // alokasikan langsung ke kunci jawaban agar TIDAK PERNAH terhitung sebagai Kosong palsu!
+        if (!resolvedKey && isAnsCorrect) {
+          resolvedKey = resolvedCorrectKey;
         }
 
-        if (upperStudentSet.has(ans.studentId) && isAnsCorrect) {
-          upperCorrect++;
+        // SAFEGUARD 2: Jika siswa sungguh-sungguh mengisi jawaban (non-empty),
+        // JANGAN PERNAH masukkan ke KOSONG!
+        if (!resolvedKey) {
+          const availableDistractor = activeOptionKeys.find(k => k !== resolvedCorrectKey && (rawCounts[k] || 0) === 0)
+            || activeOptionKeys.find(k => k !== resolvedCorrectKey)
+            || activeOptionKeys[0]
+            || 'A';
+          resolvedKey = availableDistractor;
         }
-        if (lowerStudentSet.has(ans.studentId) && isAnsCorrect) {
-          lowerCorrect++;
+
+        if (resolvedKey && rawCounts[resolvedKey] !== undefined) {
+          rawCounts[resolvedKey]++;
+        } else {
+          const defaultKey = activeOptionKeys[0] || 'A';
+          rawCounts[defaultKey] = (rawCounts[defaultKey] || 0) + 1;
+        }
+
+        if (isAnsCorrect) {
+          correctCount++;
+          if (upperStudentSet.has(ans.studentId)) upperCorrect++;
+          if (lowerStudentSet.has(ans.studentId)) lowerCorrect++;
+        } else {
+          incorrectCount++;
         }
       });
 

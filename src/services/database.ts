@@ -3659,10 +3659,31 @@ export class DatabaseService {
   }
 
   /**
+   * Menautkan butir soal spesifik ke Tryout/Asesmen tertentu
+   */
+  public linkQuestionToTryout(tryoutId: string, questionId: string, questionOrder: number): void {
+    if (!tryoutId || !questionId) return;
+    if (!this.state.tryoutQuestions) this.state.tryoutQuestions = [];
+    const existing = this.state.tryoutQuestions.find(
+      tq => tq.tryoutId === tryoutId && tq.questionId === questionId
+    );
+    if (!existing) {
+      this.state.tryoutQuestions.push({
+        id: generateUuid(),
+        tryoutId,
+        questionId,
+        questionOrder,
+      });
+      this.persistState();
+    }
+  }
+
+  /**
    * Mengambil butir soal yang spesifik milik Tryout ini:
    * 1. Soal yang terdaftar di tryoutQuestions
    * 2. Soal yang memiliki jawaban tersimpan di tabel answers untuk tryoutId ini
-   * 3. Soal yang cocok dengan subjectId tryout
+   * 3. Soal dengan uniqueCode yang memuat kode tryout
+   * 4. Soal yang cocok dengan subjectId tryout
    */
   public getQuestionsForTryout(tryoutId?: string, subjectId?: string): Question[] {
     if (!tryoutId || tryoutId === 'ALL') {
@@ -3692,6 +3713,12 @@ export class DatabaseService {
     let result = this.state.questions.filter(
       q => linkedQIds.has(q.id) || answerQIds.has(q.id)
     );
+
+    // Jika belum ditemukan dari linkedQIds atau answers, coba cari berdasarkan prefix tryout.code
+    if (result.length === 0 && tryout?.code) {
+      const codePrefix = `${tryout.code.toLowerCase().trim()}-`;
+      result = this.state.questions.filter(q => q.uniqueCode && q.uniqueCode.toLowerCase().startsWith(codePrefix));
+    }
 
     // Jika terdapat questionId pada answers yang belum terdaftar di tabel questions (misal hasil sinkronisasi / impor),
     // bentuk entitas Question otomatis agar seluruh butir soal (1..N) tampil utuh di halaman maupun PDF analisis

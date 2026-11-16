@@ -131,16 +131,19 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
   const [columnSelectorKeyRow, setColumnSelectorKeyRow] = useState<Record<string, string> | null>(null);
   const [columnSelectorChecked, setColumnSelectorChecked] = useState<Record<string, boolean>>({});
 
-  // Database Local States
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [tryouts, setTryouts] = useState<Tryout[]>([]);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [materials, setMaterials] = useState<Material[]>([]);
-  const [competencies, setCompetencies] = useState<Competency[]>([]);
-  const [classes, setClasses] = useState<ClassRoom[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [scores, setScores] = useState<Score[]>([]);
-  const [explanations, setExplanations] = useState<Explanation[]>([]);
+  // Database Local States — Inisialisasi sinkron dari dbService untuk eliminasi flash/kedipan kosong saat refresh
+  const [questions, setQuestions] = useState<Question[]>(() => dbService.getQuestionsForTeacher(currentUser));
+  const [tryouts, setTryouts] = useState<Tryout[]>(() => dbService.getTryoutsForTeacher(currentUser));
+  const [subjects, setSubjects] = useState<Subject[]>(() => dbService.getSubjects());
+  const [materials, setMaterials] = useState<Material[]>(() => dbService.getMaterialsForTeacher(currentUser));
+  const [competencies, setCompetencies] = useState<Competency[]>(() => dbService.getCompetenciesForTeacher(currentUser));
+  const [classes, setClasses] = useState<ClassRoom[]>(() => dbService.getClassesForTeacher(currentUser));
+  const [students, setStudents] = useState<Student[]>(() => dbService.getStudentsForTeacher(currentUser));
+  const [scores, setScores] = useState<Score[]>(() => dbService.getScores());
+  const [explanations, setExplanations] = useState<Explanation[]>(() =>
+    currentUser?.role === 'ADMIN' ? dbService.getExplanations() : dbService.getExplanationsForTeacher(currentUser)
+  );
+  const [examPackages, setExamPackages] = useState<ExamPackage[]>(() => dbService.getExamPackages());
 
   // ── Auto-Sync State: per-tryout Google Sheet polling status ────────────────
   const [sheetSyncStatus, setSheetSyncStatus] = useState<Record<string, {
@@ -151,8 +154,8 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
   }>>({});
 
   // Permissions of Current Teacher
-  const [allowedSubjectIds, setAllowedSubjectIds] = useState<string[]>([]);
-  const [allowedClassIds, setAllowedClassIds] = useState<string[]>([]);
+  const [allowedSubjectIds, setAllowedSubjectIds] = useState<string[]>(() => dbService.getTeacherAllowedSubjectIds(currentUser));
+  const [allowedClassIds, setAllowedClassIds] = useState<string[]>(() => dbService.getTeacherAllowedClassIds(currentUser));
 
   // Question Modal State (Create / Edit)
   const [showQuestionModal, setShowQuestionModal] = useState(false);
@@ -769,7 +772,7 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
   const [simResult, setSimResult] = useState<CalculationResult | null>(null);
 
   // Phase 9: Analytics Engine UI States
-  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
+  const [academicYears, setAcademicYears] = useState<AcademicYear[]>(() => dbService.getAcademicYears());
   const [toAnalyticsSubTab, setToAnalyticsSubTab] = useState<'PROGRESS' | 'ITEM_ANALYSIS' | 'REPORTS'>('PROGRESS');
   const [analyticsSubTab, setAnalyticsSubTab] = useState<'OVERALL' | 'CLASS' | 'STUDENT' | 'PSYCHOMETRICS'>('OVERALL');
   const [selectedSumatifPackageId, setSelectedSumatifPackageId] = useState<string>('');
@@ -806,6 +809,7 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
     }
 
     setAcademicYears(dbService.getAcademicYears());
+    setExamPackages(dbService.getExamPackages());
     setQuestions(dbService.getQuestionsForTeacher(currentUser));
     setMaterials(dbService.getMaterialsForTeacher(currentUser));
     setCompetencies(dbService.getCompetenciesForTeacher(currentUser));
@@ -894,7 +898,8 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
         keyRow,
         currentUser,
         effectiveColumns,
-        rows
+        rows,
+        tryout
       );
       setQuestions(dbService.getQuestions());
 
@@ -1317,14 +1322,14 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
 
   // Wadah Sumatif (SAS & SAT) untuk Guru: hanya wadah yang memuat mapel yang diampu oleh guru (atau semua jika ADMIN)
   const teacherSumatifPackages = useMemo(() => {
-    const rawPackages = dbService.getExamPackages().filter(p => p.assessmentType === 'SAS' || p.assessmentType === 'SAT');
+    const rawPackages = examPackages.filter(p => p.assessmentType === 'SAS' || p.assessmentType === 'SAT');
     if (!currentUser || currentUser.role === 'ADMIN') return rawPackages;
 
     const teacherAllowedSubjIds = dbService.getTeacherAllowedSubjectIds(currentUser);
     return rawPackages.filter(pkg =>
       (pkg.subjects || []).some(sub => teacherAllowedSubjIds.includes(sub.subjectId))
     );
-  }, [tryouts, currentUser, dbService]);
+  }, [examPackages, tryouts, currentUser, dbService]);
 
   const activeSumatifPackage = useMemo(() => {
     if (selectedSumatifPackageId) {
@@ -1343,9 +1348,10 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
       classes,
       questions,
       dbService.getAnswers(),
-      subjects
+      subjects,
+      tryouts
     );
-  }, [activeSumatifPackage, activeSubjectObj, scores, students, classes, questions, subjects]);
+  }, [activeSumatifPackage, activeSubjectObj, scores, students, classes, questions, subjects, tryouts]);
 
   const isToAnalyticsActive =
     activeTab === 'ANALYTICS_TO' ||
@@ -1831,7 +1837,8 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
         detectedKeyRow,
         currentUser,
         activeTryout?.selectedQuestionColumns,
-        parseRes.rows
+        parseRes.rows,
+        activeTryout
       );
       setQuestions(dbService.getQuestions());
     }

@@ -71,12 +71,12 @@ export const AdminAppPage: React.FC<AdminAppPageProps> = ({ currentUser, onNavig
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   // Database State
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [classes, setClasses] = useState<ClassRoom[]>([]);
-  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>(() => dbService.getTeachers());
+  const [students, setStudents] = useState<Student[]>(() => dbService.getStudents());
+  const [classes, setClasses] = useState<ClassRoom[]>(() => dbService.getClasses());
+  const [academicYears, setAcademicYears] = useState<AcademicYear[]>(() => dbService.getAcademicYears());
+  const [subjects, setSubjects] = useState<Subject[]>(() => dbService.getSubjects());
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => dbService.getState().auditLogs || []);
   const [examPackages, setExamPackages] = useState<ExamPackage[]>(() => dbService.getExamPackages());
   const [monitoringConfig, setMonitoringConfig] = useState<LiveMonitoringConfig>(() => dbService.getLiveMonitoringConfig());
 

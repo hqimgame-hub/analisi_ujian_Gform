@@ -367,27 +367,94 @@ export class GoogleIntegrationService {
 
   /**
    * Ekstraksi prefix huruf opsi eksplisit (A-E) dari teks jawaban Google Form.
-   * Hanya mengenali format eksplisit seperti "A", "A. ...", "B) ...", "[C] ...", "A: ...", "Opsi A ...",
-   * TIDAK mencocokkan kalimat biasa yang kebetulan diawali huruf A-E diikuti spasi (seperti "E = mc^2" atau "A dan B").
+   * Mengenali format:
+   * - Huruf tunggal: "A", "B", "C", "D", "E" (case-insensitive)
+   * - Format huruf berdelimeter: "A.", "A)", "(A)", "[A]", "A:", "A -", "A /", "Opsi A", "Pilihan A", "Jawaban A"
+   * - Format angka 1-5 (sangat umum di Google Form guru): "1" -> "A", "2" -> "B", "3" -> "C", "4" -> "D", "5" -> "E"
+   * - Angka berdelimeter: "1.", "1)", "(1)", "[1]", "Opsi 1", "Pilihan 1", "Jawaban 1", "1 -"
+   * - Angka Romawi: "I" -> "A", "II" -> "B", "III" -> "C", "IV" -> "D", "V" -> "E", "(I)", "I."
+   * - Format Boolean: "BENAR"/"TRUE"/"YA"/"YES"/"SETUJU" -> "A", "SALAH"/"FALSE"/"TIDAK"/"NO"/"TIDAK SETUJU" -> "B"
+   * Menolak kalimat biasa seperti "A dan B", "A atau B", "A & B" agar tidak salah dipetakan ke A.
    */
   public static extractExplicitOptionPrefix(rawVal: string): { letter: 'A' | 'B' | 'C' | 'D' | 'E'; text: string } | null {
-    const trimmed = (rawVal || '').trim();
+    const trimmed = (rawVal || '').replace(/\u00A0/g, ' ').replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim();
     if (!trimmed) return null;
 
+    // 1. Cek huruf tunggal murni A..E
     if (/^[A-Ea-e]$/.test(trimmed)) {
       const letter = trimmed.toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
       return { letter, text: letter };
     }
 
-    const match = trimmed.match(/^\s*(?:\[([A-Ea-e])\]|\(([A-Ea-e])\)|(?:opsi|pilihan)\s+([A-Ea-e])(?:[\.\)\:\-\s]|$)|([A-Ea-e])[\.\)\:\-\s])(?:\s*(.*))?$/i);
-    if (!match) return null;
-
-    const letter = (match[1] || match[2] || match[3] || match[4]).toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
-    const remainder = (match[5] || '').trim();
-    return {
-      letter,
-      text: remainder || trimmed,
+    // 2. Cek angka tunggal 1..5
+    const numMap: Record<string, 'A' | 'B' | 'C' | 'D' | 'E'> = {
+      '1': 'A', '2': 'B', '3': 'C', '4': 'D', '5': 'E'
     };
+    if (/^[1-5]$/.test(trimmed)) {
+      const letter = numMap[trimmed];
+      return { letter, text: letter };
+    }
+
+    // 3. Cek angka Romawi I..V
+    const romanMap: Record<string, 'A' | 'B' | 'C' | 'D' | 'E'> = {
+      'I': 'A', 'II': 'B', 'III': 'C', 'IV': 'D', 'V': 'E'
+    };
+    const upperTrimmed = trimmed.toUpperCase();
+    if (romanMap[upperTrimmed]) {
+      return { letter: romanMap[upperTrimmed], text: romanMap[upperTrimmed] };
+    }
+
+    // 4. Cek boolean / kesepakatan
+    if (['BENAR', 'TRUE', 'YA', 'YES', 'SETUJU'].includes(upperTrimmed)) {
+      return { letter: 'A', text: trimmed };
+    }
+    if (['SALAH', 'FALSE', 'TIDAK', 'NO', 'TIDAK SETUJU'].includes(upperTrimmed)) {
+      return { letter: 'B', text: trimmed };
+    }
+
+    // Tolak jika kalimat diawali "A dan ", "A atau ", "A & ", "A/B" (karena ini teks pilihan, bukan prefix huruf)
+    if (/^A(?:\s+(?:dan|atau|serta|&)|\s*\/)/i.test(trimmed)) {
+      return null;
+    }
+
+    // 5. Cek prefix huruf A..E dengan delimiter ([A], (A), Opsi A, A., A), A:, A -)
+    const letterMatch = trimmed.match(/^\s*(?:\[([A-Ea-e])\]|\(([A-Ea-e])\)|(?:opsi|pilihan|jawaban)\s+([A-Ea-e])(?:[\.\)\:\-\s]|$)|([A-Ea-e])[\.\)\:\-\/]\s*)(?:\s*(.*))?$/i);
+    if (letterMatch) {
+      const letter = (letterMatch[1] || letterMatch[2] || letterMatch[3] || letterMatch[4]).toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
+      const remainder = (letterMatch[5] || '').trim();
+      return {
+        letter,
+        text: remainder || trimmed,
+      };
+    }
+
+    // 6. Cek prefix angka 1..5 dengan delimiter ([1], (1), Opsi 1, 1., 1), 1:, 1 -)
+    const numMatch = trimmed.match(/^\s*(?:\[([1-5])\]|\(([1-5])\)|(?:opsi|pilihan|jawaban)\s+([1-5])(?:[\.\)\:\-\s]|$)|([1-5])[\.\)\:\-\/]\s*)(?:\s*(.*))?$/i);
+    if (numMatch) {
+      const numChar = numMatch[1] || numMatch[2] || numMatch[3] || numMatch[4];
+      const letter = numMap[numChar];
+      const remainder = (numMatch[5] || '').trim();
+      return {
+        letter,
+        text: remainder || trimmed,
+      };
+    }
+
+    // 7. Cek prefix Romawi I..V dengan delimiter ([I], (I), I., I), I:)
+    const romanPrefixMatch = trimmed.match(/^\s*(?:\[(I|II|III|IV|V)\]|\((I|II|III|IV|V)\)|(I|II|III|IV|V)[\.\)\:\-\/]\s*)(?:\s*(.*))?$/i);
+    if (romanPrefixMatch) {
+      const romanStr = (romanPrefixMatch[1] || romanPrefixMatch[2] || romanPrefixMatch[3]).toUpperCase();
+      const letter = romanMap[romanStr];
+      const remainder = (romanPrefixMatch[4] || '').trim();
+      if (letter) {
+        return {
+          letter,
+          text: remainder || trimmed,
+        };
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -555,6 +622,8 @@ export class GoogleIntegrationService {
         if (explicit.text && explicit.text.toUpperCase() !== explicit.letter) {
           keyToText.set(explicit.letter, explicit.text);
           seenNormTexts.add(explicit.text.toUpperCase());
+        } else if (!keyToText.has(explicit.letter)) {
+          keyToText.set(explicit.letter, `Pilihan ${explicit.letter}`);
         }
         return;
       }
@@ -650,9 +719,24 @@ export class GoogleIntegrationService {
   /**
    * Menormalisasi jawaban mentah siswa pada satu butir soal menjadi huruf opsi 'A'..'E' (atau '' jika kosong).
    */
+  /**
+   * Menormalisasi jawaban mentah siswa pada satu butir soal menjadi huruf opsi 'A'..'E' (atau '' jika kosong).
+   * Mendukung penuh format:
+   * - Huruf tunggal: 'A'..'E'
+   * - Huruf berprefix: "A.", "A)", "[A]", "Opsi A", "Pilihan A"
+   * - Angka 1-5: "1" -> "A", "2" -> "B", "3" -> "C", "4" -> "D", "5" -> "E", "1.", "(1)", "Opsi 1"
+   * - Angka Romawi: "I" -> "A", "II" -> "B", "III" -> "C", "IV" -> "D", "V" -> "E"
+   * - Teks penuh jawaban (mencocokkan terhadap q.options secara eksak maupun toleran)
+   * - Boolean: "BENAR"/"TRUE"/"YA"/"SETUJU" -> "A", "SALAH"/"FALSE"/"TIDAK"/"TIDAK SETUJU" -> "B"
+   */
   public static normalizeAnswerToOptionKey(rawVal: string, q: Question): string {
-    const trimmed = (rawVal || '').replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim();
+    const trimmed = (rawVal || '').replace(/\u00A0/g, ' ').replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').replace(/\s+/g, ' ').trim();
     if (!trimmed) return '';
+
+    const upper = trimmed.toUpperCase();
+    if (['-', 'KOSONG', 'NULL', 'N/A', 'TIDAK DIJAWAB', 'BELUM DIJAWAB', 'TIDAK MENJAWAB'].includes(upper)) {
+      return '';
+    }
 
     const multi = this.extractMultiSelectLetters(trimmed);
     if (multi) return multi;
@@ -660,37 +744,52 @@ export class GoogleIntegrationService {
     const explicit = this.extractExplicitOptionPrefix(trimmed);
     if (explicit) return explicit.letter;
 
-    const rawUpper = trimmed.toUpperCase();
-    if (['BENAR', 'TRUE'].includes(rawUpper)) return 'A';
-    if (['SALAH', 'FALSE'].includes(rawUpper)) return 'B';
-
-    const cleanRaw = rawUpper.replace(/^[A-E][\.\)\:\-\s]+\s*/, '').replace(/[\.\,\;]+$/, '').trim();
+    // Normalisasi awalan dan akhiran tanda baca untuk pencocokan teks opsi
+    const cleanRaw = upper
+      .replace(/^(?:\[[A-E1-5]\]|\([A-E1-5]\)|[A-E1-5][\.\)\:\-\/]|(?:opsi|pilihan|jawaban)\s+[A-E1-5][\.\)\:\-\s]*)\s*/i, '')
+      .replace(/[\.\,\;\:\-]+$/, '')
+      .trim();
 
     // Cocokkan dengan teks opsi butir soal
     if (Array.isArray(q.options) && q.options.length > 0) {
       // 1. Exact match (case-insensitive)
       const exactOpt = q.options.find(opt => {
-        const optText = (opt.text || '').replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
-        return optText === rawUpper;
+        const optText = (opt.text || '').replace(/\u00A0/g, ' ').replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+        return optText === upper;
       });
-      if (exactOpt) return exactOpt.key.toUpperCase();
+      if (exactOpt && ['A', 'B', 'C', 'D', 'E'].includes(exactOpt.key.toUpperCase())) {
+        return exactOpt.key.toUpperCase();
+      }
 
       // 2. Loose match: strip prefix dan tanda baca akhir
       const looseOpt = q.options.find(opt => {
-        const optText = (opt.text || '').replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
+        const optText = (opt.text || '').replace(/\u00A0/g, ' ').replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
         if (!optText || optText === `PILIHAN ${opt.key.toUpperCase()}` || optText === `OPSI ${opt.key.toUpperCase()}`) return false;
-        const optClean = optText.replace(/^[A-E][\.\)\:\-\s]+\s*/, '').replace(/[\.\,\;]+$/, '').trim();
-        return Boolean(optClean && cleanRaw && optClean === cleanRaw);
+        const optClean = optText
+          .replace(/^(?:\[[A-E1-5]\]|\([A-E1-5]\)|[A-E1-5][\.\)\:\-\/]|(?:opsi|pilihan|jawaban)\s+[A-E1-5][\.\)\:\-\s]*)\s*/i, '')
+          .replace(/[\.\,\;\:\-]+$/, '')
+          .trim();
+        return Boolean(optClean && cleanRaw && (optClean === cleanRaw || optClean.includes(cleanRaw) || cleanRaw.includes(optClean)));
       });
-      if (looseOpt) return looseOpt.key.toUpperCase();
+      if (looseOpt && ['A', 'B', 'C', 'D', 'E'].includes(looseOpt.key.toUpperCase())) {
+        return looseOpt.key.toUpperCase();
+      }
     }
 
     // Jika jawaban cocok langsung dengan kunci jawaban yang memiliki format huruf tunggal
     if (q.correctAnswer) {
-      const cleanCorr = q.correctAnswer.replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
-      if (['A', 'B', 'C', 'D', 'E'].includes(cleanCorr) && rawUpper === cleanCorr) {
+      const cleanCorr = q.correctAnswer.replace(/\u00A0/g, ' ').replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim().toUpperCase();
+      if (['A', 'B', 'C', 'D', 'E'].includes(cleanCorr) && upper === cleanCorr) {
         return cleanCorr;
       }
+      if (cleanCorr === upper || (cleanRaw && cleanCorr === cleanRaw)) {
+        if (['A', 'B', 'C', 'D', 'E'].includes(cleanCorr)) return cleanCorr;
+      }
+    }
+
+    // Cek apakah berupa huruf A-E langsung
+    if (['A', 'B', 'C', 'D', 'E'].includes(upper)) {
+      return upper;
     }
 
     return trimmed;
@@ -700,6 +799,7 @@ export class GoogleIntegrationService {
    * Auto-Bootstrap Butir Soal:
    * Jika bank soal di database untuk mapel ini masih kosong atau kurang lengkap,
    * otomatis buat/perbarui butir soal dari kolom Bagian 2 Google Form beserta opsi A..E dan kunci jawabannya.
+   * Terikat secara deterministik ke tryout spesifik agar tidak saling menimpa antar-paket ujian!
    */
   public static ensureQuestionsExist(
     subject: Subject,
@@ -707,10 +807,15 @@ export class GoogleIntegrationService {
     answerKeyRow?: Record<string, string> | null,
     currentUser?: User | null,
     selectedColumns?: string[] | null,
-    rows?: Record<string, string>[] | null
+    rows?: Record<string, string>[] | null,
+    tryout?: Tryout | null
   ): Question[] {
     const questionHeaders = this.reconcileSelectedColumns(selectedColumns, headers, rows);
     if (questionHeaders.length === 0) {
+      if (tryout?.id) {
+        const tryoutQs = dbService.getQuestionsForTryout(tryout.id, subject.id);
+        if (tryoutQs.length > 0) return tryoutQs;
+      }
       return dbService.getQuestions().filter(q => q.subjectId === subject.id);
     }
 
@@ -721,6 +826,10 @@ export class GoogleIntegrationService {
       dbService.deleteQuestionsBatch(bogusQuestions.map(q => q.id), null);
     }
 
+    // 2. Ambil soal yang secara spesifik terhubung dengan tryout ini jika ada
+    const tryoutSpecificQuestions = tryout?.id
+      ? dbService.getQuestionsForTryout(tryout.id, subject.id)
+      : [];
     const remainingQuestions = dbService.getQuestions().filter(q => q.subjectId === subject.id);
 
     let firstMaterial = dbService.getMaterials().find(m => m.subjectId === subject.id);
@@ -766,7 +875,13 @@ export class GoogleIntegrationService {
     questionHeaders.forEach((headerText, idx) => {
       const qNum = idx + 1;
       const cleanText = headerText.trim() || `Butir Soal Nomor ${qNum}`;
-      const existing = remainingQuestions.find(q => q.questionNumber === qNum);
+
+      // Prioritas 1: Cari soal yang sudah terikat langsung dengan tryout ini
+      let existing = tryoutSpecificQuestions.find(q => q.questionNumber === qNum);
+      // Prioritas 2: Jika tryout belum memiliki soal sendiri, cari soal umum yang nomornya cocok
+      if (!existing && (!tryout || tryoutSpecificQuestions.length === 0)) {
+        existing = remainingQuestions.find(q => q.questionNumber === qNum);
+      }
 
       const enriched = this.enrichQuestionOptionsFromRows(
         existing?.options,
@@ -792,9 +907,14 @@ export class GoogleIntegrationService {
         if (Object.keys(updates).length > 0) {
           dbService.updateQuestion(existing.id, updates, null);
         }
-        resultQuestions.push({ ...existing, ...updates });
+        const updatedQ = { ...existing, ...updates };
+        if (tryout?.id) {
+          dbService.linkQuestionToTryout(tryout.id, updatedQ.id, qNum);
+        }
+        resultQuestions.push(updatedQ);
       } else {
-        const uniqueCode = `${subject.code || 'SOAL'}-Q${String(qNum).padStart(3, '0')}`;
+        const codePrefix = tryout?.code ? tryout.code.replace(/[^a-zA-Z0-9_-]/g, '') : (subject.code || 'SOAL');
+        const uniqueCode = `${codePrefix}-Q${String(qNum).padStart(3, '0')}`;
         const newQ = dbService.addQuestion(
           {
             uniqueCode,
@@ -810,6 +930,9 @@ export class GoogleIntegrationService {
           },
           null // System action: bypass teacher subject restriction during automated ingestion
         );
+        if (tryout?.id) {
+          dbService.linkQuestionToTryout(tryout.id, newQ.id, qNum);
+        }
         resultQuestions.push(newQ);
       }
     });

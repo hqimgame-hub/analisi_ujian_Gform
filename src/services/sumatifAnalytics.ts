@@ -11,6 +11,7 @@
  */
 
 import { Student, Score, Subject, Question, Answer, ClassRoom, ExamPackage, Tryout } from '../types/database';
+import { dbService } from './database';
 
 export interface StudentSubjectScoreItem {
   subjectId: string;
@@ -126,13 +127,14 @@ export class SumatifAnalyticsService {
   public static extractScoreForSubject(
     scoreRecord: Score | undefined,
     subjectId: string,
-    validTryoutIds?: Set<string>
+    validTryoutIds?: Set<string>,
+    subjectObj?: Subject
   ): number | null {
     if (!scoreRecord) return null;
     if (validTryoutIds && validTryoutIds.size > 0 && !validTryoutIds.has(scoreRecord.tryoutId)) {
       return null;
     }
-    // 1. Cek subjectScores dengan exact match atau case-insensitive match
+    // 1. Cek subjectScores dengan exact match, case-insensitive, atau code/name match
     if (scoreRecord.subjectScores) {
       if (typeof scoreRecord.subjectScores[subjectId] === 'number') {
         return scoreRecord.subjectScores[subjectId];
@@ -143,13 +145,25 @@ export class SumatifAnalyticsService {
           return v;
         }
       }
+      if (subjectObj) {
+        const lowerCode = (subjectObj.code || '').toLowerCase().trim();
+        const lowerName = (subjectObj.name || '').toLowerCase().trim();
+        for (const [k, v] of Object.entries(scoreRecord.subjectScores)) {
+          if (typeof v === 'number') {
+            const lk = k.toLowerCase().trim();
+            if ((lowerCode && lk === lowerCode) || (lowerName && lk === lowerName)) {
+              return v;
+            }
+          }
+        }
+      }
     }
     // 2. Jika tryoutId cocok dengan tryout wadah/mapel ini, ambil skor aktual (prioritaskan googleFormScore asli jika ada)
     if (validTryoutIds && validTryoutIds.has(scoreRecord.tryoutId)) {
       const gForm = scoreRecord.googleFormScore;
       const calc = scoreRecord.calculatedScore;
-      if (typeof gForm === 'number') return gForm;
-      if (typeof calc === 'number') return calc;
+      if (typeof gForm === 'number' && !isNaN(gForm)) return gForm;
+      if (typeof calc === 'number' && !isNaN(calc)) return calc;
       return 0;
     }
     return null;
@@ -166,6 +180,10 @@ export class SumatifAnalyticsService {
     allSubjects: Subject[],
     allTryouts: Tryout[] = []
   ): StudentSumatifProfile {
+    const effectiveTryouts = (allTryouts && allTryouts.length > 0) ? allTryouts : dbService.getTryouts();
+    const effectiveScores = (allScores && allScores.length > 0) ? allScores : dbService.getScores();
+    const effectiveSubjects = (allSubjects && allSubjects.length > 0) ? allSubjects : dbService.getSubjects();
+
     const pkgSubjects = pkg.subjects || [];
 
     const subjectScores: StudentSubjectScoreItem[] = [];
@@ -175,7 +193,7 @@ export class SumatifAnalyticsService {
     let gradedCount = 0;
 
     pkgSubjects.forEach(pkgSub => {
-      const subInfo = allSubjects.find(s => s.id === pkgSub.subjectId);
+      const subInfo = effectiveSubjects.find(s => s.id === pkgSub.subjectId);
       const subCode = subInfo?.code || 'MAPEL';
       const subName = subInfo?.name || 'Mata Pelajaran';
       // Prioritaskan KKM master dari Admin (subInfo.passingGrade)
@@ -187,13 +205,13 @@ export class SumatifAnalyticsService {
       const pkgSubSheet = (pkgSub.googleSheetUrl || '').trim();
 
       const matchingTryoutIds = new Set(
-        allTryouts
+        effectiveTryouts
           .filter(t => {
             const tPkgId = (t.packageId || '').toLowerCase().trim();
             const tCode = (t.code || '').toLowerCase().trim();
             const tSubId = (t.subjectId || '').toLowerCase().trim();
             const isPkgMatch = tPkgId === pkgId || (pkgCode && tCode.startsWith(pkgCode)) || t.id.toLowerCase() === pkgId;
-            const isSubMatch = tSubId === subIdNorm ||
+            const isSubMatch = !t.subjectId || tSubId === subIdNorm ||
               (t.id && t.id.toLowerCase().includes(subIdNorm)) ||
               (t.title && subName && t.title.toLowerCase().includes(subName.toLowerCase().trim())) ||
               (t.code && subCode && t.code.toLowerCase().includes(subCode.toLowerCase().trim()));
@@ -205,7 +223,7 @@ export class SumatifAnalyticsService {
       matchingTryoutIds.add(pkg.id);
 
       // Cari skor siswa khusus untuk tryout wadah ini
-      const studentScores = allScores.filter(s =>
+      const studentScores = effectiveScores.filter(s =>
         s.studentId === student.id && matchingTryoutIds.has(s.tryoutId)
       );
 
@@ -287,7 +305,15 @@ export class SumatifAnalyticsService {
     allSubjects: Subject[],
     allTryouts: Tryout[] = []
   ): TeacherSumatifAnalytics {
-    const subInfo = allSubjects.find(s => s.id === subjectId);
+    const effectiveTryouts = (allTryouts && allTryouts.length > 0) ? allTryouts : dbService.getTryouts();
+    const effectiveScores = (allScores && allScores.length > 0) ? allScores : dbService.getScores();
+    const effectiveStudents = (allStudents && allStudents.length > 0) ? allStudents : dbService.getStudents();
+    const effectiveClasses = (allClasses && allClasses.length > 0) ? allClasses : dbService.getClasses();
+    const effectiveSubjects = (allSubjects && allSubjects.length > 0) ? allSubjects : dbService.getSubjects();
+    const effectiveQuestions = (allQuestions && allQuestions.length > 0) ? allQuestions : dbService.getQuestions();
+    const effectiveAnswers = (allAnswers && allAnswers.length > 0) ? allAnswers : dbService.getAnswers();
+
+    const subInfo = effectiveSubjects.find(s => s.id === subjectId);
     const pkgSub = pkg.subjects?.find(s => s.subjectId === subjectId);
     // Prioritaskan KKM yang diinput Admin pada master data Mata Pelajaran
     const passingGrade = subInfo?.passingGrade || pkgSub?.passingGrade || 75;
@@ -298,12 +324,12 @@ export class SumatifAnalyticsService {
     const subIdNorm = subjectId.toLowerCase().trim();
     const pkgSubSheet = (pkgSub?.googleSheetUrl || '').trim();
 
-    const matchingTryouts = allTryouts.filter(t => {
+    const matchingTryouts = effectiveTryouts.filter(t => {
       const tPkgId = (t.packageId || '').toLowerCase().trim();
       const tCode = (t.code || '').toLowerCase().trim();
       const tSubId = (t.subjectId || '').toLowerCase().trim();
       const isPkgMatch = tPkgId === pkgId || (pkgCode && tCode.startsWith(pkgCode)) || t.id.toLowerCase() === pkgId;
-      const isSubMatch = tSubId === subIdNorm ||
+      const isSubMatch = !t.subjectId || tSubId === subIdNorm ||
         (t.id && t.id.toLowerCase().includes(subIdNorm)) ||
         (t.title && subInfo?.name && t.title.toLowerCase().includes(subInfo.name.toLowerCase().trim())) ||
         (t.code && subInfo?.code && t.code.toLowerCase().includes(subInfo.code.toLowerCase().trim()));
@@ -315,7 +341,7 @@ export class SumatifAnalyticsService {
     matchingTryoutIds.add(pkg.id);
 
     // 2. Tentukan target siswa berdasarkan targetClassIds / targetGrades paket ujian
-    const targetClasses = allClasses.filter(c => {
+    const targetClasses = effectiveClasses.filter(c => {
       if (pkg.targetClassIds && pkg.targetClassIds.length > 0) {
         if (pkg.targetClassIds.includes(c.id)) return true;
       }
@@ -328,8 +354,8 @@ export class SumatifAnalyticsService {
       return false;
     });
     const targetClassIds = new Set(targetClasses.map(c => c.id));
-    const targetStudents = allStudents.filter(s =>
-      targetClassIds.has(s.classId) && !s.isAnswerKeyAccount
+    const targetStudents = effectiveStudents.filter(s =>
+      (targetClassIds.size === 0 || targetClassIds.has(s.classId)) && !s.isAnswerKeyAccount
     );
     const targetStudentIdSet = new Set(targetStudents.map(s => s.id));
 
@@ -337,10 +363,17 @@ export class SumatifAnalyticsService {
     // Lakukan deduplikasi per studentId (ambil skor tertinggi jika ada multiple submissions)
     const studentScoreMap = new Map<string, { scoreRecord: Score; studentId: string; scoreValue: number }>();
 
-    allScores.forEach(s => {
-      if (!targetStudentIdSet.has(s.studentId)) return;
+    effectiveScores.forEach(s => {
+      // Abaikan akun kunci jawaban
+      const st = effectiveStudents.find(std => std.id === s.studentId);
+      if (st?.isAnswerKeyAccount) return;
 
-      const scVal = this.extractScoreForSubject(s, subjectId, matchingTryoutIds);
+      // Jika ada target siswa dan siswa ini bukan target siswa DAN bukan peserta tryout wadah ini, lewati
+      if (targetStudentIdSet.size > 0 && !targetStudentIdSet.has(s.studentId) && !matchingTryoutIds.has(s.tryoutId)) {
+        return;
+      }
+
+      const scVal = this.extractScoreForSubject(s, subjectId, matchingTryoutIds, subInfo);
       if (scVal === null) return; // Bukan skor untuk wadah/mapel ini
 
       const existing = studentScoreMap.get(s.studentId);
@@ -384,7 +417,7 @@ export class SumatifAnalyticsService {
       .map((item, idx) => ({ ...item, rank: idx + 1 }));
 
     // 4. Hitung Analisis Butir Soal Murni per Nomor Soal (hanya dari tryout wadah ini)
-    const subjectQuestions = allQuestions
+    const subjectQuestions = effectiveQuestions
       .filter(q => {
         if (matchingTryoutIds.size > 0 && (q as any).tryoutId) {
           return matchingTryoutIds.has((q as any).tryoutId) && q.subjectId === subjectId;
@@ -401,9 +434,9 @@ export class SumatifAnalyticsService {
       const upperGroupStudentIds = new Set(sortedScores.slice(0, groupSize).map(s => s.studentId));
       const lowerGroupStudentIds = new Set(sortedScores.slice(-groupSize).map(s => s.studentId));
 
-      const relevantAnswers = allAnswers.filter(a =>
+      const relevantAnswers = effectiveAnswers.filter(a =>
         (matchingTryoutIds.has(a.tryoutId) || matchingTryoutIds.has(pkg.id)) &&
-        targetStudentIdSet.has(a.studentId)
+        (targetStudentIdSet.size === 0 || targetStudentIdSet.has(a.studentId) || studentScoreMap.has(a.studentId))
       );
 
       questionStats = subjectQuestions.map((q, idx) => {

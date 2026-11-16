@@ -40,9 +40,15 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
     return dbService.getTeacherAllowedSubjectIds(currentUser);
   }, [dbService, currentUser]);
 
+  // Fallback wadah jika props packages belum terisi pada frame awal
+  const effectivePackages = useMemo(() => {
+    if (packages && packages.length > 0) return packages;
+    return dbService ? dbService.getExamPackages() : [];
+  }, [packages, dbService]);
+
   // Statistik kelengkapan tautan mapel guru per wadah
   const packagesWithStats = useMemo(() => {
-    return packages
+    return effectivePackages
       .map(pkg => {
         // Filter mapel hanya yang diampu oleh guru yang sedang login (atau semua jika role ADMIN)
         const relevantPkgSubjects = (pkg.subjects || []).filter(pkgSub => {
@@ -84,7 +90,7 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
       })
       // Untuk guru: hanya tampilkan wadah yang memuat mata pelajaran yang diampunya
       .filter(item => currentUser.role === 'ADMIN' || item.totalSubjects > 0);
-  }, [packages, subjects, allowedSubjectIds, currentUser, dbService]);
+  }, [effectivePackages, subjects, allowedSubjectIds, currentUser, dbService]);
 
   // ID Wadah yang Sedang Dipilih
   const [selectedPkgId, setSelectedPkgId] = useState<string>('');
@@ -107,7 +113,7 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
     formUrl: string;
   } | null>(null);
 
-  const totalAllPackages = packages.length;
+  const totalAllPackages = effectivePackages.length;
   const completedPackagesCount = packagesWithStats.filter(p => p.isComplete).length;
   const overallProgressPct = totalAllPackages > 0
     ? Math.round((completedPackagesCount / totalAllPackages) * 100)
@@ -145,7 +151,7 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
     if (!editingItem) return;
 
     try {
-      const pkg = packages.find(p => p.id === editingItem.pkgId);
+      const pkg = effectivePackages.find(p => p.id === editingItem.pkgId);
       if (!pkg) throw new Error('Wadah tidak ditemukan.');
 
       const cleanSheet = editingItem.sheetUrl.trim();
@@ -268,7 +274,7 @@ export const GuruSumatifAssessmentsSection: React.FC<GuruSumatifAssessmentsSecti
   };
 
   // EMPTY STATE: Jika admin belum membuat wadah SAS/SAT
-  if (packages.length === 0) {
+  if (effectivePackages.length === 0) {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xs">
