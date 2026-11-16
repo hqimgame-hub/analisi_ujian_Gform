@@ -324,22 +324,40 @@ export class AnalyticsService {
       let incorrectCount = 0;
       let unansweredCount = 0;
 
-      // Tentukan opsi yang sah untuk butir soal ini (misal SMP 4 opsi: A..D, atau SMA 5 opsi: A..E)
+      // Tentukan apakah butir soal ini MURNI Benar / Salah (True/False):
+      const isPureTrueFalse = Array.isArray(q.options) && q.options.length === 2 &&
+        q.options.some(opt => ['BENAR', 'TRUE', 'YA', 'SETUJU'].includes((opt.text || '').trim().toUpperCase())) &&
+        q.options.some(opt => ['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU'].includes((opt.text || '').trim().toUpperCase()));
+
+      // Tentukan opsi yang sah untuk butir soal ini (misal SMP 4 opsi: A..D, SMA 5 opsi: A..E, atau BS 2 opsi: A..B)
       const validOptionKeys: Array<'A' | 'B' | 'C' | 'D' | 'E'> = (Array.isArray(q.options) && q.options.length > 0)
         ? q.options
             .map(o => (o.key || '').trim().toUpperCase())
             .filter((k): k is 'A' | 'B' | 'C' | 'D' | 'E' => ['A', 'B', 'C', 'D', 'E'].includes(k))
         : (['A', 'B', 'C', 'D'] as const).slice();
-      const activeOptionKeys: Array<'A' | 'B' | 'C' | 'D' | 'E'> = validOptionKeys.length > 0 ? [...validOptionKeys] : (['A', 'B', 'C', 'D'] as const).slice();
 
-      // Periksa apakah ada kunci jawaban atau respon siswa yang memuat opsi 'E'
-      const hasOptionE = (q.correctAnswer || '').trim().toUpperCase() === 'E' ||
-        qAnswers.some(a => {
-          const raw = (a.studentAnswer || '').trim().toUpperCase();
-          return raw === 'E' || raw.startsWith('E.') || raw.startsWith('E)') || raw.startsWith('E -') || raw.startsWith('OPSI E') || raw.startsWith('PILIHAN E');
-        });
-      if (hasOptionE && !activeOptionKeys.includes('E')) {
-        activeOptionKeys.push('E');
+      let activeOptionKeys: Array<'A' | 'B' | 'C' | 'D' | 'E'> = ['A', 'B', 'C', 'D'];
+
+      if (isPureTrueFalse) {
+        // Hanya batasi ke 2 opsi jika soal MURNI Benar / Salah
+        activeOptionKeys = ['A', 'B'];
+      } else {
+        // Untuk soal Pilihan Ganda: jangan biarkan opsi terpotong menjadi A-B hanya karena 0 pemilih!
+        // Selalu sertakan minimal A..D, dan tambahkan E jika ada bukti opsi E
+        const hasOptionE =
+          validOptionKeys.includes('E') ||
+          (q.correctAnswer || '').trim().toUpperCase() === 'E' ||
+          (q.correctAnswer || '').includes('E') ||
+          qAnswers.some(a => {
+            const raw = (a.studentAnswer || '').trim().toUpperCase();
+            return raw === 'E' || raw.startsWith('E.') || raw.startsWith('E)') || raw.startsWith('E -') || raw.startsWith('OPSI E') || raw.startsWith('PILIHAN E');
+          });
+
+        if (hasOptionE) {
+          activeOptionKeys = ['A', 'B', 'C', 'D', 'E'];
+        } else {
+          activeOptionKeys = ['A', 'B', 'C', 'D'];
+        }
       }
 
       const rawCounts: Record<string, number> = { KOSONG: 0 };
@@ -606,9 +624,9 @@ export class AnalyticsService {
         // Dukungan Benar / Salah untuk 'B' (Benar -> Opsi A) dan 'S' (Salah -> Opsi B)
         let effectiveAns = rawAns;
         if (isTrueFalseQuestion) {
-          if (['B', 'BENAR', 'TRUE', 'YA', 'SETUJU', 'A'].includes(upperAns)) {
+          if (['BENAR', 'TRUE', 'YA', 'SETUJU', 'A'].includes(upperAns)) {
             effectiveAns = 'A';
-          } else if (['S', 'SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU', 'B'].includes(upperAns)) {
+          } else if (['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU', 'S', 'B'].includes(upperAns)) {
             effectiveAns = 'B';
           }
         }

@@ -1092,11 +1092,29 @@ export const ItemAnalysisVisualizer: React.FC<ItemAnalysisVisualizerProps> = ({
                             Analisis Sebaran Pilihan Jawaban Siswa (Efektivitas Pengecoh):
                           </span>
                           {(() => {
+                            const isPureTrueFalse = Array.isArray(item.options) && item.options.length === 2 &&
+                              item.options.some((o: any) => ['BENAR', 'TRUE', 'YA', 'SETUJU'].includes((o.text || '').toUpperCase())) &&
+                              item.options.some((o: any) => ['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU'].includes((o.text || '').toUpperCase()));
+
                             const validKeys = (Array.isArray(item.options) && item.options.length > 0)
                               ? item.options.map((o: any) => o.key.toUpperCase()).filter((k: string) => ['A', 'B', 'C', 'D', 'E'].includes(k))
                               : Object.keys(item.distractorStats || item.distractorCounts || {}).filter(k => ['A', 'B', 'C', 'D', 'E'].includes(k) && (k !== 'E' || (item.distractorStats?.[k]?.count || item.distractorCounts?.[k] || 0) > 0));
-                            const renderKeys = validKeys.length > 0 ? validKeys : ['A', 'B', 'C', 'D'];
-                            const colsClass = renderKeys.length <= 4 ? 'grid-cols-4' : 'grid-cols-5';
+
+                            let renderKeys = validKeys.length > 0 ? validKeys : ['A', 'B', 'C', 'D'];
+                            if (!isPureTrueFalse && renderKeys.length < 4) {
+                              renderKeys = ['A', 'B', 'C', 'D'];
+                              if (validKeys.includes('E') || (item.distractorStats?.['E']?.count || 0) > 0) {
+                                renderKeys = ['A', 'B', 'C', 'D', 'E'];
+                              }
+                            }
+
+                            const colsClass = renderKeys.length === 2
+                              ? 'grid-cols-2'
+                              : renderKeys.length === 3
+                              ? 'grid-cols-3'
+                              : renderKeys.length === 4
+                              ? 'grid-cols-4'
+                              : 'grid-cols-5';
 
                             return (
                               <div className={`grid ${colsClass} gap-2`}>

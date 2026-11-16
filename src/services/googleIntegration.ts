@@ -619,11 +619,26 @@ export class GoogleIntegrationService {
       ? [rawKeyCell, ...rawValues.filter(v => v !== rawKeyCell)]
       : rawValues;
 
+    // Ekstraksi token kandidat: jika ada jawaban multi-select berdelimeter koma (PGK), pecah menjadi token atomik
+    const candidateTokens: string[] = [];
     rawCandidates.forEach(val => {
       const trimmedVal = val.trim();
       if (!trimmedVal || ['-', 'KOSONG', 'NULL', 'N/A', 'TIDAK DIJAWAB', 'BELUM DIJAWAB'].includes(trimmedVal.toUpperCase())) {
         return;
       }
+      // Jangan pecah jika berupa angka desimal murni, misal "2,5" atau "0,75"
+      if (trimmedVal.includes(',') && !/^\d+(?:,\d+)?(?:\s*[a-zA-Z%°]+)?$/.test(trimmedVal)) {
+        const parts = trimmedVal.split(',').map(p => p.trim()).filter(Boolean);
+        if (parts.length > 1) {
+          parts.forEach(p => candidateTokens.push(p));
+          return;
+        }
+      }
+      candidateTokens.push(trimmedVal);
+    });
+
+    candidateTokens.forEach(trimmedVal => {
+      if (!trimmedVal) return;
       if (this.extractMultiSelectLetters(trimmedVal)) return;
 
       const explicit = this.extractExplicitOptionPrefix(trimmedVal);
@@ -666,13 +681,10 @@ export class GoogleIntegrationService {
 
     const hasSpreadsheetOptionTexts = explicitPrefixMatches.size > 0 || unprefixedSpreadsheetTexts.length > 0;
 
-    // Jika spreadsheet memiliki teks opsi nyata (misal "12", "8", "6", "10" atau "6 cm"):
-    // JANGAN biarkan opsi lama dari bank soal lain (seperti "3° C") menimpa atau memblokir opsi nyata sheet!
+    // Jika spreadsheet memiliki teks opsi nyata: alokasikan ke huruf opsi A..E
     if (hasSpreadsheetOptionTexts) {
-      // 2a. Alokasikan teks opsi tanpa prefix dari spreadsheet ke huruf opsi A..E
       unprefixedSpreadsheetTexts.forEach(txt => {
         const txtUpper = txt.toUpperCase();
-        // Cek apakah ada existingOption yang teksnya persis sama dengan opsi sheet ini
         let matchedKey: 'A' | 'B' | 'C' | 'D' | 'E' | undefined = undefined;
         if (Array.isArray(existingOptions)) {
           const matchOpt = existingOptions.find(o => {
@@ -694,7 +706,6 @@ export class GoogleIntegrationService {
         }
       });
     } else if (Array.isArray(existingOptions)) {
-      // 2b. Spreadsheet hanya memuat huruf murni A-E atau belum ada respon: gunakan existingOptions
       const existingNonPlaceholder = existingOptions.filter(opt => {
         const k = (opt.key || '').trim().toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
         return optionKeys.includes(k) && !isPlaceholderText(opt.text, k);
@@ -706,23 +717,49 @@ export class GoogleIntegrationService {
     }
 
     // 3. Tentukan jumlah opsi aktif secara dinamis:
-    // Jika soal di Google Form hanya memiliki 4 pilihan (A..D, standar SMP/MTs), JANGAN buat opsi E dummy!
-    // Hanya sertakan E jika data eksplisit memiliki opsi E atau terdapat 5 variasi jawaban.
+    // Cek apakah soal ini MURNI Benar / Salah (True/False):
+    // Yaitu: kedua opsi A dan B hanya berisi Benar/Salah, TIDAK ada teks materi lain dan TIDAK ada opsi C/D/E
+    const isPureTrueFalse =
+      keyToText.size === 2 &&
+      keyToText.has('A') &&
+      keyToText.has('B') &&
+      !keyToText.has('C') &&
+      !keyToText.has('D') &&
+      !keyToText.has('E') &&
+      ['BENAR', 'TRUE', 'YA', 'SETUJU'].includes((keyToText.get('A') || '').toUpperCase()) &&
+      ['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU'].includes((keyToText.get('B') || '').toUpperCase());
+
     let activeOptionKeys: Array<'A' | 'B' | 'C' | 'D' | 'E'> = ['A', 'B', 'C', 'D'];
-    if (keyToText.has('E')) {
-      activeOptionKeys = ['A', 'B', 'C', 'D', 'E'];
-    } else if (keyToText.size === 2 && keyToText.has('A') && keyToText.has('B') && !keyToText.has('C')) {
+
+    if (isPureTrueFalse) {
+      // Hanya batasi ke A dan B jika soal MURNI Benar/Salah
       activeOptionKeys = ['A', 'B'];
-    } else if (keyToText.size === 3 && keyToText.has('A') && keyToText.has('B') && keyToText.has('C') && !keyToText.has('D')) {
-      activeOptionKeys = ['A', 'B', 'C'];
     } else {
-      activeOptionKeys = ['A', 'B', 'C', 'D'];
+      // Untuk soal Pilihan Ganda (PG / PGK / Menjodohkan):
+      // Jangan pernah memotong opsi menjadi hanya A-B atau A-C hanya karena pemilih opsi C/D adalah 0!
+      // Cek apakah ada bukti opsi E (kunci memuat E, respon memuat E, atau bank soal memuat E)
+      const hasEvidenceOfOptionE =
+        keyToText.has('E') ||
+        unprefixedSpreadsheetTexts.length >= 5 ||
+        (rawKeyCell && (rawKeyCell.toUpperCase().includes('E') || rawKeyCell.toUpperCase().startsWith('E.'))) ||
+        (Array.isArray(existingOptions) && existingOptions.some(o => o.key.toUpperCase() === 'E' && !isPlaceholderText(o.text, 'E')));
+
+      if (hasEvidenceOfOptionE) {
+        activeOptionKeys = ['A', 'B', 'C', 'D', 'E'];
+      } else {
+        activeOptionKeys = ['A', 'B', 'C', 'D'];
+      }
     }
 
-    const finalOptions = activeOptionKeys.map(k => ({
-      key: k,
-      text: keyToText.get(k) || `Pilihan ${k}`,
-    }));
+    const finalOptions = activeOptionKeys.map(k => {
+      // Prioritaskan teks dari keyToText, fallback ke existingOptions, lalu placeholder
+      const existingOpt = Array.isArray(existingOptions) ? existingOptions.find(o => o.key.toUpperCase() === k) : undefined;
+      const existingText = existingOpt?.text && !isPlaceholderText(existingOpt.text, k) ? existingOpt.text : undefined;
+      return {
+        key: k,
+        text: keyToText.get(k) || existingText || `Pilihan ${k}`,
+      };
+    });
 
     // 4. Tentukan kunci jawaban (correctAnswer) dalam bentuk huruf 'A'..'E'
     const candidateRawCorrect = rawKeyCell || (existingCorrectAnswer || '').trim();
@@ -799,10 +836,10 @@ export class GoogleIntegrationService {
       q.options.some(opt => ['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU'].includes((opt.text || '').trim().toUpperCase()));
 
     if (isTrueFalseQuestion) {
-      if (['BENAR', 'TRUE', 'YA', 'SETUJU', 'B', 'A'].includes(upper)) {
+      if (['BENAR', 'TRUE', 'YA', 'SETUJU', 'A'].includes(upper)) {
         return 'A';
       }
-      if (['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU', 'S'].includes(upper)) {
+      if (['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU', 'S', 'B'].includes(upper)) {
         return 'B';
       }
     }

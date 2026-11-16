@@ -1720,10 +1720,21 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
                           <td className="py-3 px-3 text-center font-mono text-[10px]">
                             <div className="flex items-center justify-center space-x-1">
                               {(() => {
+                                const isPureTrueFalse = Array.isArray((qa as any).options) && (qa as any).options.length === 2 &&
+                                  (qa as any).options.some((o: any) => ['BENAR', 'TRUE', 'YA', 'SETUJU'].includes((o.text || '').toUpperCase())) &&
+                                  (qa as any).options.some((o: any) => ['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU'].includes((o.text || '').toUpperCase()));
+
                                 const validKeys = (Array.isArray((qa as any).options) && (qa as any).options.length > 0)
                                   ? (qa as any).options.map((o: any) => o.key.toUpperCase()).filter((k: string) => ['A', 'B', 'C', 'D', 'E'].includes(k))
                                   : Object.keys(qa.distractorStats || {}).filter(k => ['A', 'B', 'C', 'D', 'E'].includes(k) && (k !== 'E' || (qa.distractorStats[k]?.count || 0) > 0));
-                                const renderKeys = validKeys.length > 0 ? validKeys : ['A', 'B', 'C', 'D'];
+
+                                let renderKeys = validKeys.length > 0 ? validKeys : ['A', 'B', 'C', 'D'];
+                                if (!isPureTrueFalse && renderKeys.length < 4) {
+                                  renderKeys = ['A', 'B', 'C', 'D'];
+                                  if (validKeys.includes('E') || (qa.distractorStats?.['E']?.count || 0) > 0) {
+                                    renderKeys = ['A', 'B', 'C', 'D', 'E'];
+                                  }
+                                }
 
                                 return renderKeys.map((opt: string) => {
                                   const stat = qa.distractorStats?.[opt];

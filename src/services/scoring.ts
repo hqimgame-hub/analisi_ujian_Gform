@@ -98,16 +98,23 @@ export class ScoringService {
       }
     }
 
-    // True/False or Benar/Salah mapping
-    const boolMap: Record<string, string> = {
-      B: 'BENAR', TRUE: 'BENAR', T: 'BENAR', '1': 'BENAR', YA: 'BENAR', SETUJU: 'BENAR',
-      S: 'SALAH', FALSE: 'SALAH', F: 'SALAH', '0': 'SALAH', TIDAK: 'SALAH', 'TIDAK SETUJU': 'SALAH',
-    };
-    const sNorm = boolMap[s.toUpperCase()] || s.toUpperCase();
-    const cNorm = boolMap[c.toUpperCase()] || c.toUpperCase();
-    if (sNorm === cNorm) return true;
-    if ((sNorm === 'BENAR' && c.toUpperCase() === 'A') || (sNorm === 'SALAH' && c.toUpperCase() === 'B')) return true;
-    if ((cNorm === 'BENAR' && s.toUpperCase() === 'A') || (cNorm === 'SALAH' && s.toUpperCase() === 'B')) return true;
+    // True/False or Benar/Salah mapping (hanya jika salah satu nilai eksplisit berupa kata boolean)
+    const explicitBoolWords = ['BENAR', 'SALAH', 'TRUE', 'FALSE', 'SETUJU', 'TIDAK SETUJU', 'YA', 'TIDAK'];
+    const sUp = s.toUpperCase();
+    const cUp = c.toUpperCase();
+    const hasExplicitBool = explicitBoolWords.includes(sUp) || explicitBoolWords.includes(cUp);
+
+    if (hasExplicitBool) {
+      const boolMap: Record<string, string> = {
+        TRUE: 'BENAR', T: 'BENAR', '1': 'BENAR', YA: 'BENAR', SETUJU: 'BENAR', BENAR: 'BENAR',
+        FALSE: 'SALAH', F: 'SALAH', '0': 'SALAH', TIDAK: 'SALAH', 'TIDAK SETUJU': 'SALAH', SALAH: 'SALAH',
+      };
+      const sNorm = boolMap[sUp] || sUp;
+      const cNorm = boolMap[cUp] || cUp;
+      if (sNorm === cNorm) return true;
+      if ((sNorm === 'BENAR' && cUp === 'A') || (sNorm === 'SALAH' && cUp === 'B')) return true;
+      if ((cNorm === 'BENAR' && sUp === 'A') || (cNorm === 'SALAH' && sUp === 'B')) return true;
+    }
 
     // Multiple Choice Option Prefix matching (e.g. "A" matches "A. Pilihan", "(A) Pilihan", "[A] Pilihan", "A - Pilihan")
     const extractOptionLetter = (val: string): string | null => {
