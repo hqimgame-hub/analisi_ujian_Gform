@@ -8,6 +8,7 @@ import {
   getStageOrderNumber,
   resolveTryoutGroup,
 } from '../utils/tryoutGroupUtils';
+import { ScoringService } from './scoring';
 
 export interface DistractorOptionStat {
   count: number;
