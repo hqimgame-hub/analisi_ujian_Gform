@@ -2364,6 +2364,74 @@ export const AdminAppPage: React.FC<AdminAppPageProps> = ({ currentUser, onNavig
                 )}
               </div>
 
+              {/* Cadangan & Pemulihan Offline (Ekspor / Impor JSON Lintas Perangkat) */}
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                      <Download className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                        Cadangan &amp; Pemulihan Data Offline (Lintas Perangkat)
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Pindahkan atau pulihkan seluruh data (rombel, siswa, paket SAT/SAS, tryout, nilai) antar-perangkat secara instan via file JSON tanpa bergantung kuota cloud.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const jsonStr = dbService.exportBackupJson();
+                        const blob = new Blob([jsonStr], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `backup_analisis_ujian_${new Date().toISOString().slice(0, 10)}.json`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        triggerToast('File cadangan database (.json) berhasil diunduh!');
+                      }}
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer shrink-0 shadow-xs"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Unduh Cadangan (.json)
+                    </button>
+
+                    <label className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer shrink-0">
+                      <Upload className="w-3.5 h-3.5" />
+                      Pulihkan dari File (.json)
+                      <input
+                        type="file"
+                        accept=".json"
+                        className="hidden"
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = ev => {
+                            const content = ev.target?.result as string;
+                            if (content) {
+                              const res = dbService.importBackupJson(content);
+                              if (res.ok) {
+                                refreshData();
+                                triggerToast(res.message);
+                              } else {
+                                triggerToast(res.message, 'error');
+                              }
+                            }
+                          };
+                          reader.readAsText(file);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
               {/* ========================================================= */}
               {/* KARTU PENGATURAN: LIVE MONITORING & REKAP NILAI PUBLIK (/rekap) */}
               {/* ========================================================= */}

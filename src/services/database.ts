@@ -1452,10 +1452,73 @@ export class DatabaseService {
       schoolProfile: this.getSchoolProfile(),
     });
     const ok = result.failed === 0;
+    const isEgress = (result.errors || []).some(e => e.includes('exceed_egress_quota') || e.includes('restricted'));
     const message = ok
       ? `Berhasil menyinkronkan ${result.success} data ke cloud.`
-      : `${result.success} berhasil, ${result.failed} gagal. Error: ${result.errors.slice(0, 2).join('; ')}`;
+      : isEgress
+        ? `Layanan Supabase Cloud dibatasi kuota (exceed_egress_quota). Silakan gunakan 'Cadangan & Pemulihan Data Offline (.json)' untuk menyinkronkan data antar-perangkat.`
+        : `${result.success} berhasil, ${result.failed} gagal. Error: ${result.errors.slice(0, 2).join('; ')}`;
     return { ok, message };
+  }
+
+  /**
+   * Ekspor seluruh state database lokal ke format JSON untuk backup manual antar-perangkat
+   */
+  public exportBackupJson(): string {
+    return JSON.stringify({
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      schoolProfile: this.getSchoolProfile(),
+      state: this.state,
+    }, null, 2);
+  }
+
+  /**
+   * Impor seluruh state database dari file JSON cadangan
+   */
+  public importBackupJson(jsonString: string): { ok: boolean; message: string } {
+    try {
+      const parsed = JSON.parse(jsonString);
+      const rawState = parsed.state || parsed;
+      if (!rawState || typeof rawState !== 'object') {
+        throw new Error('Format file cadangan tidak valid.');
+      }
+
+      this.state = {
+        ...this.state,
+        users: Array.isArray(rawState.users) ? rawState.users : this.state.users,
+        teachers: Array.isArray(rawState.teachers) ? rawState.teachers : this.state.teachers,
+        students: Array.isArray(rawState.students) ? rawState.students : this.state.students,
+        classes: Array.isArray(rawState.classes) ? rawState.classes : this.state.classes,
+        academicYears: Array.isArray(rawState.academicYears) ? rawState.academicYears : this.state.academicYears,
+        subjects: Array.isArray(rawState.subjects) ? rawState.subjects : this.state.subjects,
+        materials: Array.isArray(rawState.materials) ? rawState.materials : this.state.materials,
+        competencies: Array.isArray(rawState.competencies) ? rawState.competencies : this.state.competencies,
+        questions: Array.isArray(rawState.questions) ? rawState.questions : this.state.questions,
+        answers: Array.isArray(rawState.answers) ? rawState.answers : this.state.answers,
+        tryouts: Array.isArray(rawState.tryouts) ? rawState.tryouts : this.state.tryouts,
+        responses: Array.isArray(rawState.responses) ? rawState.responses : this.state.responses,
+        scores: Array.isArray(rawState.scores) ? rawState.scores : this.state.scores,
+        explanations: Array.isArray(rawState.explanations) ? rawState.explanations : this.state.explanations,
+        examPackages: Array.isArray(rawState.examPackages) ? rawState.examPackages : this.state.examPackages,
+        tryoutQuestions: Array.isArray(rawState.tryoutQuestions) ? rawState.tryoutQuestions : (this.state.tryoutQuestions || []),
+        auditLogs: Array.isArray(rawState.auditLogs) ? rawState.auditLogs : this.state.auditLogs,
+      };
+
+      if (parsed.schoolProfile) {
+        this.saveCachedSchoolProfile(parsed.schoolProfile);
+      }
+
+      this.persistState();
+      this.rebuildIndexes();
+      this.notifyListeners();
+      return {
+        ok: true,
+        message: `Berhasil memulihkan ${this.state.classes.length} kelas, ${this.state.students.length} siswa, dan ${this.state.examPackages.length} paket ujian.`
+      };
+    } catch (err: any) {
+      return { ok: false, message: err.message || 'Gagal memulihkan file cadangan.' };
+    }
   }
 
   /**
