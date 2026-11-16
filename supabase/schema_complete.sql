@@ -1,23 +1,35 @@
 -- ============================================================
--- SKEMA LENGKAP SUPABASE (UNIFIED 1-KLIK)
--- Analisis Ujian Sekolah
+-- SKEMA LENGKAP SUPABASE (UNIFIED 1-KLIK BERSIH)
+-- WIKAN - Analisis Ujian Sekolah
 -- ============================================================
--- Skrip ini menggabungkan seluruh tabel, indeks, constraint, RLS,
--- dan konfigurasi Supabase Realtime secara terpadu tanpa dependensi bertingkat.
--- 
--- CARA PENGGUNAAN DI PROJECT SUPABASE BARU:
--- 1. Buka Supabase Dashboard -> Menu SQL Editor -> New Query
--- 2. Salin dan tempel seluruh isi file ini, lalu klik Run.
+-- Skrip ini membersihkan skema lama yang rusak/setengah jadi (CASCADE),
+-- lalu membuat seluruh 25 tabel, indeks, RLS multi-device, dan Supabase Realtime
+-- secara terurut, rapi, dan bebas error.
+--
+-- CARA MENJALANKAN DI SUPABASE BARU:
+-- 1. Buka Supabase Dashboard (https://supabase.com/dashboard/project/skblhptwieauvtcwnrwf)
+-- 2. Masuk ke menu "SQL Editor" -> "New Query"
+-- 3. Tempel seluruh isi skrip ini lalu klik "Run".
 -- ============================================================
+
+-- Reset skema public agar sisa tabel yang gagal/tidak lengkap terhapus bersih
+DROP SCHEMA IF EXISTS public CASCADE;
+CREATE SCHEMA public;
+
+-- Berikan izin akses penuh ke role standar Supabase
+GRANT ALL ON SCHEMA public TO postgres;
+GRANT ALL ON SCHEMA public TO anon;
+GRANT ALL ON SCHEMA public TO authenticated;
+GRANT ALL ON SCHEMA public TO service_role;
 
 -- Aktifkan ekstensi UUID
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ============================================================
--- 1. USERS
+-- 1. USERS (Akun Login & Role)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.users (
+CREATE TABLE public.users (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email         VARCHAR(255) UNIQUE NOT NULL,
   name          VARCHAR(255) NOT NULL,
@@ -27,12 +39,12 @@ CREATE TABLE IF NOT EXISTS public.users (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS idx_users_email ON public.users (email);
+CREATE INDEX idx_users_email ON public.users (email);
 
 -- ============================================================
--- 2. ACADEMIC YEARS
+-- 2. ACADEMIC YEARS (Tahun Pelajaran & Semester)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.academic_years (
+CREATE TABLE public.academic_years (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   year_label  VARCHAR(20) NOT NULL,
   semester    VARCHAR(10) NOT NULL CHECK (semester IN ('ODD', 'EVEN')),
@@ -41,29 +53,22 @@ CREATE TABLE IF NOT EXISTS public.academic_years (
 );
 
 -- ============================================================
--- 3. CLASSES
+-- 3. CLASSES (Rombel / Kelas)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.classes (
+CREATE TABLE public.classes (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name             VARCHAR(50) NOT NULL,
   grade_level      VARCHAR(10) NOT NULL,
   academic_year_id UUID NOT NULL REFERENCES public.academic_years(id) ON DELETE RESTRICT,
-  created_at       TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_classes_name_ay UNIQUE (name, academic_year_id)
 );
-CREATE INDEX IF NOT EXISTS idx_classes_academic_year ON public.classes (academic_year_id);
-
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_classes_name_ay') THEN
-    ALTER TABLE public.classes ADD CONSTRAINT uq_classes_name_ay UNIQUE (name, academic_year_id);
-  END IF;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
+CREATE INDEX idx_classes_academic_year ON public.classes (academic_year_id);
 
 -- ============================================================
--- 4. TEACHERS
+-- 4. TEACHERS (Guru & Wali Kelas)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.teachers (
+CREATE TABLE public.teachers (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id             UUID REFERENCES public.users(id) ON DELETE SET NULL,
   nip                 VARCHAR(50) UNIQUE NOT NULL,
@@ -77,15 +82,13 @@ CREATE TABLE IF NOT EXISTS public.teachers (
   home_room_class_id  UUID,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-ALTER TABLE public.teachers ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES public.users(id) ON DELETE SET NULL;
-ALTER TABLE public.teachers ADD COLUMN IF NOT EXISTS password_hint TEXT;
-CREATE INDEX IF NOT EXISTS idx_teachers_user_id ON public.teachers (user_id);
-CREATE INDEX IF NOT EXISTS idx_teachers_nip     ON public.teachers (nip);
+CREATE INDEX idx_teachers_user_id ON public.teachers (user_id);
+CREATE INDEX idx_teachers_nip     ON public.teachers (nip);
 
 -- ============================================================
--- 5. STUDENTS
+-- 5. STUDENTS (Siswa)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.students (
+CREATE TABLE public.students (
   id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id               UUID REFERENCES public.users(id) ON DELETE SET NULL,
   nisn                  VARCHAR(20) UNIQUE NOT NULL,
@@ -100,16 +103,14 @@ CREATE TABLE IF NOT EXISTS public.students (
   is_answer_key_account BOOLEAN DEFAULT false,
   created_at            TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-ALTER TABLE public.students ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES public.users(id) ON DELETE SET NULL;
-ALTER TABLE public.students ADD COLUMN IF NOT EXISTS is_answer_key_account BOOLEAN DEFAULT false;
-CREATE INDEX IF NOT EXISTS idx_students_user_id  ON public.students (user_id);
-CREATE INDEX IF NOT EXISTS idx_students_nisn     ON public.students (nisn);
-CREATE INDEX IF NOT EXISTS idx_students_class_id ON public.students (class_id);
+CREATE INDEX idx_students_user_id  ON public.students (user_id);
+CREATE INDEX idx_students_nisn     ON public.students (nisn);
+CREATE INDEX idx_students_class_id ON public.students (class_id);
 
 -- ============================================================
--- 6. STUDENT CLASSES
+-- 6. STUDENT CLASSES (Riwayat Penempatan Siswa di Kelas)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.student_classes (
+CREATE TABLE public.student_classes (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   student_id       UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
   class_id         UUID NOT NULL REFERENCES public.classes(id) ON DELETE CASCADE,
@@ -118,9 +119,9 @@ CREATE TABLE IF NOT EXISTS public.student_classes (
 );
 
 -- ============================================================
--- 7. SUBJECTS
+-- 7. SUBJECTS (Mata Pelajaran)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.subjects (
+CREATE TABLE public.subjects (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code          VARCHAR(20) UNIQUE NOT NULL,
   name          VARCHAR(100) NOT NULL,
@@ -130,9 +131,9 @@ CREATE TABLE IF NOT EXISTS public.subjects (
 );
 
 -- ============================================================
--- 8. TEACHER SUBJECTS
+-- 8. TEACHER SUBJECTS (Penugasan Mapel ke Guru)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.teacher_subjects (
+CREATE TABLE public.teacher_subjects (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   teacher_id UUID NOT NULL REFERENCES public.teachers(id) ON DELETE CASCADE,
   subject_id UUID NOT NULL REFERENCES public.subjects(id) ON DELETE CASCADE,
@@ -140,9 +141,9 @@ CREATE TABLE IF NOT EXISTS public.teacher_subjects (
 );
 
 -- ============================================================
--- 9. MATERIALS
+-- 9. MATERIALS (Materi Pembelajaran)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.materials (
+CREATE TABLE public.materials (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code        VARCHAR(20) NOT NULL,
   name        VARCHAR(255) NOT NULL,
@@ -151,24 +152,24 @@ CREATE TABLE IF NOT EXISTS public.materials (
   semester    VARCHAR(10) NOT NULL CHECK (semester IN ('ODD', 'EVEN')),
   created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS idx_materials_subject ON public.materials (subject_id);
+CREATE INDEX idx_materials_subject ON public.materials (subject_id);
 
 -- ============================================================
--- 10. COMPETENCIES
+-- 10. COMPETENCIES (Kompetensi Dasar / Capaian Pembelajaran)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.competencies (
+CREATE TABLE public.competencies (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code        VARCHAR(20) NOT NULL,
   description TEXT NOT NULL,
   material_id UUID NOT NULL REFERENCES public.materials(id) ON DELETE CASCADE,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS idx_competencies_material ON public.competencies (material_id);
+CREATE INDEX idx_competencies_material ON public.competencies (material_id);
 
 -- ============================================================
--- 11. EXAM PACKAGES (SAT, SAS, TRYOUT, SUMATIF, FORMATIF)
+-- 11. EXAM PACKAGES (Paket Ujian: SAT, SAS, TRYOUT, SUMATIF)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.exam_packages (
+CREATE TABLE public.exam_packages (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code             VARCHAR(50) UNIQUE NOT NULL,
   title            VARCHAR(255) NOT NULL,
@@ -183,12 +184,12 @@ CREATE TABLE IF NOT EXISTS public.exam_packages (
   created_at       TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS idx_exam_packages_status ON public.exam_packages (status);
+CREATE INDEX idx_exam_packages_status ON public.exam_packages (status);
 
 -- ============================================================
--- 12. EXAM PACKAGE SUBJECTS
+-- 12. EXAM PACKAGE SUBJECTS (Mapel di dalam Paket Ujian)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.exam_package_subjects (
+CREATE TABLE public.exam_package_subjects (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   package_id    UUID NOT NULL REFERENCES public.exam_packages(id) ON DELETE CASCADE,
   subject_id    UUID NOT NULL REFERENCES public.subjects(id) ON DELETE RESTRICT,
@@ -201,9 +202,9 @@ CREATE TABLE IF NOT EXISTS public.exam_package_subjects (
 );
 
 -- ============================================================
--- 13. TRYOUTS
+-- 13. TRYOUTS (Ujian / Try Out / Penilaian)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.tryouts (
+CREATE TABLE public.tryouts (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code             VARCHAR(50) UNIQUE NOT NULL,
   title            VARCHAR(255) NOT NULL,
@@ -221,16 +222,12 @@ CREATE TABLE IF NOT EXISTS public.tryouts (
   source           VARCHAR(20) DEFAULT 'INTERNAL',
   created_at       TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-ALTER TABLE public.tryouts ADD COLUMN IF NOT EXISTS is_external BOOLEAN DEFAULT false;
-ALTER TABLE public.tryouts ADD COLUMN IF NOT EXISTS source VARCHAR(20) DEFAULT 'INTERNAL';
-ALTER TABLE public.tryouts ADD COLUMN IF NOT EXISTS package_id UUID REFERENCES public.exam_packages(id) ON DELETE SET NULL;
-ALTER TABLE public.tryouts ADD COLUMN IF NOT EXISTS target_class_ids JSONB NOT NULL DEFAULT '[]'::jsonb;
-CREATE INDEX IF NOT EXISTS idx_tryouts_package_id ON public.tryouts (package_id);
+CREATE INDEX idx_tryouts_package_id ON public.tryouts (package_id);
 
 -- ============================================================
 -- 14. TRYOUT SUBJECTS
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.tryout_subjects (
+CREATE TABLE public.tryout_subjects (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tryout_id        UUID NOT NULL REFERENCES public.tryouts(id) ON DELETE CASCADE,
   subject_id       UUID NOT NULL REFERENCES public.subjects(id) ON DELETE RESTRICT,
@@ -242,9 +239,9 @@ CREATE TABLE IF NOT EXISTS public.tryout_subjects (
 );
 
 -- ============================================================
--- 15. QUESTIONS
+-- 15. QUESTIONS (Bank Soal)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.questions (
+CREATE TABLE public.questions (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   subject_id      UUID NOT NULL REFERENCES public.subjects(id) ON DELETE RESTRICT,
   material_id     UUID REFERENCES public.materials(id) ON DELETE SET NULL,
@@ -259,12 +256,12 @@ CREATE TABLE IF NOT EXISTS public.questions (
   weight          NUMERIC(4,2) NOT NULL DEFAULT 1.00,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS idx_questions_subject ON public.questions (subject_id);
+CREATE INDEX idx_questions_subject ON public.questions (subject_id);
 
 -- ============================================================
 -- 16. TRYOUT QUESTIONS
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.tryout_questions (
+CREATE TABLE public.tryout_questions (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tryout_id      UUID NOT NULL REFERENCES public.tryouts(id) ON DELETE CASCADE,
   question_id    UUID NOT NULL REFERENCES public.questions(id) ON DELETE CASCADE,
@@ -273,9 +270,9 @@ CREATE TABLE IF NOT EXISTS public.tryout_questions (
 );
 
 -- ============================================================
--- 17. GOOGLE FORMS
+-- 17. GOOGLE FORMS (Koneksi Sinkronisasi Google Form)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.google_forms (
+CREATE TABLE public.google_forms (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tryout_id      UUID NOT NULL REFERENCES public.tryouts(id) ON DELETE CASCADE,
   form_id        VARCHAR(255) NOT NULL,
@@ -288,9 +285,9 @@ CREATE TABLE IF NOT EXISTS public.google_forms (
 );
 
 -- ============================================================
--- 18. RESPONSES
+-- 18. RESPONSES (Hasil Pengumpulan Jawaban Siswa)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.responses (
+CREATE TABLE public.responses (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tryout_id          UUID NOT NULL REFERENCES public.tryouts(id) ON DELETE CASCADE,
   student_id         UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
@@ -302,15 +299,13 @@ CREATE TABLE IF NOT EXISTS public.responses (
   created_at         TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (tryout_id, student_id)
 );
-ALTER TABLE public.responses ADD COLUMN IF NOT EXISTS is_external BOOLEAN DEFAULT false;
-ALTER TABLE public.responses ADD COLUMN IF NOT EXISTS source VARCHAR(20) DEFAULT 'INTERNAL';
-CREATE INDEX IF NOT EXISTS idx_responses_tryout  ON public.responses (tryout_id);
-CREATE INDEX IF NOT EXISTS idx_responses_student ON public.responses (student_id);
+CREATE INDEX idx_responses_tryout  ON public.responses (tryout_id);
+CREATE INDEX idx_responses_student ON public.responses (student_id);
 
 -- ============================================================
--- 19. ANSWERS
+-- 19. ANSWERS (Rincian Jawaban Butir Soal Per Siswa)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.answers (
+CREATE TABLE public.answers (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   response_id      UUID NOT NULL REFERENCES public.responses(id) ON DELETE CASCADE,
   question_id      UUID NOT NULL REFERENCES public.questions(id) ON DELETE CASCADE,
@@ -320,13 +315,13 @@ CREATE TABLE IF NOT EXISTS public.answers (
   score_earned     NUMERIC(5,2) NOT NULL DEFAULT 0.00,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS idx_answers_response ON public.answers (response_id);
-CREATE INDEX IF NOT EXISTS idx_answers_question ON public.answers (question_id);
+CREATE INDEX idx_answers_response ON public.answers (response_id);
+CREATE INDEX idx_answers_question ON public.answers (question_id);
 
 -- ============================================================
--- 20. SCORES
+-- 20. SCORES (Rekap Nilai Siswa)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.scores (
+CREATE TABLE public.scores (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tryout_id          UUID NOT NULL REFERENCES public.tryouts(id) ON DELETE CASCADE,
   student_id         UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
@@ -339,24 +334,15 @@ CREATE TABLE IF NOT EXISTS public.scores (
   is_passed          BOOLEAN NOT NULL,
   is_external        BOOLEAN DEFAULT false,
   source             VARCHAR(20) DEFAULT 'INTERNAL',
-  calculated_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+  calculated_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_scores_tryout_student_subject UNIQUE (tryout_id, student_id, subject_id)
 );
-ALTER TABLE public.scores ADD COLUMN IF NOT EXISTS is_external BOOLEAN DEFAULT false;
-ALTER TABLE public.scores ADD COLUMN IF NOT EXISTS source VARCHAR(20) DEFAULT 'INTERNAL';
-CREATE INDEX IF NOT EXISTS idx_scores_tryout_student ON public.scores (tryout_id, student_id);
-
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_scores_tryout_student_subject') THEN
-    ALTER TABLE public.scores ADD CONSTRAINT uq_scores_tryout_student_subject UNIQUE (tryout_id, student_id, subject_id);
-  END IF;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
+CREATE INDEX idx_scores_tryout_student ON public.scores (tryout_id, student_id);
 
 -- ============================================================
--- 21. QUESTION ANALYSIS
+-- 21. QUESTION ANALYSIS (Analisis Butir Soal)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.question_analysis (
+CREATE TABLE public.question_analysis (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tryout_id            UUID NOT NULL REFERENCES public.tryouts(id) ON DELETE CASCADE,
   question_id          UUID NOT NULL REFERENCES public.questions(id) ON DELETE CASCADE,
@@ -369,9 +355,9 @@ CREATE TABLE IF NOT EXISTS public.question_analysis (
 );
 
 -- ============================================================
--- 22. EXPLANATIONS
+-- 22. EXPLANATIONS (Pembahasan Soal)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.explanations (
+CREATE TABLE public.explanations (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   question_id      UUID NOT NULL REFERENCES public.questions(id) ON DELETE CASCADE,
   text_explanation TEXT NOT NULL,
@@ -381,12 +367,12 @@ CREATE TABLE IF NOT EXISTS public.explanations (
   created_by       UUID REFERENCES public.users(id) ON DELETE SET NULL,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS idx_explanations_question ON public.explanations (question_id);
+CREATE INDEX idx_explanations_question ON public.explanations (question_id);
 
 -- ============================================================
--- 23. REPORTS
+-- 23. REPORTS (Laporan Eksekutif & Statistik)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.reports (
+CREATE TABLE public.reports (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tryout_id    UUID NOT NULL REFERENCES public.tryouts(id) ON DELETE CASCADE,
   report_type  VARCHAR(20) NOT NULL CHECK (report_type IN ('EXECUTIVE', 'SUBJECT', 'CLASS', 'STUDENT')),
@@ -396,9 +382,9 @@ CREATE TABLE IF NOT EXISTS public.reports (
 );
 
 -- ============================================================
--- 24. AUDIT LOGS
+-- 24. AUDIT LOGS (Riwayat Aktivitas)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.audit_logs (
+CREATE TABLE public.audit_logs (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id    UUID REFERENCES public.users(id) ON DELETE SET NULL,
   action     VARCHAR(50) NOT NULL,
@@ -409,23 +395,22 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
   ip_address VARCHAR(45),
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES public.users(id) ON DELETE SET NULL;
-CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON public.audit_logs (user_id);
+CREATE INDEX idx_audit_logs_user_id ON public.audit_logs (user_id);
 
 -- ============================================================
--- 25. SCHOOL PROFILE
+-- 25. SCHOOL PROFILE (Identitas Lembaga Sekolah)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.school_profile (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name            VARCHAR(255) NOT NULL DEFAULT 'SMP AYO SINAU',
-  npsn            VARCHAR(20) NOT NULL DEFAULT '12345678',
-  address         TEXT,
-  headmaster_name VARCHAR(255) NOT NULL DEFAULT 'Drs. H. Ahmad Fauzi, M.Pd.',
-  headmaster_nip  VARCHAR(50) NOT NULL DEFAULT '196805141994031005',
-  logo_url        TEXT,
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE public.school_profile (
+  id             VARCHAR(50) PRIMARY KEY DEFAULT 'default',
+  name           VARCHAR(255) NOT NULL,
+  sub_header     TEXT,
+  address        TEXT,
+  principal_name VARCHAR(255),
+  principal_nip  VARCHAR(50),
+  academic_year  VARCHAR(100),
+  logo_url       TEXT,
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-ALTER TABLE public.school_profile ADD COLUMN IF NOT EXISTS logo_url TEXT;
 
 -- ============================================================
 -- KONFIGURASI ROW LEVEL SECURITY (RLS) MULTI-DEVICE
@@ -443,43 +428,8 @@ DECLARE
   ];
 BEGIN
   FOREACH tbl IN ARRAY tables LOOP
-    IF EXISTS (
-      SELECT 1 FROM information_schema.tables 
-      WHERE table_schema = 'public' AND table_name = tbl
-    ) THEN
-      -- Bersihkan semua policy lama agar tidak ada konflik
-      EXECUTE format('DROP POLICY IF EXISTS "sync_all_access" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "admin_full_access" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "admin_all_access" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "teacher_manage_own" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "authenticated_read_teachers" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "staff_read_students" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "anon_student_lookup" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "anon_student_lookup_by_nisn" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "student_own_scores" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "student_own_answers" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "student_own_responses" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "scores_access" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "answers_access" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "responses_access" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "staff_write_scores" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "staff_write_answers" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "staff_write_responses" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "staff_manage_questions" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "public_published_explanations" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "staff_manage_explanations" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "admin_read_audit_logs" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "service_write_audit_logs" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "admin_manage_exam_packages" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "admin_guru_manage_package_subjects" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "authenticated_read" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "users_read_own" ON public.%I', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS "users_insert_own" ON public.%I', tbl);
-
-      -- Pasang policy sinkronisasi terbuka untuk anon dan authenticated
-      EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', tbl);
-      EXECUTE format('CREATE POLICY "sync_all_access" ON public.%I FOR ALL TO anon, authenticated USING (true) WITH CHECK (true)', tbl);
-    END IF;
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', tbl);
+    EXECUTE format('CREATE POLICY "sync_all_access" ON public.%I FOR ALL TO anon, authenticated USING (true) WITH CHECK (true)', tbl);
   END LOOP;
 END $$;
 
@@ -500,17 +450,12 @@ BEGIN
   END IF;
 
   FOREACH tbl IN ARRAY tables LOOP
-    IF EXISTS (
-      SELECT 1 FROM information_schema.tables 
-      WHERE table_schema = 'public' AND table_name = tbl
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables 
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = tbl
     ) THEN
-      IF NOT EXISTS (
-        SELECT 1 FROM pg_publication_tables 
-        WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = tbl
-      ) THEN
-        EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I', tbl);
-      END IF;
-      EXECUTE format('ALTER TABLE public.%I REPLICA IDENTITY FULL', tbl);
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I', tbl);
     END IF;
+    EXECUTE format('ALTER TABLE public.%I REPLICA IDENTITY FULL', tbl);
   END LOOP;
 END $$;
