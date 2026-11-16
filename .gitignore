@@ -41,3 +41,10 @@ bun.lock.*
 # Supabase local
 .supabase/
 supabase/.temp/
+
+# Backup & sensitive school datasets
+*.csv
+backup_*.json
+*.cjs
+*.sql.bak
+
