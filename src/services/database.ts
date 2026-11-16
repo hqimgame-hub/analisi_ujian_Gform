@@ -1490,7 +1490,7 @@ export class DatabaseService {
         teachers: Array.isArray(rawState.teachers) ? rawState.teachers : this.state.teachers,
         students: Array.isArray(rawState.students) ? rawState.students : this.state.students,
         classes: Array.isArray(rawState.classes) ? rawState.classes : this.state.classes,
-        academicYears: Array.isArray(rawState.academicYears) ? rawState.academicYears : this.state.academicYears,
+        academicYears: Array.isArray(rawState.academicYears) ? rawState.academicYears : (Array.isArray(rawState.academic_years) ? rawState.academic_years : this.state.academicYears),
         subjects: Array.isArray(rawState.subjects) ? rawState.subjects : this.state.subjects,
         materials: Array.isArray(rawState.materials) ? rawState.materials : this.state.materials,
         competencies: Array.isArray(rawState.competencies) ? rawState.competencies : this.state.competencies,
@@ -1500,13 +1500,14 @@ export class DatabaseService {
         responses: Array.isArray(rawState.responses) ? rawState.responses : this.state.responses,
         scores: Array.isArray(rawState.scores) ? rawState.scores : this.state.scores,
         explanations: Array.isArray(rawState.explanations) ? rawState.explanations : this.state.explanations,
-        examPackages: Array.isArray(rawState.examPackages) ? rawState.examPackages : this.state.examPackages,
-        tryoutQuestions: Array.isArray(rawState.tryoutQuestions) ? rawState.tryoutQuestions : (this.state.tryoutQuestions || []),
-        auditLogs: Array.isArray(rawState.auditLogs) ? rawState.auditLogs : this.state.auditLogs,
+        examPackages: Array.isArray(rawState.examPackages) ? rawState.examPackages : (Array.isArray(rawState.exam_packages) ? rawState.exam_packages : this.state.examPackages),
+        tryoutQuestions: Array.isArray(rawState.tryoutQuestions) ? rawState.tryoutQuestions : (Array.isArray(rawState.tryout_questions) ? rawState.tryout_questions : (this.state.tryoutQuestions || [])),
+        auditLogs: Array.isArray(rawState.auditLogs) ? rawState.auditLogs : (Array.isArray(rawState.audit_logs) ? rawState.audit_logs : this.state.auditLogs),
       };
 
-      if (parsed.schoolProfile) {
-        this.saveCachedSchoolProfile(parsed.schoolProfile);
+      const prof = parsed.schoolProfile || (Array.isArray(parsed.school_profile) ? parsed.school_profile[0] : parsed.school_profile);
+      if (prof) {
+        this.saveCachedSchoolProfile(prof);
       }
 
       this.persistState();
