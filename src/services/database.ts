@@ -12,8 +12,7 @@ import {
   INITIAL_SUBJECTS, INITIAL_TEACHER_SUBJECTS, INITIAL_MATERIALS,
   INITIAL_COMPETENCIES, INITIAL_STUDENTS, INITIAL_TRYOUTS,
   INITIAL_TRYOUT_SUBJECTS, INITIAL_QUESTIONS, INITIAL_TRYOUT_QUESTIONS,
-  INITIAL_EXPLANATIONS, INITIAL_RESPONSES, INITIAL_ANSWERS, INITIAL_SCORES, INITIAL_AUDIT_LOGS,
-  INITIAL_EXAM_PACKAGES, INITIAL_SCHOOL_PROFILE
+  INITIAL_EXPLANATIONS, INITIAL_RESPONSES, INITIAL_ANSWERS, INITIAL_SCORES, INITIAL_AUDIT_LOGS
 } from './mockData';
 import { ScoringService, ScoringTestCaseResult } from './scoring';
 import {
@@ -1911,28 +1910,6 @@ export class DatabaseService {
           });
         }
 
-        if (!parsed.classes || !Array.isArray(parsed.classes) || parsed.classes.length === 0) {
-          parsed.classes = INITIAL_CLASSES;
-        }
-        if (!parsed.students || !Array.isArray(parsed.students) || parsed.students.length === 0) {
-          parsed.students = INITIAL_STUDENTS;
-        }
-        if (!parsed.subjects || !Array.isArray(parsed.subjects) || parsed.subjects.length === 0) {
-          parsed.subjects = INITIAL_SUBJECTS;
-        }
-        if (!parsed.examPackages || !Array.isArray(parsed.examPackages) || parsed.examPackages.length === 0) {
-          parsed.examPackages = INITIAL_EXAM_PACKAGES;
-        }
-        if (!parsed.tryouts || !Array.isArray(parsed.tryouts) || parsed.tryouts.length === 0) {
-          parsed.tryouts = INITIAL_TRYOUTS;
-        }
-        if (!parsed.scores || !Array.isArray(parsed.scores) || parsed.scores.length === 0) {
-          parsed.scores = INITIAL_SCORES;
-        }
-        if (!parsed.questions || !Array.isArray(parsed.questions) || parsed.questions.length === 0) {
-          parsed.questions = INITIAL_QUESTIONS;
-        }
-
         return parsed;
       }
     } catch (err) {
@@ -1951,20 +1928,20 @@ export class DatabaseService {
       teacherSubjects: INITIAL_TEACHER_SUBJECTS,
       materials: INITIAL_MATERIALS,
       competencies: INITIAL_COMPETENCIES,
-      examPackages: INITIAL_EXAM_PACKAGES,
-      tryouts: INITIAL_TRYOUTS,
+      examPackages: [],
+      tryouts: [],
       tryoutSubjects: [],
-      questions: INITIAL_QUESTIONS,
+      questions: [],
       tryoutQuestions: [],
       googleForms: [],
       responses: [],
       answers: [],
-      scores: INITIAL_SCORES,
+      scores: [],
       questionAnalysis: [],
       explanations: [],
       reports: [],
       auditLogs: [],
-      schoolProfile: cachedProfile || INITIAL_SCHOOL_PROFILE,
+      schoolProfile: cachedProfile,
     };
     return defaultState;
   }
