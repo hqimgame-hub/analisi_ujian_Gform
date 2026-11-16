@@ -4,7 +4,7 @@
 -- Dashboard -> SQL Editor -> New Query -> Run
 -- ============================================================
 
-SELECT json_pretty(json_build_object(
+SELECT json_build_object(
   'school_profile', COALESCE((SELECT json_agg(t) FROM school_profile t), '[]'::json),
   'academic_years', COALESCE((SELECT json_agg(t) FROM academic_years t), '[]'::json),
   'classes', COALESCE((SELECT json_agg(t) FROM classes t), '[]'::json),
@@ -30,4 +30,4 @@ SELECT json_pretty(json_build_object(
   'exam_packages', COALESCE((SELECT json_agg(t) FROM exam_packages t), '[]'::json),
   'exam_package_subjects', COALESCE((SELECT json_agg(t) FROM exam_package_subjects t), '[]'::json),
   'audit_logs', COALESCE((SELECT json_agg(t) FROM audit_logs t), '[]'::json)
-)) AS database_backup_json;
+) AS database_backup_json;
