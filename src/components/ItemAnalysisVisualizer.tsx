@@ -1092,28 +1092,31 @@ export const ItemAnalysisVisualizer: React.FC<ItemAnalysisVisualizerProps> = ({
                             Analisis Sebaran Pilihan Jawaban Siswa (Efektivitas Pengecoh):
                           </span>
                           {(() => {
-                            const isPureTrueFalse = Array.isArray(item.options) && item.options.length === 2 &&
-                              item.options.some((o: any) => ['BENAR', 'TRUE', 'YA', 'SETUJU'].includes((o.text || '').toUpperCase())) &&
-                              item.options.some((o: any) => ['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU'].includes((o.text || '').toUpperCase()));
+                            const opts = Array.isArray(item.options) ? item.options : [];
+                            const optA = opts.find((o: any) => o.key === 'A')?.text?.trim().toUpperCase() || '';
+                            const optB = opts.find((o: any) => o.key === 'B')?.text?.trim().toUpperCase() || '';
+                            const isBoolA = ['BENAR', 'TRUE', 'YA', 'SETUJU'].includes(optA);
+                            const isBoolB = ['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU'].includes(optB);
 
-                            const validKeys = (Array.isArray(item.options) && item.options.length > 0)
-                              ? item.options.map((o: any) => o.key.toUpperCase()).filter((k: string) => ['A', 'B', 'C', 'D', 'E'].includes(k))
-                              : Object.keys(item.distractorStats || item.distractorCounts || {}).filter(k => ['A', 'B', 'C', 'D', 'E'].includes(k) && (k !== 'E' || (item.distractorStats?.[k]?.count || item.distractorCounts?.[k] || 0) > 0));
+                            const isPureTrueFalse =
+                              Boolean((opts.length === 2 && isBoolA && isBoolB) ||
+                              /(?:\[\s*pernya?taan|soal\s*benar|benar\s*(?:atau|\/)\s*salah|true\s*(?:or|\/)\s*false)/i.test(item.questionText || '') ||
+                              (isBoolA && isBoolB));
 
-                            const hasEvidenceOfOptionE =
-                              (item.correctAnswer || '').toUpperCase().includes('E') ||
-                              (Array.isArray(item.options) && item.options.some((o: any) => o.key.toUpperCase() === 'E' && o.text && !o.text.toLowerCase().startsWith('pilihan'))) ||
-                              ((item.distractorStats?.['E']?.count || item.distractorCounts?.['E'] || 0) > 0 && validKeys.includes('E'));
+                            let renderKeys: string[] = ['A', 'B', 'C', 'D'];
+                            if (isPureTrueFalse) {
+                              renderKeys = ['A', 'B'];
+                            } else {
+                              const validKeys = (Array.isArray(item.options) && item.options.length > 0)
+                                ? item.options.map((o: any) => o.key.toUpperCase()).filter((k: string) => ['A', 'B', 'C', 'D', 'E'].includes(k))
+                                : ['A', 'B', 'C', 'D'];
 
-                            let renderKeys = validKeys.length > 0 ? validKeys : ['A', 'B', 'C', 'D'];
-                            if (!hasEvidenceOfOptionE) {
-                              renderKeys = renderKeys.filter((k: string) => k !== 'E');
-                            }
-                            if (!isPureTrueFalse && renderKeys.length < 4) {
-                              renderKeys = ['A', 'B', 'C', 'D'];
-                              if (hasEvidenceOfOptionE) {
-                                renderKeys = ['A', 'B', 'C', 'D', 'E'];
-                              }
+                              const hasEvidenceOfOptionE =
+                                (item.correctAnswer || '').toUpperCase().includes('E') ||
+                                (Array.isArray(item.options) && item.options.some((o: any) => o.key.toUpperCase() === 'E' && o.text && !o.text.toLowerCase().startsWith('pilihan') && !['CAMPURAN', 'DIAFAN', 'MODERN', '6 CM', 'IBU', 'PAGI HARI'].includes(o.text.trim().toUpperCase()))) ||
+                                ((item.distractorStats?.['E']?.count || item.distractorCounts?.['E'] || 0) > 0 && validKeys.includes('E'));
+
+                              renderKeys = hasEvidenceOfOptionE ? ['A', 'B', 'C', 'D', 'E'] : ['A', 'B', 'C', 'D'];
                             }
 
                             const colsClass = renderKeys.length === 2

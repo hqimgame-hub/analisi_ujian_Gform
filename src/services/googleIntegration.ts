@@ -421,8 +421,8 @@ export class GoogleIntegrationService {
       return null;
     }
 
-    // 5. Cek prefix huruf A..E dengan delimiter ([A], (A), Opsi A, Pilihan A, A., A), A:, A -, A /, A <spasi>)
-    const letterMatch = trimmed.match(/^\s*(?:\[([A-Ea-e])\]|\(([A-Ea-e])\)|(?:opsi|pilihan|jawaban)\s+([A-Ea-e])(?:[\.\)\:\-\s]|$)|([A-Ea-e])(?:[\.\)\:\-\/]\s*|\s+))(?:\s*(.*))?$/i);
+    // 5. Cek prefix huruf A..E dengan delimiter ([A], (A), Opsi A, Pilihan A, Option A, A., A), A:, A -, A /, A <spasi>)
+    const letterMatch = trimmed.match(/^\s*(?:\[([A-Ea-e])\]|\(([A-Ea-e])\)|(?:opsi|pilihan|jawaban|option)\s+([A-Ea-e])(?:[\.\)\:\-\s]|$)|([A-Ea-e])(?:[\.\)\:\-\/]\s*|\s+))(?:\s*(.*))?$/i);
     if (letterMatch) {
       const letter = (letterMatch[1] || letterMatch[2] || letterMatch[3] || letterMatch[4]).toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
       const remainder = (letterMatch[5] || '').trim();
@@ -432,8 +432,8 @@ export class GoogleIntegrationService {
       };
     }
 
-    // 6. Cek prefix angka 1..5 dengan delimiter ([1], (1), Opsi 1, 1., 1), 1:, 1 -, 1 <spasi>)
-    const numMatch = trimmed.match(/^\s*(?:\[([1-5])\]|\(([1-5])\)|(?:opsi|pilihan|jawaban)\s+([1-5])(?:[\.\)\:\-\s]|$)|([1-5])(?:[\.\)\:\-\/]\s*|\s+))(?:\s*(.*))?$/i);
+    // 6. Cek prefix angka 1..5 dengan delimiter ([1], (1), Opsi 1, Pilihan 1, Option 1, 1., 1), 1:, 1 -, 1 <spasi>)
+    const numMatch = trimmed.match(/^\s*(?:\[([1-5])\]|\(([1-5])\)|(?:opsi|pilihan|jawaban|option)\s+([1-5])(?:[\.\)\:\-\s]|$)|([1-5])(?:[\.\)\:\-\/]\s*|\s+))(?:\s*(.*))?$/i);
     if (numMatch) {
       const numChar = numMatch[1] || numMatch[2] || numMatch[3] || numMatch[4];
       const letter = numMap[numChar];
@@ -605,6 +605,44 @@ export class GoogleIntegrationService {
       rawValues.push(rawKeyCell);
     }
 
+    // 0. Deteksi komprehensif apakah butir soal ini adalah Benar / Salah (True/False):
+    const headerIsBS = /(?:\[\s*pernya?taan|soal\s*benar|benar\s*(?:atau|\/)\s*salah|true\s*(?:or|\/)\s*false)/i.test(header) ||
+      /\b(?:benar|salah)\b.*\[.*\]/i.test(header);
+
+    const nonBlankRawValues = rawValues.filter(v => {
+      const up = v.trim().toUpperCase();
+      return up && !['-', 'KOSONG', 'NULL', 'N/A', 'TIDAK DIJAWAB', 'BELUM DIJAWAB'].includes(up);
+    });
+
+    const valuesArePureBS = nonBlankRawValues.length > 0 && nonBlankRawValues.every(v => {
+      const up = v.trim().toUpperCase();
+      return ['BENAR', 'SALAH', 'TRUE', 'FALSE', 'YA', 'TIDAK', 'SETUJU', 'TIDAK SETUJU', 'A', 'B', 'S'].includes(up);
+    });
+
+    const rawKeyIsBS = Boolean(rawKeyCell && ['BENAR', 'SALAH', 'TRUE', 'FALSE', 'YA', 'TIDAK', 'SETUJU', 'TIDAK SETUJU'].includes(rawKeyCell.trim().toUpperCase()));
+
+    const isTrueFalseQuestion = headerIsBS || valuesArePureBS || rawKeyIsBS;
+
+    if (isTrueFalseQuestion) {
+      // Untuk soal Benar / Salah: HANYA ada 2 opsi A: Benar dan B: Salah!
+      // Dilarang keras memunculkan opsi C, D, atau E!
+      let bsCorrect = 'A';
+      const candidateKey = (rawKeyCell || existingCorrectAnswer || '').trim().toUpperCase();
+      if (['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU', 'S', 'B'].includes(candidateKey)) {
+        bsCorrect = 'B';
+      } else {
+        bsCorrect = 'A';
+      }
+
+      return {
+        options: [
+          { key: 'A', text: 'Benar' },
+          { key: 'B', text: 'Salah' },
+        ],
+        correctAnswer: bsCorrect,
+      };
+    }
+
     // Peta opsi A..E saat ini
     const keyToText = new Map<'A' | 'B' | 'C' | 'D' | 'E', string>();
 
@@ -614,9 +652,17 @@ export class GoogleIntegrationService {
     const unprefixedSpreadsheetTexts: string[] = [];
     const seenSpreadsheetTexts = new Set<string>();
 
+    // Jika existingOptions tercemar oleh opsi Benar/Salah padahal soal ini bukan soal Benar/Salah:
+    // Buang existingOptions yang tercemar tersebut agar teks materi soal tidak tergeser!
+    const isExistingPollutedWithBS = Array.isArray(existingOptions) &&
+      existingOptions.some(o => o.key.toUpperCase() === 'A' && ['BENAR', 'TRUE', 'YA', 'SETUJU'].includes((o.text || '').trim().toUpperCase())) &&
+      existingOptions.some(o => o.key.toUpperCase() === 'B' && ['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU'].includes((o.text || '').trim().toUpperCase()));
+
+    const sanitizedExistingOptions = isExistingPollutedWithBS ? undefined : existingOptions;
+
     // Jika existingOptions sudah memuat teks materi nyata, daftarkan terlebih dahulu agar pemetaan huruf naskah terjaga
-    if (Array.isArray(existingOptions)) {
-      existingOptions.forEach(opt => {
+    if (Array.isArray(sanitizedExistingOptions)) {
+      sanitizedExistingOptions.forEach(opt => {
         const k = (opt.key || '').trim().toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
         if (optionKeys.includes(k) && !isPlaceholderText(opt.text, k)) {
           keyToText.set(k, opt.text.trim());
@@ -624,13 +670,18 @@ export class GoogleIntegrationService {
       });
     }
 
-    // Jika existingCorrectAnswer sudah bernilai huruf tertentu (misal 'D' atau 'B') dan baris kunci (rawKeyCell) berupa teks nyata:
-    // Petakan teks kunci langsung ke huruf existingCorrectAnswer agar kunci TIDAK bergeser ke 'A'!
+    // Jika ada baris kunci resmi (rawKeyCell):
     const cleanExistingKey = (existingCorrectAnswer || '').trim().toUpperCase();
-    if (rawKeyCell && optionKeys.includes(cleanExistingKey as any) && !explicitPrefixMatches.has(cleanExistingKey as any)) {
+    if (rawKeyCell) {
       const explicitKeyPrefix = this.extractExplicitOptionPrefix(rawKeyCell);
-      if (!explicitKeyPrefix) {
+      if (explicitKeyPrefix && optionKeys.includes(explicitKeyPrefix.letter)) {
+        keyToText.set(explicitKeyPrefix.letter, explicitKeyPrefix.text || rawKeyCell);
+        seenSpreadsheetTexts.add(rawKeyCell.toUpperCase());
+        if (explicitKeyPrefix.text) seenSpreadsheetTexts.add(explicitKeyPrefix.text.toUpperCase());
+      } else if (optionKeys.includes(cleanExistingKey as any)) {
+        // Kunci jawaban guru sudah diset huruf (misal D/B/C) -> kunci teks jawaban ke huruf tersebut!
         keyToText.set(cleanExistingKey as any, rawKeyCell);
+        seenSpreadsheetTexts.add(rawKeyCell.toUpperCase());
       }
     }
 
@@ -678,14 +729,6 @@ export class GoogleIntegrationService {
       }
 
       const upper = trimmedVal.toUpperCase();
-      if (['BENAR', 'TRUE', 'YA', 'SETUJU'].includes(upper)) {
-        if (!explicitPrefixMatches.has('A')) explicitPrefixMatches.set('A', 'Benar');
-        return;
-      }
-      if (['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU'].includes(upper)) {
-        if (!explicitPrefixMatches.has('B')) explicitPrefixMatches.set('B', 'Salah');
-        return;
-      }
 
       // Jika hanya huruf tunggal A-E, jangan masukkan ke unprefixedSpreadsheetTexts
       if (optionKeys.includes(upper as any)) {
@@ -710,8 +753,8 @@ export class GoogleIntegrationService {
       unprefixedSpreadsheetTexts.forEach(txt => {
         const txtUpper = txt.toUpperCase();
         let matchedKey: 'A' | 'B' | 'C' | 'D' | 'E' | undefined = undefined;
-        if (Array.isArray(existingOptions)) {
-          const matchOpt = existingOptions.find(o => {
+        if (Array.isArray(sanitizedExistingOptions)) {
+          const matchOpt = sanitizedExistingOptions.find(o => {
             const k = (o.key || '').trim().toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
             if (!optionKeys.includes(k) || isPlaceholderText(o.text, k)) return false;
             return o.text.trim().toUpperCase() === txtUpper;
@@ -732,42 +775,25 @@ export class GoogleIntegrationService {
     }
 
     // 3. Tentukan jumlah opsi aktif secara dinamis:
-    // Cek apakah soal ini MURNI Benar / Salah (True/False):
-    // Yaitu: kedua opsi A dan B hanya berisi Benar/Salah, TIDAK ada teks materi lain dan TIDAK ada opsi C/D/E
-    const isPureTrueFalse =
-      keyToText.size === 2 &&
-      keyToText.has('A') &&
-      keyToText.has('B') &&
-      !keyToText.has('C') &&
-      !keyToText.has('D') &&
-      !keyToText.has('E') &&
-      ['BENAR', 'TRUE', 'YA', 'SETUJU'].includes((keyToText.get('A') || '').toUpperCase()) &&
-      ['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU'].includes((keyToText.get('B') || '').toUpperCase());
-
     let activeOptionKeys: Array<'A' | 'B' | 'C' | 'D' | 'E'> = ['A', 'B', 'C', 'D'];
 
-    if (isPureTrueFalse) {
-      // Hanya batasi ke A dan B jika soal MURNI Benar/Salah
-      activeOptionKeys = ['A', 'B'];
-    } else {
-      // Untuk soal Pilihan Ganda (PG / PGK / Menjodohkan):
-      // Opsi E HANYA AKTIF jika ada bukti sah eksplisit (bukan variasi teks ke-5 yang mungkin merupakan typo/anomali):
-      const hasEvidenceOfOptionE =
-        explicitPrefixMatches.has('E') ||
-        (rawKeyCell && (rawKeyCell.trim().toUpperCase() === 'E' || /^[E][\.\)\:\-\s]/i.test(rawKeyCell.trim()))) ||
-        (existingCorrectAnswer && (existingCorrectAnswer.trim().toUpperCase() === 'E' || /^[E][\.\)\:\-\s]/i.test(existingCorrectAnswer.trim()))) ||
-        (Array.isArray(existingOptions) && existingOptions.some(o => o.key.toUpperCase() === 'E' && !isPlaceholderText(o.text, 'E')));
+    // Untuk soal Pilihan Ganda (PG / PGK / Menjodohkan):
+    // Opsi E HANYA AKTIF jika ada bukti sah eksplisit (bukan variasi teks ke-5 yang mungkin merupakan typo/anomali):
+    const hasEvidenceOfOptionE =
+      explicitPrefixMatches.has('E') ||
+      (rawKeyCell && (rawKeyCell.trim().toUpperCase() === 'E' || /^[E][\.\)\:\-\s]/i.test(rawKeyCell.trim()))) ||
+      (existingCorrectAnswer && (existingCorrectAnswer.trim().toUpperCase() === 'E' || /^[E][\.\)\:\-\s]/i.test(existingCorrectAnswer.trim()))) ||
+      (Array.isArray(sanitizedExistingOptions) && sanitizedExistingOptions.some(o => o.key.toUpperCase() === 'E' && !isPlaceholderText(o.text, 'E')));
 
-      if (hasEvidenceOfOptionE) {
-        activeOptionKeys = ['A', 'B', 'C', 'D', 'E'];
-      } else {
-        activeOptionKeys = ['A', 'B', 'C', 'D'];
-      }
+    if (hasEvidenceOfOptionE) {
+      activeOptionKeys = ['A', 'B', 'C', 'D', 'E'];
+    } else {
+      activeOptionKeys = ['A', 'B', 'C', 'D'];
     }
 
     const finalOptions = activeOptionKeys.map(k => {
       // Prioritaskan teks dari keyToText, fallback ke existingOptions, lalu placeholder
-      const existingOpt = Array.isArray(existingOptions) ? existingOptions.find(o => o.key.toUpperCase() === k) : undefined;
+      const existingOpt = Array.isArray(sanitizedExistingOptions) ? sanitizedExistingOptions.find(o => o.key.toUpperCase() === k) : undefined;
       const existingText = existingOpt?.text && !isPlaceholderText(existingOpt.text, k) ? existingOpt.text : undefined;
       return {
         key: k,
@@ -785,17 +811,13 @@ export class GoogleIntegrationService {
         finalCorrect = multi;
       } else {
         const explicit = this.extractExplicitOptionPrefix(candidateRawCorrect);
-        if (explicit) {
+        if (explicit && activeOptionKeys.includes(explicit.letter)) {
           finalCorrect = explicit.letter;
         } else {
           const upperCorr = candidateRawCorrect.replace(/\s+/g, ' ').trim().toUpperCase();
           const strippedCorr = upperCorr.replace(/^[A-E][\.\)\:\-\s]+\s*/, '').trim();
 
-          if (['BENAR', 'TRUE', 'YA', 'SETUJU'].includes(upperCorr)) {
-            finalCorrect = 'A';
-          } else if (['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU'].includes(upperCorr)) {
-            finalCorrect = 'B';
-          } else if (activeOptionKeys.includes(upperCorr as any)) {
+          if (activeOptionKeys.includes(upperCorr as any)) {
             finalCorrect = upperCorr;
           } else {
             const matchedOpt = finalOptions.find(o => {
@@ -805,6 +827,9 @@ export class GoogleIntegrationService {
             });
             if (matchedOpt) {
               finalCorrect = matchedOpt.key;
+            } else if (optionKeys.includes(cleanExistingKey as any)) {
+              // Jika kunci lama sudah huruf sah (D/B/C), pertahankan kunci lama!
+              finalCorrect = cleanExistingKey;
             }
           }
         }
@@ -844,10 +869,13 @@ export class GoogleIntegrationService {
       return '';
     }
 
-    // 1. Cek tipe Benar / Salah jika butir soal memiliki 2 opsi (Benar & Salah)
-    const isTrueFalseQuestion = Array.isArray(q.options) && q.options.length === 2 &&
-      q.options.some(opt => ['BENAR', 'TRUE', 'YA', 'SETUJU'].includes((opt.text || '').trim().toUpperCase())) &&
-      q.options.some(opt => ['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU'].includes((opt.text || '').trim().toUpperCase()));
+    // 1. Cek tipe Benar / Salah
+    const isTrueFalseQuestion =
+      (Array.isArray(q.options) && q.options.length === 2 &&
+        q.options.some(opt => ['BENAR', 'TRUE', 'YA', 'SETUJU'].includes((opt.text || '').trim().toUpperCase())) &&
+        q.options.some(opt => ['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU'].includes((opt.text || '').trim().toUpperCase()))) ||
+      /(?:\[\s*pernya?taan|soal\s*benar|benar\s*(?:atau|\/)\s*salah|true\s*(?:or|\/)\s*false)/i.test(q.questionText || '') ||
+      ['BENAR', 'SALAH', 'TRUE', 'FALSE'].includes((q.correctAnswer || '').trim().toUpperCase());
 
     if (isTrueFalseQuestion) {
       if (['BENAR', 'TRUE', 'YA', 'SETUJU', 'A'].includes(upper)) {
@@ -1022,9 +1050,12 @@ export class GoogleIntegrationService {
         }
       }
 
+      const tryoutKeyForQ = (Array.isArray(tryout?.answerKey) && tryout.answerKey[idx]) ? tryout.answerKey[idx].trim() : undefined;
+      const effectiveExpectedKey = tryoutKeyForQ || existing?.correctAnswer;
+
       const enriched = this.enrichQuestionOptionsFromRows(
         existing?.options,
-        existing?.correctAnswer,
+        effectiveExpectedKey,
         headerText,
         rows,
         answerKeyRow
@@ -1460,9 +1491,13 @@ export class GoogleIntegrationService {
       const header = mappingConfig.questionMappings[q.uniqueCode];
       if (!header) return;
 
+      const qIdx = (q.questionNumber || 1) - 1;
+      const tryoutKeyForQ = (Array.isArray(tryout?.answerKey) && tryout.answerKey[qIdx]) ? tryout.answerKey[qIdx].trim() : undefined;
+      const effectiveExpectedKey = tryoutKeyForQ || q.correctAnswer;
+
       const enriched = this.enrichQuestionOptionsFromRows(
         q.options,
-        q.correctAnswer,
+        effectiveExpectedKey,
         header,
         studentRows,
         detectedKeyRow

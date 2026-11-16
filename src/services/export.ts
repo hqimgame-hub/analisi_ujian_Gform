@@ -1596,6 +1596,15 @@ export class ExportService {
             a => a.questionId === qId && a.isCorrect && a.studentAnswer && a.studentAnswer.trim() !== ''
           );
           const inferredKey = correctSample?.studentAnswer?.trim().toUpperCase() || '-';
+          const qText = `Butir Soal Nomor ${qNum}`;
+          const isBsQuestion = ['BENAR', 'SALAH'].includes(inferredKey);
+          const generatedOptions = isBsQuestion
+            ? [{ key: 'A', text: 'Benar' }, { key: 'B', text: 'Salah' }]
+            : (inferredKey === 'E' ? ['A', 'B', 'C', 'D', 'E'] : ['A', 'B', 'C', 'D']).map(k => ({
+                key: k,
+                text: `Pilihan ${k}`,
+              }));
+
           missingQuestions.push({
             id: qId,
             uniqueCode: `${tryout.code || 'SOAL'}-Q${String(qNum).padStart(2, '0')}`,
@@ -1603,11 +1612,8 @@ export class ExportService {
             subjectId: tryout.subjectId || 'sub-1',
             materialId: '',
             competencyId: '',
-            questionText: `Butir Soal Nomor ${qNum}`,
-            options: (inferredKey === 'E' ? ['A', 'B', 'C', 'D', 'E'] : ['A', 'B', 'C', 'D']).map(k => ({
-              key: k,
-              text: `Pilihan ${k}`,
-            })),
+            questionText: qText,
+            options: generatedOptions,
             correctAnswer: inferredKey,
             weight: 1,
             status: 'ACTIVE',

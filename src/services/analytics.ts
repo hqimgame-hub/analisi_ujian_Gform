@@ -325,9 +325,26 @@ export class AnalyticsService {
       let unansweredCount = 0;
 
       // Tentukan apakah butir soal ini MURNI Benar / Salah (True/False):
-      const isPureTrueFalse = Array.isArray(q.options) && q.options.length === 2 &&
-        q.options.some(opt => ['BENAR', 'TRUE', 'YA', 'SETUJU'].includes((opt.text || '').trim().toUpperCase())) &&
-        q.options.some(opt => ['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU'].includes((opt.text || '').trim().toUpperCase()));
+      const hasBSHeaderOrText =
+        /(?:\[\s*pernya?taan|soal\s*benar|benar\s*(?:atau|\/)\s*salah|true\s*(?:or|\/)\s*false)/i.test(q.questionText || '') ||
+        /\b(?:benar|salah)\b.*\[.*\]/i.test(q.questionText || '');
+
+      const hasBSOptionsInAandB = Array.isArray(q.options) &&
+        q.options.some(opt => (opt.key || '').toUpperCase() === 'A' && ['BENAR', 'TRUE', 'YA', 'SETUJU'].includes((opt.text || '').trim().toUpperCase())) &&
+        q.options.some(opt => (opt.key || '').toUpperCase() === 'B' && ['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU'].includes((opt.text || '').trim().toUpperCase()));
+
+      const hasBSCorrectAnswer = ['BENAR', 'SALAH', 'TRUE', 'FALSE'].includes((q.correctAnswer || '').trim().toUpperCase());
+
+      // Periksa apakah seluruh respon nyata siswa pada soal ini hanya memuat Benar/Salah:
+      const nonBlankRawStudentAnswers = qAnswers
+        .map(a => (a.studentAnswer || '').trim().toUpperCase())
+        .filter(ans => ans && !['-', 'KOSONG', 'NULL', 'N/A', 'TIDAK DIJAWAB', 'BELUM DIJAWAB'].includes(ans));
+
+      const allAnswersArePureBS = nonBlankRawStudentAnswers.length > 0 && nonBlankRawStudentAnswers.every(ans =>
+        ['BENAR', 'SALAH', 'TRUE', 'FALSE', 'YA', 'TIDAK', 'SETUJU', 'TIDAK SETUJU', 'A', 'B', 'S'].includes(ans)
+      );
+
+      const isPureTrueFalse = hasBSHeaderOrText || hasBSOptionsInAandB || hasBSCorrectAnswer || (allAnswersArePureBS && !qAnswers.some(a => ['C', 'D', 'E'].includes(a.studentAnswer?.trim().toUpperCase())));
 
       // Tentukan opsi yang sah untuk butir soal ini (misal SMP 4 opsi: A..D, SMA 5 opsi: A..E, atau BS 2 opsi: A..B)
       const validOptionKeys: Array<'A' | 'B' | 'C' | 'D' | 'E'> = (Array.isArray(q.options) && q.options.length > 0)
@@ -339,7 +356,8 @@ export class AnalyticsService {
       let activeOptionKeys: Array<'A' | 'B' | 'C' | 'D' | 'E'> = ['A', 'B', 'C', 'D'];
 
       if (isPureTrueFalse) {
-        // Hanya batasi ke 2 opsi jika soal MURNI Benar / Salah
+        // Hanya batasi ke 2 opsi (A & B) jika soal MURNI Benar / Salah!
+        // Dilarang keras memunculkan opsi C, D, atau E!
         activeOptionKeys = ['A', 'B'];
       } else {
         // Untuk soal Pilihan Ganda: jangan biarkan opsi terpotong menjadi A-B hanya karena 0 pemilih!
@@ -349,10 +367,10 @@ export class AnalyticsService {
           (
             (q.correctAnswer || '').trim().toUpperCase() === 'E' ||
             (q.correctAnswer || '').includes('E') ||
-            (Array.isArray(q.options) && q.options.some(o => o.key.toUpperCase() === 'E' && !o.text.toUpperCase().startsWith('PILIHAN '))) ||
+            (Array.isArray(q.options) && q.options.some(o => o.key.toUpperCase() === 'E' && !o.text.toUpperCase().startsWith('PILIHAN ') && !['CAMPURAN', 'DIAFAN', 'MODERN', '6 CM', 'IBU', 'PAGI HARI'].includes(o.text.trim().toUpperCase()))) ||
             qAnswers.some(a => {
               const raw = (a.studentAnswer || '').trim().toUpperCase();
-              return raw === 'E' || raw.startsWith('E.') || raw.startsWith('E)') || raw.startsWith('E -') || raw.startsWith('OPSI E') || raw.startsWith('PILIHAN E');
+              return raw === 'E' || raw.startsWith('E.') || raw.startsWith('E)') || raw.startsWith('E -') || raw.startsWith('OPSI E') || raw.startsWith('PILIHAN E') || raw.startsWith('OPTION E');
             })
           );
 
@@ -419,11 +437,19 @@ export class AnalyticsService {
         const cleaned = cleanText(str).replace(/^["'“”‘’]+|["'“”‘’]+$/g, '');
         if (!cleaned) return null;
         if (!/^A(?:\s+(?:dan|atau|serta|&)|\s*\/)/i.test(cleaned)) {
-          const m = cleaned.match(/^\s*(?:\[([A-Ea-e])\]|\(([A-Ea-e])\)|(?:opsi|pilihan|jawaban)\s+([A-Ea-e])(?:[\.\)\:\-\s]|$)|([A-Ea-e])[\.\)\:\-\/]\s*)(.*)$/i);
+          const m = cleaned.match(/^\s*(?:\[([A-Ea-e])\]|\(([A-Ea-e])\)|(?:opsi|pilihan|jawaban|option)\s+([A-Ea-e])(?:[\.\)\:\-\s]|$)|([A-Ea-e])[\.\)\:\-\/]\s*)(.*)$/i);
           if (m) {
             const letter = (m[1] || m[2] || m[3] || m[4]).toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
             const text = (m[5] || '').trim();
             return { letter, text };
+          }
+          const numM = cleaned.match(/^\s*(?:\[([1-5])\]|\(([1-5])\)|(?:opsi|pilihan|jawaban|option)\s+([1-5])(?:[\.\)\:\-\s]|$)|([1-5])[\.\)\:\-\/]\s*)(.*)$/i);
+          if (numM) {
+            const numChar = numM[1] || numM[2] || numM[3] || numM[4];
+            const numMap: Record<string, 'A' | 'B' | 'C' | 'D' | 'E'> = { '1': 'A', '2': 'B', '3': 'C', '4': 'D', '5': 'E' };
+            const letter = numMap[numChar];
+            const text = (numM[5] || '').trim();
+            if (letter) return { letter, text };
           }
         }
         return null;
@@ -555,7 +581,7 @@ export class AnalyticsService {
 
         // 5. Cek prefix huruf A..E eksplisit
         if (!/^A(?:\s+(?:dan|atau|serta|&)|\s*\/)/i.test(cleaned)) {
-          const prefixMatch = cleaned.match(/^\s*(?:\[([A-Ea-e])\]|\(([A-Ea-e])\)|(?:opsi|pilihan|jawaban)\s+([A-Ea-e])(?:[\.\)\:\-\s]|$)|([A-Ea-e])[\.\)\:\-\/]\s*)/i);
+          const prefixMatch = cleaned.match(/^\s*(?:\[([A-Ea-e])\]|\(([A-Ea-e])\)|(?:opsi|pilihan|jawaban|option)\s+([A-Ea-e])(?:[\.\)\:\-\s]|$)|([A-Ea-e])[\.\)\:\-\/]\s*)/i);
           if (prefixMatch) {
             const matchedLetter = (prefixMatch[1] || prefixMatch[2] || prefixMatch[3] || prefixMatch[4]).toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
             if (activeOptionKeys.includes(matchedLetter)) {
@@ -565,7 +591,7 @@ export class AnalyticsService {
         }
 
         // 6. Cek prefix angka 1..5 eksplisit
-        const numPrefixMatch = cleaned.match(/^\s*(?:\[([1-5])\]|\(([1-5])\)|(?:opsi|pilihan|jawaban)\s+([1-5])(?:[\.\)\:\-\s]|$)|([1-5])[\.\)\:\-\/]\s*)/i);
+        const numPrefixMatch = cleaned.match(/^\s*(?:\[([1-5])\]|\(([1-5])\)|(?:opsi|pilihan|jawaban|option)\s+([1-5])(?:[\.\)\:\-\s]|$)|([1-5])[\.\)\:\-\/]\s*)/i);
         if (numPrefixMatch) {
           const numChar = numPrefixMatch[1] || numPrefixMatch[2] || numPrefixMatch[3] || numPrefixMatch[4];
           const mappedLetter = numMap[numChar];

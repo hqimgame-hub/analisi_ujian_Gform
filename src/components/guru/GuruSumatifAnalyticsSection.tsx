@@ -1720,28 +1720,31 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
                           <td className="py-3 px-3 text-center font-mono text-[10px]">
                             <div className="flex items-center justify-center space-x-1">
                               {(() => {
-                                const isPureTrueFalse = Array.isArray((qa as any).options) && (qa as any).options.length === 2 &&
-                                  (qa as any).options.some((o: any) => ['BENAR', 'TRUE', 'YA', 'SETUJU'].includes((o.text || '').toUpperCase())) &&
-                                  (qa as any).options.some((o: any) => ['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU'].includes((o.text || '').toUpperCase()));
+                                const opts = Array.isArray((qa as any).options) ? (qa as any).options : [];
+                                const optA = opts.find((o: any) => o.key === 'A')?.text?.trim().toUpperCase() || '';
+                                const optB = opts.find((o: any) => o.key === 'B')?.text?.trim().toUpperCase() || '';
+                                const isBoolA = ['BENAR', 'TRUE', 'YA', 'SETUJU'].includes(optA);
+                                const isBoolB = ['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU'].includes(optB);
 
-                                const validKeys = (Array.isArray((qa as any).options) && (qa as any).options.length > 0)
-                                  ? (qa as any).options.map((o: any) => o.key.toUpperCase()).filter((k: string) => ['A', 'B', 'C', 'D', 'E'].includes(k))
-                                  : Object.keys(qa.distractorStats || {}).filter(k => ['A', 'B', 'C', 'D', 'E'].includes(k) && (k !== 'E' || (qa.distractorStats[k]?.count || 0) > 0));
+                                const isPureTrueFalse =
+                                  Boolean((opts.length === 2 && isBoolA && isBoolB) ||
+                                  /(?:\[\s*pernya?taan|soal\s*benar|benar\s*(?:atau|\/)\s*salah|true\s*(?:or|\/)\s*false)/i.test((qa as any).questionText || '') ||
+                                  (isBoolA && isBoolB));
 
-                                const hasEvidenceOfOptionE =
-                                  (qa.correctAnswer || '').toUpperCase().includes('E') ||
-                                  (Array.isArray((qa as any).options) && (qa as any).options.some((o: any) => o.key.toUpperCase() === 'E' && o.text && !o.text.toLowerCase().startsWith('pilihan'))) ||
-                                  ((qa.distractorStats?.['E']?.count || 0) > 0 && validKeys.includes('E'));
+                                let renderKeys: string[] = ['A', 'B', 'C', 'D'];
+                                if (isPureTrueFalse) {
+                                  renderKeys = ['A', 'B'];
+                                } else {
+                                  const validKeys = (Array.isArray((qa as any).options) && (qa as any).options.length > 0)
+                                    ? (qa as any).options.map((o: any) => o.key.toUpperCase()).filter((k: string) => ['A', 'B', 'C', 'D', 'E'].includes(k))
+                                    : ['A', 'B', 'C', 'D'];
 
-                                let renderKeys = validKeys.length > 0 ? validKeys : ['A', 'B', 'C', 'D'];
-                                if (!hasEvidenceOfOptionE) {
-                                  renderKeys = renderKeys.filter((k: string) => k !== 'E');
-                                }
-                                if (!isPureTrueFalse && renderKeys.length < 4) {
-                                  renderKeys = ['A', 'B', 'C', 'D'];
-                                  if (hasEvidenceOfOptionE) {
-                                    renderKeys = ['A', 'B', 'C', 'D', 'E'];
-                                  }
+                                  const hasEvidenceOfOptionE =
+                                    (qa.correctAnswer || '').toUpperCase().includes('E') ||
+                                    (Array.isArray((qa as any).options) && (qa as any).options.some((o: any) => o.key.toUpperCase() === 'E' && o.text && !o.text.toLowerCase().startsWith('pilihan') && !['CAMPURAN', 'DIAFAN', 'MODERN', '6 CM', 'IBU', 'PAGI HARI'].includes(o.text.trim().toUpperCase()))) ||
+                                    ((qa.distractorStats?.['E']?.count || 0) > 0 && validKeys.includes('E'));
+
+                                  renderKeys = hasEvidenceOfOptionE ? ['A', 'B', 'C', 'D', 'E'] : ['A', 'B', 'C', 'D'];
                                 }
 
                                 return renderKeys.map((opt: string) => {

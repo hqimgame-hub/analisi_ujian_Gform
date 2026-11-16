@@ -5522,10 +5522,32 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                                   <td className="py-3 px-3 text-center font-mono text-[10px]">
                                     <div className="flex items-center justify-center space-x-1">
                                       {(() => {
-                                        const validKeys = (Array.isArray((qa as any).options) && (qa as any).options.length > 0)
-                                          ? (qa as any).options.map((o: any) => o.key.toUpperCase()).filter((k: string) => ['A', 'B', 'C', 'D', 'E'].includes(k))
-                                          : Object.keys(qa.distractorStats || {}).filter(k => ['A', 'B', 'C', 'D', 'E'].includes(k) && (k !== 'E' || (qa.distractorStats[k]?.count || 0) > 0));
-                                        const renderKeys = validKeys.length > 0 ? validKeys : ['A', 'B', 'C', 'D'];
+                                        const opts = Array.isArray((qa as any).options) ? (qa as any).options : [];
+                                        const optA = opts.find((o: any) => o.key === 'A')?.text?.trim().toUpperCase() || '';
+                                        const optB = opts.find((o: any) => o.key === 'B')?.text?.trim().toUpperCase() || '';
+                                        const isBoolA = ['BENAR', 'TRUE', 'YA', 'SETUJU'].includes(optA);
+                                        const isBoolB = ['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU'].includes(optB);
+
+                                        const isPureTrueFalse =
+                                          Boolean((opts.length === 2 && isBoolA && isBoolB) ||
+                                          /(?:\[\s*pernya?taan|soal\s*benar|benar\s*(?:atau|\/)\s*salah|true\s*(?:or|\/)\s*false)/i.test((qa as any).questionText || '') ||
+                                          (isBoolA && isBoolB));
+
+                                        let renderKeys: string[] = ['A', 'B', 'C', 'D'];
+                                        if (isPureTrueFalse) {
+                                          renderKeys = ['A', 'B'];
+                                        } else {
+                                          const validKeys = (Array.isArray((qa as any).options) && (qa as any).options.length > 0)
+                                            ? (qa as any).options.map((o: any) => o.key.toUpperCase()).filter((k: string) => ['A', 'B', 'C', 'D', 'E'].includes(k))
+                                            : ['A', 'B', 'C', 'D'];
+
+                                          const hasEvidenceOfOptionE =
+                                            (qa.correctAnswer || '').toUpperCase().includes('E') ||
+                                            (Array.isArray((qa as any).options) && (qa as any).options.some((o: any) => o.key.toUpperCase() === 'E' && o.text && !o.text.toLowerCase().startsWith('pilihan') && !['CAMPURAN', 'DIAFAN', 'MODERN', '6 CM', 'IBU', 'PAGI HARI'].includes(o.text.trim().toUpperCase()))) ||
+                                            ((qa.distractorStats?.['E']?.count || 0) > 0 && validKeys.includes('E'));
+
+                                          renderKeys = hasEvidenceOfOptionE ? ['A', 'B', 'C', 'D', 'E'] : ['A', 'B', 'C', 'D'];
+                                        }
 
                                         return renderKeys.map((opt: string) => {
                                           const stat = qa.distractorStats?.[opt];
