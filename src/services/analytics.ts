@@ -329,7 +329,17 @@ export class AnalyticsService {
             .map(o => (o.key || '').trim().toUpperCase())
             .filter((k): k is 'A' | 'B' | 'C' | 'D' | 'E' => ['A', 'B', 'C', 'D', 'E'].includes(k))
         : (['A', 'B', 'C', 'D'] as const).slice();
-      const activeOptionKeys: Array<'A' | 'B' | 'C' | 'D' | 'E'> = validOptionKeys.length > 0 ? validOptionKeys : (['A', 'B', 'C', 'D'] as const).slice();
+      const activeOptionKeys: Array<'A' | 'B' | 'C' | 'D' | 'E'> = validOptionKeys.length > 0 ? [...validOptionKeys] : (['A', 'B', 'C', 'D'] as const).slice();
+
+      // Periksa apakah ada kunci jawaban atau respon siswa yang memuat opsi 'E'
+      const hasOptionE = (q.correctAnswer || '').trim().toUpperCase() === 'E' ||
+        qAnswers.some(a => {
+          const raw = (a.studentAnswer || '').trim().toUpperCase();
+          return raw === 'E' || raw.startsWith('E.') || raw.startsWith('E)') || raw.startsWith('E -') || raw.startsWith('OPSI E') || raw.startsWith('PILIHAN E');
+        });
+      if (hasOptionE && !activeOptionKeys.includes('E')) {
+        activeOptionKeys.push('E');
+      }
 
       const rawCounts: Record<string, number> = { KOSONG: 0 };
       activeOptionKeys.forEach(k => {
@@ -346,7 +356,9 @@ export class AnalyticsService {
 
       // Build smart option mapper for this question (handles A..E, explicit prefixes, q.options text, and legacy unmapped full-text answers)
       const textToOptionKey = new Map<string, 'A' | 'B' | 'C' | 'D' | 'E'>();
-      const usedOptionKeys = new Set<'A' | 'B' | 'C' | 'D' | 'E'>();
+      // usedOptionKeys hanya untuk tracking teks yang sudah dipetakan ke opsi tertentu
+      // TIDAK digunakan untuk dynamic fallback agar distribusi tidak bergeser
+      const textMappedOptionKeys = new Set<'A' | 'B' | 'C' | 'D' | 'E'>();
 
       if (Array.isArray(q.options)) {
         q.options.forEach(opt => {
@@ -356,7 +368,7 @@ export class AnalyticsService {
           if (activeOptionKeys.includes(k) && tClean && !tClean.startsWith('PILIHAN ') && !tClean.startsWith('OPSI ') && tClean !== k) {
             textToOptionKey.set(tClean, k);
             if (tStripped) textToOptionKey.set(tStripped, k);
-            usedOptionKeys.add(k);
+            textMappedOptionKeys.add(k);
           }
         });
       }
@@ -448,10 +460,12 @@ export class AnalyticsService {
           }
         }
 
-        // Dynamic fallback for unmapped options, ONLY within activeOptionKeys, NEVER defaulting to 'E'
-        const nextAvailable = activeOptionKeys.find(k => !usedOptionKeys.has(k));
+        // Dynamic fallback untuk teks jawaban yang tidak dikenali: petakan ke opsi yang belum punya teks mapping.
+        // PENTING: Gunakan textMappedOptionKeys (bukan usedOptionKeys) agar tidak terpengaruh oleh
+        // pemanggilan resolveToOptionKey untuk correctAnswer sebelum jawaban siswa diproses.
+        const nextAvailable = activeOptionKeys.find(k => !textMappedOptionKeys.has(k));
         if (nextAvailable) {
-          usedOptionKeys.add(nextAvailable);
+          textMappedOptionKeys.add(nextAvailable);
           textToOptionKey.set(upper, nextAvailable);
           return nextAvailable;
         }
@@ -479,38 +493,55 @@ export class AnalyticsService {
           return;
         }
 
-        const cleanRawAns = cleanText(rawAns).toUpperCase().replace(/^["'“”‘’]+|["'“”‘’]+$/g, '');
-        const cleanCorrectAns = cleanText(q.correctAnswer).toUpperCase().replace(/^["'“”‘’]+|["'“”‘’]+$/g, '');
-        let resolvedKey = resolveToOptionKey(rawAns);
+        const isTrueFalseQuestion = Array.isArray(q.options) && q.options.length === 2 &&
+          q.options.some(opt => ['BENAR', 'TRUE', 'YA', 'SETUJU'].includes((opt.text || '').trim().toUpperCase())) &&
+          q.options.some(opt => ['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU'].includes((opt.text || '').trim().toUpperCase()));
+
+        // Dukungan Benar / Salah untuk 'B' (Benar -> Opsi A) dan 'S' (Salah -> Opsi B)
+        let effectiveAns = rawAns;
+        if (isTrueFalseQuestion) {
+          if (['B', 'BENAR', 'TRUE', 'YA', 'SETUJU', 'A'].includes(upperAns)) {
+            effectiveAns = 'A';
+          } else if (['S', 'SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU', 'B'].includes(upperAns)) {
+            effectiveAns = 'B';
+          }
+        }
+
+        const isMulti = effectiveAns.includes(',');
+        const multiKeys = isMulti
+          ? effectiveAns.split(',').map(p => resolveToOptionKey(p.trim())).filter((k): k is 'A' | 'B' | 'C' | 'D' | 'E' => Boolean(k && activeOptionKeys.includes(k as any)))
+          : [];
 
         const isAnsCorrect = Boolean(
           ans.isCorrect ||
-          (resolvedKey && resolvedCorrectKey && resolvedKey === resolvedCorrectKey) ||
-          (cleanRawAns && cleanCorrectAns && cleanRawAns === cleanCorrectAns) ||
-          (cleanRawAns && cleanCorrectAns && stripPrefix(cleanRawAns) === stripPrefix(cleanCorrectAns))
+          ScoringService.isAnswerMatching(rawAns, q.correctAnswer) ||
+          ScoringService.isAnswerMatching(effectiveAns, q.correctAnswer)
         );
 
-        // SAFEGUARD 1: Jika jawaban benar tapi resolvedKey belum terpetakan,
-        // alokasikan langsung ke kunci jawaban agar TIDAK PERNAH terhitung sebagai Kosong palsu!
-        if (!resolvedKey && isAnsCorrect) {
-          resolvedKey = resolvedCorrectKey;
-        }
-
-        // SAFEGUARD 2: Jika siswa sungguh-sungguh mengisi jawaban (non-empty),
-        // JANGAN PERNAH masukkan ke KOSONG!
-        if (!resolvedKey) {
-          const availableDistractor = activeOptionKeys.find(k => k !== resolvedCorrectKey && (rawCounts[k] || 0) === 0)
-            || activeOptionKeys.find(k => k !== resolvedCorrectKey)
-            || activeOptionKeys[0]
-            || 'A';
-          resolvedKey = availableDistractor;
-        }
-
-        if (resolvedKey && rawCounts[resolvedKey] !== undefined) {
-          rawCounts[resolvedKey]++;
+        if (isMulti && multiKeys.length > 0) {
+          // Pilihan Ganda Kompleks (Checkbox): tambahkan ke setiap opsi yang dicentang siswa
+          multiKeys.forEach(k => {
+            rawCounts[k] = (rawCounts[k] || 0) + 1;
+          });
         } else {
-          const defaultKey = activeOptionKeys[0] || 'A';
-          rawCounts[defaultKey] = (rawCounts[defaultKey] || 0) + 1;
+          // Pilihan Tunggal
+          let resolvedKey = resolveToOptionKey(effectiveAns);
+
+          if (!resolvedKey && isAnsCorrect) {
+            resolvedKey = resolvedCorrectKey;
+          }
+
+          // Hitung persebaran opsi secara murni dan presisi sesuai respon nyata siswa
+          if (resolvedKey && rawCounts[resolvedKey] !== undefined) {
+            rawCounts[resolvedKey]++;
+          } else if (resolvedKey && activeOptionKeys.includes(resolvedKey as any)) {
+            rawCounts[resolvedKey] = (rawCounts[resolvedKey] || 0) + 1;
+          } else {
+            // Jika jawaban tidak dapat dipetakan ke opsi A-E mana pun, jangan rekayasa ke opsi acak!
+            // Catat sebagai tidak terjawab / kosong agar persebaran opsi A-E 100% murni sesuai spreadsheet.
+            unansweredCount++;
+            rawCounts.KOSONG = (rawCounts.KOSONG || 0) + 1;
+          }
         }
 
         if (isAnsCorrect) {
@@ -568,10 +599,12 @@ export class AnalyticsService {
       const distractorPercentages: Record<string, number> = {};
       const reviewReasons: string[] = [];
 
+      const correctKeys = (q.correctAnswer || '').split(',').map(s => s.trim().toUpperCase());
+
       [...activeOptionKeys, 'KOSONG'].forEach(opt => {
         const count = rawCounts[opt] || 0;
         const pct = Math.round((count / divisor) * 100 * 10) / 10;
-        const isCorrect = opt === resolvedCorrectKey;
+        const isCorrect = correctKeys.includes(opt) || opt === resolvedCorrectKey;
         // A distractor is misleading if it is wrong yet chosen more than the correct answer
         const isMisleading = !isCorrect && opt !== 'KOSONG' && count > correctCount && count > 0;
 

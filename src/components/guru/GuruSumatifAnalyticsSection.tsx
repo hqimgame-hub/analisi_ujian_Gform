@@ -514,42 +514,71 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
       return analytics.questionStats.map((qs, idx) => {
         const qNum = qs.questionNumber || idx + 1;
         const matchingQ = relevantSubjectQuestions.find(q => (q.questionNumber || idx + 1) === qNum);
-        const correctKey = matchingQ?.correctAnswer || 'A';
+        const correctKey = (matchingQ?.correctAnswer || 'A').toUpperCase();
         const totalResp = qs.totalResponses || 1;
         const pVal = qs.facilityValue;
         const dVal = qs.discriminationIndex ?? 0;
         const isReview = qs.isReviewRecommended;
 
-        const wrongTotal = Math.max(0, qs.wrongCount);
         const optKeys = (Array.isArray(matchingQ?.options) && matchingQ.options.length > 0)
           ? matchingQ.options.map(o => o.key.toUpperCase()).filter(k => ['A', 'B', 'C', 'D', 'E'].includes(k))
           : ['A', 'B', 'C', 'D'];
-        const otherKeys = optKeys.filter(k => k !== correctKey.toUpperCase());
-        const perDist = otherKeys.length > 0 ? Math.floor(wrongTotal / otherKeys.length) : 0;
-        const remainder = otherKeys.length > 0 ? wrongTotal % otherKeys.length : 0;
+        const otherKeys = optKeys.filter(k => k !== correctKey);
 
+        // Coba ambil distribusi nyata dari DB answers terlebih dahulu (akurat)
         const distStats: Record<string, any> = {};
-        distStats[correctKey.toUpperCase()] = {
-          count: qs.correctCount,
-          percentage: Math.round((qs.correctCount / totalResp) * 100),
-          isMisleading: false,
-        };
-        otherKeys.forEach((k, kIdx) => {
-          const count = perDist + (kIdx === 0 ? remainder : 0);
-          distStats[k] = {
-            count,
-            percentage: Math.round((count / totalResp) * 100),
-            isMisleading: count > qs.correctCount,
+        const distCounts: Record<string, number> = {};
+
+        if (matchingQ && matchedSumatifTryout && effectiveAnswers.length > 0) {
+          // Hitung distribusi dari data answers nyata
+          const qAnswers = effectiveAnswers.filter(
+            a => a.questionId === matchingQ.id && a.tryoutId === matchedSumatifTryout.id
+          );
+          if (qAnswers.length > 0) {
+            optKeys.forEach(k => { distCounts[k] = 0; });
+            distCounts['KOSONG'] = 0;
+            qAnswers.forEach(a => {
+              const ans = (a.studentAnswer || '').trim().toUpperCase();
+              if (!ans || ['-', 'KOSONG', 'NULL', 'N/A'].includes(ans)) {
+                distCounts['KOSONG'] = (distCounts['KOSONG'] || 0) + 1;
+              } else if (optKeys.includes(ans)) {
+                distCounts[ans] = (distCounts[ans] || 0) + 1;
+              }
+            });
+            optKeys.forEach(k => {
+              const count = distCounts[k] || 0;
+              distStats[k] = {
+                count,
+                percentage: Math.round((count / totalResp) * 100),
+                isCorrect: k === correctKey,
+                isMisleading: k !== correctKey && count > (distCounts[correctKey] || qs.correctCount) && count > 0,
+              };
+            });
+            if (distCounts['KOSONG'] > 0) {
+              distStats['KOSONG'] = { count: distCounts['KOSONG'], percentage: Math.round((distCounts['KOSONG'] / totalResp) * 100), isCorrect: false, isMisleading: false };
+            }
+          }
+        }
+
+        // Fallback: jika tidak ada data answers nyata, gunakan hanya correctCount (tanpa estimasi distribusi distraktor)
+        if (Object.keys(distStats).length === 0) {
+          distCounts[correctKey] = qs.correctCount;
+          distStats[correctKey] = {
+            count: qs.correctCount,
+            percentage: Math.round((qs.correctCount / totalResp) * 100),
+            isCorrect: true,
+            isMisleading: false,
           };
-        });
+          // Untuk distraktor, tampilkan wrongCount total tapi TIDAK dibagi rata (tidak akurat)
+          // Biarkan 0 agar tidak menyesatkan guru
+          otherKeys.forEach(k => {
+            distCounts[k] = 0;
+            distStats[k] = { count: 0, percentage: 0, isCorrect: false, isMisleading: false };
+          });
+        }
 
         const qId = matchingQ?.id || `q-sum-${qNum}`;
         const tryoutId = matchedSumatifTryout?.id || activePackage?.id || `pkg-${activePackage?.id}`;
-        const distCounts: Record<string, number> = {};
-        distCounts[correctKey.toUpperCase()] = qs.correctCount;
-        otherKeys.forEach((k, kIdx) => {
-          distCounts[k] = perDist + (kIdx === 0 ? remainder : 0);
-        });
 
         const diffCategory: 'MUDAH' | 'SEDANG' | 'SULIT' = pVal > 0.70 ? 'MUDAH' : pVal >= 0.30 ? 'SEDANG' : 'SULIT';
         const discCategory: 'SANGAT_BAIK' | 'BAIK' | 'CUKUP' | 'BURUK' = dVal >= 0.40 ? 'SANGAT_BAIK' : dVal >= 0.30 ? 'BAIK' : dVal >= 0.20 ? 'CUKUP' : 'BURUK';
@@ -605,6 +634,7 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
     currentUser,
     relevantSubjectQuestions,
     answers,
+    effectiveAnswers,
     targetStudentIdSet,
     scores,
     materials,
@@ -1685,7 +1715,7 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
 
                                 return renderKeys.map((opt: string) => {
                                   const stat = qa.distractorStats?.[opt];
-                                  const isKey = opt === qa.correctAnswer.toUpperCase();
+                                  const isKey = (qa.correctAnswer || '').split(',').map(s => s.trim().toUpperCase()).includes(opt);
                                   const optText = (qa as any).options?.find((o: any) => o.key === opt)?.text;
                                   const hasText = optText && !optText.toLowerCase().startsWith('pilihan');
                                   return (

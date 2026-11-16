@@ -85,16 +85,29 @@ export class ScoringService {
       if (sParts.length === cParts.length && sParts.every((val, idx) => val === cParts[idx])) {
         return true;
       }
+
+      // Normalisasi prefix huruf pada setiap opsi koma (misal "A. Fotosintesis" -> "A")
+      const extractLetter = (val: string): string => {
+        const prefix = val.match(/^\s*(?:\[([A-Ea-e])\]|\(([A-Ea-e])\)|(?:opsi|pilihan)\s+([A-Ea-e])(?:[\.\)\:\-\s]|$)|([A-Ea-e])(?:[\.\)\:\-\/]\s*|\s+))/i);
+        return prefix ? (prefix[1] || prefix[2] || prefix[3] || prefix[4]).toUpperCase() : val.trim().toUpperCase();
+      };
+      const sLetters = sParts.map(extractLetter).sort();
+      const cLetters = cParts.map(extractLetter).sort();
+      if (sLetters.length === cLetters.length && sLetters.every((val, idx) => val === cLetters[idx])) {
+        return true;
+      }
     }
 
     // True/False or Benar/Salah mapping
     const boolMap: Record<string, string> = {
-      B: 'BENAR', TRUE: 'BENAR', T: 'BENAR', '1': 'BENAR', YA: 'BENAR',
-      S: 'SALAH', FALSE: 'SALAH', F: 'SALAH', '0': 'SALAH', TIDAK: 'SALAH',
+      B: 'BENAR', TRUE: 'BENAR', T: 'BENAR', '1': 'BENAR', YA: 'BENAR', SETUJU: 'BENAR',
+      S: 'SALAH', FALSE: 'SALAH', F: 'SALAH', '0': 'SALAH', TIDAK: 'SALAH', 'TIDAK SETUJU': 'SALAH',
     };
     const sNorm = boolMap[s.toUpperCase()] || s.toUpperCase();
     const cNorm = boolMap[c.toUpperCase()] || c.toUpperCase();
     if (sNorm === cNorm) return true;
+    if ((sNorm === 'BENAR' && c.toUpperCase() === 'A') || (sNorm === 'SALAH' && c.toUpperCase() === 'B')) return true;
+    if ((cNorm === 'BENAR' && s.toUpperCase() === 'A') || (cNorm === 'SALAH' && s.toUpperCase() === 'B')) return true;
 
     // Multiple Choice Option Prefix matching (e.g. "A" matches "A. Pilihan", "(A) Pilihan", "[A] Pilihan", "A - Pilihan")
     const extractOptionLetter = (val: string): string | null => {

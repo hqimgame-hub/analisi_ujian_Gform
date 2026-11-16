@@ -1101,7 +1101,7 @@ export const ItemAnalysisVisualizer: React.FC<ItemAnalysisVisualizerProps> = ({
                             return (
                               <div className={`grid ${colsClass} gap-2`}>
                                 {renderKeys.map((opt: string) => {
-                                  const isCorrectKey = opt === item.correctAnswer;
+                                  const isCorrectKey = (item.correctAnswer || '').split(',').map((s: string) => s.trim().toUpperCase()).includes(opt);
                                   const stat = item.distractorStats?.[opt];
                                   const count = stat ? stat.count : (item.distractorCounts?.[opt] || 0);
                                   const totalResp = item.totalRespondents || 1;
