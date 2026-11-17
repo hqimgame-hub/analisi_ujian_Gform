@@ -235,27 +235,6 @@ export class SumatifAnalyticsService {
         }
       }
 
-      // Fallback: jika belum dapat skor, cari di SEMUA score siswa berdasarkan subjectScores[subjectId]
-      // Ini menangani kasus guru input nilai langsung tanpa link tryout spesifik
-      if (rawScore === null) {
-        const allStudentScores = effectiveScores.filter(s => s.studentId === student.id);
-        for (const rec of allStudentScores) {
-          if (rec.subjectScores && typeof rec.subjectScores[pkgSub.subjectId] === 'number') {
-            const val = rec.subjectScores[pkgSub.subjectId];
-            if (rawScore === null || val > rawScore) rawScore = val;
-          }
-          // Juga cari case-insensitive
-          if (rawScore === null && rec.subjectScores) {
-            const lowerSubjId = pkgSub.subjectId.toLowerCase().trim();
-            for (const [k, v] of Object.entries(rec.subjectScores)) {
-              if (k.toLowerCase().trim() === lowerSubjId && typeof v === 'number') {
-                if (rawScore === null || v > rawScore) rawScore = v;
-              }
-            }
-          }
-        }
-      }
-
       const hasGrade = rawScore !== null;
       const roundedScore = hasGrade ? Math.round(rawScore! * 10) / 10 : 0;
       const isPassed = hasGrade && roundedScore >= passingGrade;

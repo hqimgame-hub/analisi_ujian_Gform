@@ -456,18 +456,13 @@ export const StudentPortalPage: React.FC = () => {
     const pkgCode = (activePackage.code || '').toLowerCase().trim();
     const pkgId = activePackage.id.toLowerCase().trim();
     const subId = selectedSumatifSubjectId.toLowerCase().trim();
-    // Cari via filter packageId + subjectId
-    const found = tryouts.find(t => {
+    return tryouts.find(t => {
       const tPkg = (t.packageId || '').toLowerCase().trim();
       const tCode = (t.code || '').toLowerCase().trim();
       const tSub = (t.subjectId || '').toLowerCase().trim();
       return (tPkg === pkgId || (pkgCode && tCode.startsWith(pkgCode))) && tSub === subId;
-    });
-    if (found) return found;
-    // Fallback: cari via ID deterministik yang dibuat handleSyncSumatifSheet
-    const deterministicId = `to-sum-${activePackage.id}-${selectedSumatifSubjectId}`;
-    return tryouts.find(t => t.id === deterministicId) || allTryouts.find(t => t.id === deterministicId) || null;
-  }, [isSumatifPackage, activePackage, selectedSumatifSubjectId, tryouts, allTryouts]);
+    }) || null;
+  }, [isSumatifPackage, activePackage, selectedSumatifSubjectId, tryouts]);
 
   // Target Tryout ID untuk tab lembar butir soal
   const effectiveQuestionSheetTryoutId = useMemo(() => {
@@ -529,11 +524,16 @@ export const StudentPortalPage: React.FC = () => {
     return ids;
   }, [selectedTryoutId, tryouts, allTryouts]);
 
-  // Published Explanations: tampilkan semua yang dipublikasikan guru (tidak dibatasi per tryout),
-  // siswa dapat melihat semua pembahasan yang relevan untuk jenjang/angkatan mereka
+  // Published Explanations for selected Tryout stage / group
   const publishedExplanations = useMemo(() => {
-    return allExplanations.filter(e => e.status === 'PUBLISHED');
-  }, [allExplanations]);
+    return allExplanations.filter(e => {
+      if (e.status !== 'PUBLISHED') return false;
+      if (stageSiblingTryoutIds.has(e.tryoutId)) return true;
+      if (e.tryoutId === selectedTryoutId) return true;
+      const targetTo = allTryouts.find(t => t.id === selectedTryoutId);
+      return Boolean(targetTo && (e.tryoutId === targetTo.code || e.tryoutId === targetTo.id));
+    });
+  }, [allExplanations, selectedTryoutId, stageSiblingTryoutIds, allTryouts]);
 
   // Ranking & Tie-Breaker Calculation (Multi-tier: Total Score -> Total Correct -> Math Correct)
   const mathSubject = allSubjects.find(s => s.code === 'MAT' || s.name.toLowerCase().includes('matematika')) || allSubjects[0];
