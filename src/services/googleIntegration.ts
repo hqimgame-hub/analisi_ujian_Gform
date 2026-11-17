@@ -224,6 +224,87 @@ export class GoogleIntegrationService {
   }
 
   /**
+   * Mendeteksi baris Akun Kunci Jawaban Resmi dari Spreadsheet Google Form secara komprehensif.
+   * Mendeteksi berdasarkan:
+   * 1. Nama / Identitas: mengandung kata 'kunci', 'answer key', 'master key', 'guru', 'pembahasan'.
+   * 2. NISN: '0000000000', '9999999999', '111122222', atau akun bertanda isAnswerKeyAccount di DB.
+   * 3. Kolom Skor Google Form Quiz: peserta yang mendapatkan skor 100% (sempurna) otomatis menjadi acuan kunci jawaban.
+   */
+  public static detectAnswerKeyRow(
+    headers: string[],
+    rows: Record<string, string>[],
+    allDbStudents?: Student[]
+  ): { keyRow: Record<string, string> | null; studentName: string } {
+    if (!rows || rows.length === 0) return { keyRow: null, studentName: '' };
+
+    const nameCol = this.autoDetectNameColumn(headers);
+    const nisnCol = this.autoDetectNisnColumn(headers, rows, allDbStudents);
+    const scoreCol = this.autoDetectScoreColumn(headers);
+
+    const extractVal = (row: Record<string, string>, targetCol: string, fallbacks: string[]): string => {
+      if (targetCol && row[targetCol] !== undefined) return String(row[targetCol]).trim();
+      for (const [k, v] of Object.entries(row)) {
+        if (!v || !String(v).trim()) continue;
+        const lk = k.toLowerCase();
+        if (fallbacks.some(f => lk === f || lk.includes(f))) return String(v).trim();
+      }
+      return '';
+    };
+
+    // 1. Cek berdasarkan Nama, NISN, atau kecocokan akun isAnswerKeyAccount
+    for (const row of rows) {
+      const rawName = extractVal(row, nameCol, ['nama', 'name', 'siswa', 'peserta']);
+      const rawNisn = extractVal(row, nisnCol, ['nisn', 'nis', 'no peserta', 'nomor peserta', 'id']);
+
+      const isKeyByName = /kunci|answer\s*key|master\s*key|kunci\s*jawaban|pembahasan/i.test(rawName);
+      const isKeyByNisn = /kunci|answer\s*key|master\s*key/i.test(rawNisn) ||
+        rawNisn === '0000000000' || rawNisn === '9999999999' || rawNisn === '111122222';
+
+      let matchedDbKey = false;
+      if (allDbStudents && allDbStudents.length > 0) {
+        const cleanNisn = this.normalizeNisn(rawNisn);
+        matchedDbKey = allDbStudents.some(s =>
+          s.isAnswerKeyAccount && (
+            (rawNisn && s.nisn === rawNisn) ||
+            (cleanNisn && this.normalizeNisn(s.nisn) === cleanNisn) ||
+            (rawName && s.name && s.name.trim().toLowerCase() === rawName.trim().toLowerCase())
+          )
+        );
+      }
+
+      if (isKeyByName || isKeyByNisn || matchedDbKey) {
+        return {
+          keyRow: row,
+          studentName: rawName || 'Akun Kunci Jawaban Resmi',
+        };
+      }
+    }
+
+    // 2. Fallback cerdas: Deteksi dari kolom Skor Google Form Quiz (peserta skor sempurna 100%)
+    if (scoreCol) {
+      for (const row of rows) {
+        const rawScore = row[scoreCol];
+        if (!rawScore) continue;
+        const cleanScore = String(rawScore).trim();
+        const slashMatch = cleanScore.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
+        if (slashMatch) {
+          const num = parseFloat(slashMatch[1]);
+          const den = parseFloat(slashMatch[2]);
+          if (den > 0 && num / den === 1.0) {
+            const rawName = extractVal(row, nameCol, ['nama', 'name', 'siswa', 'peserta']) || 'Peserta Skor Sempurna (100%)';
+            return {
+              keyRow: row,
+              studentName: `${rawName} [Kunci Google Form 100%]`,
+            };
+          }
+        }
+      }
+    }
+
+    return { keyRow: null, studentName: '' };
+  }
+
+  /**
    * Cek apakah suatu kolom merupakan metadata / identitas siswa (Bagian 1 Google Form).
    * Kolom metadata TIDAK boleh dijadikan butir soal.
    */
@@ -693,17 +774,7 @@ export class GoogleIntegrationService {
 
     const sanitizedExistingOptions = isExistingPollutedWithBS ? undefined : existingOptions;
 
-    // Jika existingOptions sudah memuat teks materi nyata, daftarkan terlebih dahulu agar pemetaan huruf naskah terjaga
-    if (Array.isArray(sanitizedExistingOptions)) {
-      sanitizedExistingOptions.forEach(opt => {
-        const k = (opt.key || '').trim().toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
-        if (optionKeys.includes(k) && !isPlaceholderText(opt.text, k)) {
-          keyToText.set(k, opt.text.trim());
-        }
-      });
-    }
-
-    // Jika ada baris kunci resmi (rawKeyCell):
+    // Jika ada baris kunci resmi (rawKeyCell) dengan prefix eksplisit (misal "D. 7"):
     const cleanExistingKey = (existingCorrectAnswer || '').trim().toUpperCase();
     if (rawKeyCell) {
       const explicitKeyPrefix = this.extractExplicitOptionPrefix(rawKeyCell);
@@ -711,10 +782,6 @@ export class GoogleIntegrationService {
         keyToText.set(explicitKeyPrefix.letter, explicitKeyPrefix.text || rawKeyCell);
         seenSpreadsheetTexts.add(rawKeyCell.toUpperCase());
         if (explicitKeyPrefix.text) seenSpreadsheetTexts.add(explicitKeyPrefix.text.toUpperCase());
-      } else if (optionKeys.includes(cleanExistingKey as any)) {
-        // Kunci jawaban guru sudah diset huruf (misal D/B/C) -> kunci teks jawaban ke huruf tersebut!
-        keyToText.set(cleanExistingKey as any, rawKeyCell);
-        seenSpreadsheetTexts.add(rawKeyCell.toUpperCase());
       }
     }
 
@@ -903,26 +970,28 @@ export class GoogleIntegrationService {
 
     // Jika spreadsheet memiliki teks opsi nyata: alokasikan ke huruf opsi A..E
     if (hasSpreadsheetOptionTexts) {
-      unprefixedSpreadsheetTexts.forEach(txt => {
-        const txtUpper = txt.toUpperCase();
-        let matchedKey: 'A' | 'B' | 'C' | 'D' | 'E' | undefined = undefined;
-        if (Array.isArray(sanitizedExistingOptions)) {
-          const matchOpt = sanitizedExistingOptions.find(o => {
-            const k = (o.key || '').trim().toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
-            if (!optionKeys.includes(k) || isPlaceholderText(o.text, k)) return false;
-            return o.text.trim().toUpperCase() === txtUpper;
-          });
-          if (matchOpt) {
-            const k = matchOpt.key.toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
-            if (!keyToText.has(k)) {
-              matchedKey = k;
-            }
+      if (allNumeric) {
+        // Untuk pilihan numerik murni, selalu alokasikan berurutan menaik: indeks 0 ke A, 1 ke B, dst.
+        unprefixedSpreadsheetTexts.forEach((txt, idx) => {
+          const k = optionKeys[idx];
+          if (k) {
+            keyToText.set(k, txt);
           }
-        }
-
-        const targetKey = matchedKey || optionKeys.find(k => !keyToText.has(k));
-        if (targetKey) {
-          keyToText.set(targetKey, txt);
+        });
+      } else {
+        unprefixedSpreadsheetTexts.forEach(txt => {
+          const targetKey = optionKeys.find(k => !keyToText.has(k));
+          if (targetKey) {
+            keyToText.set(targetKey, txt);
+          }
+        });
+      }
+    } else if (Array.isArray(sanitizedExistingOptions)) {
+      // Fallback jika spreadsheet belum memiliki respon: gunakan existingOptions
+      sanitizedExistingOptions.forEach(opt => {
+        const k = (opt.key || '').trim().toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E';
+        if (optionKeys.includes(k) && !isPlaceholderText(opt.text, k)) {
+          keyToText.set(k, opt.text.trim());
         }
       });
     }
@@ -950,24 +1019,25 @@ export class GoogleIntegrationService {
     });
 
     // 4. Tentukan kunci jawaban (correctAnswer) dalam bentuk huruf 'A'..'E'
-    const candidateRawCorrect = rawKeyCell || (existingCorrectAnswer || '').trim();
     let finalCorrect = 'A';
 
-    if (candidateRawCorrect) {
-      const multi = this.extractMultiSelectLetters(candidateRawCorrect);
+    if (rawKeyCell) {
+      // Prioritas 1: Kunci Jawaban Resmi dari Google Form (rawKeyCell)
+      const multi = this.extractMultiSelectLetters(rawKeyCell);
       if (multi) {
         finalCorrect = multi;
       } else {
-        const explicit = this.extractExplicitOptionPrefix(candidateRawCorrect);
+        const explicit = this.extractExplicitOptionPrefix(rawKeyCell);
         if (explicit && activeOptionKeys.includes(explicit.letter)) {
           finalCorrect = explicit.letter;
         } else {
-          const upperCorr = candidateRawCorrect.replace(/\s+/g, ' ').trim().toUpperCase();
+          const upperCorr = rawKeyCell.replace(/\s+/g, ' ').trim().toUpperCase();
           const strippedCorr = upperCorr.replace(/^[A-E][\.\)\:\-\s]+\s*/, '').trim();
 
           if (activeOptionKeys.includes(upperCorr as any)) {
             finalCorrect = upperCorr;
           } else {
+            // Cocokkan teks rawKeyCell dengan teks di finalOptions
             const matchedOpt = finalOptions.find(o => {
               const optNorm = o.text.replace(/\s+/g, ' ').trim().toUpperCase();
               const optStripped = optNorm.replace(/^[A-E][\.\)\:\-\s]+\s*/, '').trim();
@@ -976,12 +1046,14 @@ export class GoogleIntegrationService {
             if (matchedOpt) {
               finalCorrect = matchedOpt.key;
             } else if (optionKeys.includes(cleanExistingKey as any)) {
-              // Jika kunci lama sudah huruf sah (D/B/C), pertahankan kunci lama!
               finalCorrect = cleanExistingKey;
             }
           }
         }
       }
+    } else if (cleanExistingKey) {
+      // Prioritas 2: Kunci yang sudah ada jika tidak ada baris kunci di spreadsheet
+      finalCorrect = cleanExistingKey;
     }
 
     return {
@@ -1581,71 +1653,37 @@ export class GoogleIntegrationService {
       return '';
     };
 
-    // 0. Pre-scan for Official Answer Key row (identified by isAnswerKeyAccount === true, or name/NISN indicators)
+    // 0. Pre-scan for Official Answer Key row (menggunakan detektor terpadu detectAnswerKeyRow)
     const allDbStudents = dbService.getStudents();
-    let detectedKeyRow: Record<string, string> | null = null;
+    const headersList = Object.keys(parsedRows[0] || {});
+    const { keyRow: detectedKeyRow, studentName: detectedKeyStudentName } = GoogleIntegrationService.detectAnswerKeyRow(
+      headersList,
+      parsedRows,
+      allDbStudents
+    );
     let detectedKeyStudent: Student | null = null;
     let answerKeyExtractedCount = 0;
 
-    for (const row of parsedRows) {
-      const rawNisn = extractRowNisn(row);
-      const rawName = extractRowName(row);
-      if (!rawNisn && !rawName) continue;
-
-      // 1. Cek kecocokan NISN terhadap akun siswa di database yang bertanda isAnswerKeyAccount
+    if (detectedKeyRow) {
+      const rawNisn = extractRowNisn(detectedKeyRow);
+      const rawName = extractRowName(detectedKeyRow) || detectedKeyStudentName || 'KUNCI JAWABAN';
       const cleanRowNisn = GoogleIntegrationService.normalizeNisn(rawNisn);
-      const matched = (rawNisn || cleanRowNisn)
-        ? (students.find(s => s.nisn === rawNisn || String(s.nisn).trim() === rawNisn || (cleanRowNisn && GoogleIntegrationService.normalizeNisn(s.nisn) === cleanRowNisn) || (cleanRowNisn && s.nisn.replace(/\D/g, '') === cleanRowNisn))
-           || allDbStudents.find(s => s.nisn === rawNisn || String(s.nisn).trim() === rawNisn || (cleanRowNisn && GoogleIntegrationService.normalizeNisn(s.nisn) === cleanRowNisn) || (cleanRowNisn && s.nisn.replace(/\D/g, '') === cleanRowNisn)))
+      detectedKeyStudent = (rawNisn || cleanRowNisn)
+        ? (students.find(s => s.nisn === rawNisn || String(s.nisn).trim() === rawNisn || (cleanRowNisn && GoogleIntegrationService.normalizeNisn(s.nisn) === cleanRowNisn))
+           || allDbStudents.find(s => s.nisn === rawNisn || String(s.nisn).trim() === rawNisn || (cleanRowNisn && GoogleIntegrationService.normalizeNisn(s.nisn) === cleanRowNisn)))
         : null;
 
-      // 2. Cek apakah nama atau NISN secara eksplisit menandakan Kunci Jawaban
-      const isKeyByName = /kunci|answer\s*key|master\s*key/i.test(rawName);
-      const isKeyByNisn = /kunci|answer\s*key|master\s*key/i.test(rawNisn) || rawNisn === '0000000000' || rawNisn === '9999999999';
-
-      if (matched?.isAnswerKeyAccount || isKeyByName || isKeyByNisn) {
-        detectedKeyRow = row;
-        detectedKeyStudent = matched || {
+      if (!detectedKeyStudent) {
+        detectedKeyStudent = {
           id: 'temp-key-account',
           nisn: rawNisn || '0000000000',
           nis: 'KUNCI',
-          name: rawName || 'KUNCI JAWABAN',
+          name: rawName,
           gender: 'L',
           classId: '',
           targetScore: 100,
           isAnswerKeyAccount: true,
         };
-        break;
-      }
-    }
-
-    // 3. Fallback cerdas: Jika belum ada akun kunci khusus, deteksi dari kolom Skor Google Form Quiz.
-    // Baris peserta yang memiliki skor sempurna (100 / 100 atau skor tertinggi) memuat kunci jawaban resmi Google Form!
-    if (!detectedKeyRow && mappingConfig.scoreColumn) {
-      for (const row of parsedRows) {
-        const rawScore = row[mappingConfig.scoreColumn];
-        if (!rawScore) continue;
-        const cleanScore = String(rawScore).trim();
-        const slashMatch = cleanScore.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
-        if (slashMatch) {
-          const num = parseFloat(slashMatch[1]);
-          const den = parseFloat(slashMatch[2]);
-          if (den > 0 && num / den === 1.0) {
-            detectedKeyRow = row;
-            const rName = extractRowName(row) || 'Peserta Skor Sempurna (100%)';
-            detectedKeyStudent = {
-              id: 'temp-perfect-score-key',
-              nisn: extractRowNisn(row) || '0000000000',
-              nis: 'KUNCI',
-              name: `${rName} [Kunci Google Form]`,
-              gender: 'L',
-              classId: '',
-              targetScore: 100,
-              isAnswerKeyAccount: true,
-            };
-            break;
-          }
-        }
       }
     }
 

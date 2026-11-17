@@ -1020,31 +1020,8 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
       if (rows.length === 0) throw new Error('Sheet kosong atau tidak ada baris data.');
 
       const allDbStudents = dbService.getStudents();
-      const detectedKeyRow = rows.find(r => {
-        const nisnEntry = Object.entries(r).find(([k]) => {
-          const lk = k.toLowerCase();
-          return lk === 'nisn' || lk.includes('nisn') || lk.includes('nomor induk');
-        });
-        const nameEntry = Object.entries(r).find(([k]) => {
-          const lk = k.toLowerCase();
-          return lk === 'nama' || lk.includes('nama');
-        });
-        const nisnVal = nisnEntry ? nisnEntry[1]?.trim() : '';
-        const nameVal = nameEntry ? nameEntry[1]?.trim() : '';
-
-        if (/kunci|answer\s*key|master\s*key/i.test(nameVal) || /kunci|answer\s*key|master\s*key/i.test(nisnVal) || nisnVal === '0000000000' || nisnVal === '9999999999') {
-          return true;
-        }
-        if (!nisnVal) return false;
-        const cleanVal = GoogleIntegrationService.normalizeNisn(nisnVal);
-        const st = allDbStudents.find(s =>
-          s.nisn === nisnVal ||
-          String(s.nisn).trim() === String(nisnVal).trim() ||
-          (cleanVal && GoogleIntegrationService.normalizeNisn(s.nisn) === cleanVal) ||
-          (cleanVal && s.nisn.replace(/\D/g, '') === cleanVal)
-        );
-        return st?.isAnswerKeyAccount;
-      }) || null;
+      // Deteksi baris Kunci Jawaban Resmi secara cerdas menggunakan GoogleIntegrationService.detectAnswerKeyRow
+      const { keyRow: detectedKeyRow } = GoogleIntegrationService.detectAnswerKeyRow(headers, rows, allDbStudents);
 
       const preselect: Record<string, boolean> = {};
       if (tryout.selectedQuestionColumns && tryout.selectedQuestionColumns.length > 0) {
@@ -1106,31 +1083,8 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
 
       // Deteksi baris akun kunci jawaban
       const allDbStudents = dbService.getStudents();
-      const detectedKeyRow = rows.find(r => {
-        const nisnEntry = Object.entries(r).find(([k]) => {
-          const lk = k.toLowerCase();
-          return lk === 'nisn' || lk.includes('nisn') || lk.includes('nomor induk');
-        });
-        const nameEntry = Object.entries(r).find(([k]) => {
-          const lk = k.toLowerCase();
-          return lk === 'nama' || lk.includes('nama');
-        });
-        const nisnVal = nisnEntry ? nisnEntry[1]?.trim() : '';
-        const nameVal = nameEntry ? nameEntry[1]?.trim() : '';
-
-        if (/kunci|answer\s*key|master\s*key/i.test(nameVal) || /kunci|answer\s*key|master\s*key/i.test(nisnVal) || nisnVal === '0000000000' || nisnVal === '9999999999') {
-          return true;
-        }
-        if (!nisnVal) return false;
-        const cleanVal = GoogleIntegrationService.normalizeNisn(nisnVal);
-        const st = allDbStudents.find(s =>
-          s.nisn === nisnVal ||
-          String(s.nisn).trim() === String(nisnVal).trim() ||
-          (cleanVal && GoogleIntegrationService.normalizeNisn(s.nisn) === cleanVal) ||
-          (cleanVal && s.nisn.replace(/\D/g, '') === cleanVal)
-        );
-        return st?.isAnswerKeyAccount;
-      }) || null;
+      // Deteksi baris Kunci Jawaban Resmi secara cerdas menggunakan GoogleIntegrationService.detectAnswerKeyRow
+      const { keyRow: detectedKeyRow } = GoogleIntegrationService.detectAnswerKeyRow(headers, rows, allDbStudents);
 
       // Jika sudah ada konfigurasi kolom tersimpan ATAU dipanggil otomatis (background self-healing sync) → langsung sync tanpa modal
       if ((tryout.selectedQuestionColumns && tryout.selectedQuestionColumns.length > 0) || !isManual) {
