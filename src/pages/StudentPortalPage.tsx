@@ -647,6 +647,12 @@ export const StudentPortalPage: React.FC = () => {
 
     let relevantSubjects: Subject[] = [];
 
+    // Set mapel yang diizinkan oleh wadah/paket (pembatas utama untuk TRYOUT package)
+    // Jika paket memiliki daftar mapel (exam_package_subjects), hanya mapel itu yang boleh muncul
+    const pkgAllowedSubjIds = (activePackage?.subjects && activePackage.subjects.length > 0 && !isSumatifPackage)
+      ? new Set(activePackage.subjects.map(ps => ps.subjectId))
+      : null;
+
     // 1. Tryout Eksternal
     if (activeTryout.isExternal) {
       const targetSubjNames = new Set((activeTryout.externalSubjects || []).map(s => s.toLowerCase().trim()));
@@ -666,26 +672,39 @@ export const StudentPortalPage: React.FC = () => {
       const matched = allSubjects.find(s => s.id === activeTryout.subjectId);
       if (matched) relevantSubjects = [matched];
     }
-    // 3. Tryout dengan butir soal
+    // 3. Tryout multi-mapel tanpa subjectId — prioritaskan mapel dari wadah paket,
+    //    baru fallback ke soal (agar mapel lain di luar wadah tidak ikut muncul)
     else {
-      const tryoutQuestions = dbService.getQuestionsForTryout(activeTryout.id);
-      if (tryoutQuestions.length > 0) {
-        const subjIdSet = new Set(tryoutQuestions.map(q => q.subjectId));
-        relevantSubjects = allSubjects.filter(s => subjIdSet.has(s.id));
+      // 3a. Jika wadah punya daftar mapel, gunakan itu sebagai sumber kebenaran
+      if (pkgAllowedSubjIds && pkgAllowedSubjIds.size > 0) {
+        relevantSubjects = allSubjects.filter(s => pkgAllowedSubjIds.has(s.id));
+      }
+      // 3b. Jika tidak ada definisi mapel di wadah, baru cari dari butir soal
+      if (relevantSubjects.length === 0) {
+        const tryoutQuestions = dbService.getQuestionsForTryout(activeTryout.id);
+        if (tryoutQuestions.length > 0) {
+          const subjIdSet = new Set(tryoutQuestions.map(q => q.subjectId));
+          relevantSubjects = allSubjects.filter(s => subjIdSet.has(s.id));
+        }
       }
     }
 
-    // 4. Jika masih kosong tapi ada subjectScores pada activeScore
+    // 4. Jika masih kosong tapi ada subjectScores pada activeScore — filter ke mapel wadah dulu
     if (relevantSubjects.length === 0 && activeScore?.subjectScores && Object.keys(activeScore.subjectScores).length > 0) {
       const scoreKeys = Object.keys(activeScore.subjectScores).map(k => k.toLowerCase().trim());
-      relevantSubjects = allSubjects.filter(s =>
+      let fromScore = allSubjects.filter(s =>
         scoreKeys.includes(s.id.toLowerCase().trim()) ||
         scoreKeys.includes(s.name.toLowerCase().trim()) ||
         scoreKeys.includes(s.code.toLowerCase().trim())
       );
+      // Batasi ke mapel yang diizinkan wadah jika ada
+      if (pkgAllowedSubjIds && pkgAllowedSubjIds.size > 0) {
+        fromScore = fromScore.filter(s => pkgAllowedSubjIds.has(s.id));
+      }
+      relevantSubjects = fromScore;
     }
 
-    // 5. Cek dari wadah/paket jika tryout terikat ke wadah tertentu
+    // 5. Cek dari wadah/paket jika tryout terikat ke wadah tertentu (sudah tercakup di #3a, ini safety net)
     if (relevantSubjects.length === 0 && activePackage?.subjects && activePackage.subjects.length > 0) {
       const pkgSubjIds = new Set(activePackage.subjects.map(ps => ps.subjectId));
       relevantSubjects = allSubjects.filter(s => pkgSubjIds.has(s.id));
