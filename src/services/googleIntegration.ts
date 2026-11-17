@@ -462,12 +462,35 @@ export class GoogleIntegrationService {
   }
 
   /**
+   * Memecah string kombinasi jawaban Pilihan Ganda Kompleks (PGK / Checkbox)
+   * menjadi pernyataan-pernyataan atomik secara cerdas tanpa membelah koma di dalam kalimat.
+   */
+  public static splitPgkSentenceTokens(text: string): string[] {
+    if (!text) return [];
+    const trimmed = text
+      .replace(/[\u200B-\u200D\uFEFF\u200E\u200F]/g, '')
+      .replace(/\u00A0/g, ' ')
+      .replace(/^["'“”‘’]+|["'“”‘’]+$/g, '')
+      .trim();
+    if (!trimmed.includes(',')) return [trimmed];
+    // Jangan pecah jika angka desimal murni, misal "2,5" atau "0,75 m/s"
+    if (/^\d+(?:,\d+)?(?:\s*[a-zA-Z%°]+)?$/.test(trimmed)) {
+      return [trimmed];
+    }
+    // Pisahkan berdasarkan:
+    // 1. Tanda titik diikuti koma: (?<=\.)\s*,\s*
+    // 2. Tanda koma yang diikuti spasi dan huruf kapital: ,\s+(?=[A-Z])
+    const parts = trimmed.split(/(?<=\.)\s*,\s*|,\s+(?=[A-Z])/).map(p => p.trim()).filter(Boolean);
+    return parts.length > 0 ? parts : [trimmed];
+  }
+
+  /**
    * Mengecek apakah string dengan koma merupakan pilihan ganda kompleks (kotak centang) berhuruf eksplisit,
    * misalnya "A, C" atau "A. Opsi 1, C. Opsi 2", BUKAN angka desimal ("2,5 m/s") atau daftar biasa ("1, 2, dan 3").
    */
   public static extractMultiSelectLetters(rawVal: string, q?: Question): string | null {
     if (!rawVal || !rawVal.includes(',')) return null;
-    const parts = rawVal.split(',').map(p => p.trim()).filter(Boolean);
+    const parts = this.splitPgkSentenceTokens(rawVal);
     if (parts.length < 2) return null;
 
     const letters: string[] = [];
@@ -484,7 +507,7 @@ export class GoogleIntegrationService {
         const pClean = p.replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim().toUpperCase();
         const matchedOpt = q.options.find(opt => {
           const optText = (opt.text || '').replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim().toUpperCase();
-          return optText === pClean || (optText.length >= 5 && pClean.length >= 5 && (optText.startsWith(pClean) || pClean.startsWith(optText)));
+          return optText === pClean || (optText.length >= 6 && pClean.length >= 6 && (optText.startsWith(pClean) || pClean.startsWith(optText)));
         });
         if (matchedOpt && ['A', 'B', 'C', 'D', 'E'].includes(matchedOpt.key.toUpperCase())) {
           letters.push(matchedOpt.key.toUpperCase());
@@ -694,22 +717,104 @@ export class GoogleIntegrationService {
       rawCandidates.push(rawKeyCell);
     }
 
-    // Ekstraksi token kandidat: jika ada jawaban multi-select berdelimeter koma (PGK), pecah menjadi token atomik
+    // Deteksi apakah soal ini adalah Pilihan Ganda Kompleks (PGK / Checkbox):
+    // Memiliki respons atau baris kunci yang memuat beberapa token pernyataan atomik
+    const pgkMultiCount = rawCandidates.filter(val => {
+      const tokens = this.splitPgkSentenceTokens(val);
+      return tokens.length > 1;
+    }).length;
+
+    const isPgkQuestion = pgkMultiCount >= 2 || (rawKeyCell && this.splitPgkSentenceTokens(rawKeyCell).length > 1);
+
+    if (isPgkQuestion) {
+      // Kumpulkan pernyataan-pernyataan atomik dari seluruh respons
+      const statementCounts = new Map<string, number>();
+      const statementOrder: string[] = [];
+
+      const registerStatement = (stmt: string) => {
+        const clean = stmt.replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim();
+        if (!clean || clean.length < 3) return;
+        const upper = clean.toUpperCase();
+        if (['-', 'KOSONG', 'NULL', 'N/A', 'TIDAK DIJAWAB', 'BELUM DIJAWAB'].includes(upper)) return;
+        statementCounts.set(clean, (statementCounts.get(clean) || 0) + 1);
+        if (!statementOrder.some(s => s.toUpperCase() === upper)) {
+          statementOrder.push(clean);
+        }
+      };
+
+      // 1. Prioritaskan pernyataan dari baris kunci jawaban resmi jika ada
+      if (rawKeyCell) {
+        this.splitPgkSentenceTokens(rawKeyCell).forEach(registerStatement);
+      }
+
+      // 2. Kumpulkan dari seluruh respons siswa
+      rawCandidates.forEach(val => {
+        this.splitPgkSentenceTokens(val).forEach(registerStatement);
+      });
+
+      // Filter pernyataan yang valid (muncul di baris kunci atau dipilih >= 2 siswa)
+      const validStatements = statementOrder.filter(stmt => {
+        const cnt = statementCounts.get(stmt) || 0;
+        const isFromKey = rawKeyCell && rawKeyCell.toUpperCase().includes(stmt.toUpperCase());
+        return isFromKey || cnt >= 2;
+      });
+
+      // Standar SMP: 4 opsi (A, B, C, D). Opsi E hanya jika kunci resmi memuat 5 opsi
+      const activeCount = validStatements.length >= 5 && rawKeyCell && rawKeyCell.toUpperCase().includes(validStatements[4].toUpperCase()) ? 5 : 4;
+      const finalStatements = validStatements.slice(0, activeCount);
+
+      const pgkOptions = finalStatements.map((stmt, idx) => ({
+        key: optionKeys[idx] || 'A',
+        text: stmt,
+      }));
+
+      while (pgkOptions.length < 4) {
+        const k = optionKeys[pgkOptions.length];
+        pgkOptions.push({ key: k, text: `Pilihan ${k}` });
+      }
+
+      // Tentukan kunci jawaban huruf resmi (misal "A, C" atau "A, B, C")
+      let pgkCorrect = 'A';
+      const keySource = rawKeyCell || existingCorrectAnswer || '';
+      if (keySource) {
+        const keyParts = this.splitPgkSentenceTokens(keySource);
+        const matchedKeys: string[] = [];
+        keyParts.forEach(kp => {
+          const kpUpper = kp.toUpperCase();
+          const found = pgkOptions.find(o => {
+            const optUpper = o.text.toUpperCase();
+            return optUpper === kpUpper || (optUpper.length >= 6 && kpUpper.length >= 6 && (optUpper.startsWith(kpUpper) || kpUpper.startsWith(optUpper)));
+          });
+          if (found && !matchedKeys.includes(found.key)) {
+            matchedKeys.push(found.key);
+          }
+        });
+        if (matchedKeys.length > 0) {
+          pgkCorrect = matchedKeys.sort().join(', ');
+        } else if (existingCorrectAnswer && existingCorrectAnswer.includes(',')) {
+          pgkCorrect = existingCorrectAnswer;
+        }
+      }
+
+      return {
+        options: pgkOptions,
+        correctAnswer: pgkCorrect,
+      };
+    }
+
+    // Ekstraksi token kandidat untuk PG biasa: gunakan splitPgkSentenceTokens agar koma kalimat tidak terbelah
     const candidateTokens: string[] = [];
     rawCandidates.forEach(val => {
       const trimmedVal = val.trim();
       if (!trimmedVal || ['-', 'KOSONG', 'NULL', 'N/A', 'TIDAK DIJAWAB', 'BELUM DIJAWAB'].includes(trimmedVal.toUpperCase())) {
         return;
       }
-      // Jangan pecah jika berupa angka desimal murni, misal "2,5" atau "0,75"
-      if (trimmedVal.includes(',') && !/^\d+(?:,\d+)?(?:\s*[a-zA-Z%°]+)?$/.test(trimmedVal)) {
-        const parts = trimmedVal.split(',').map(p => p.trim()).filter(Boolean);
-        if (parts.length > 1) {
-          parts.forEach(p => candidateTokens.push(p));
-          return;
-        }
+      const parts = this.splitPgkSentenceTokens(trimmedVal);
+      if (parts.length > 1) {
+        parts.forEach(p => candidateTokens.push(p));
+      } else {
+        candidateTokens.push(trimmedVal);
       }
-      candidateTokens.push(trimmedVal);
     });
 
     candidateTokens.forEach(trimmedVal => {

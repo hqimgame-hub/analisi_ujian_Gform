@@ -645,7 +645,19 @@ export class AnalyticsService {
         return '';
       };
 
-      const resolvedCorrectKey = resolveToOptionKey(q.correctAnswer) || (activeOptionKeys[0] || 'A');
+      let resolvedCorrectKey = '';
+      if (q.correctAnswer && q.correctAnswer.includes(',')) {
+        const multiParts = q.correctAnswer
+          .split(',')
+          .map(p => resolveToOptionKey(p.trim()))
+          .filter((k): k is 'A' | 'B' | 'C' | 'D' | 'E' => Boolean(k && activeOptionKeys.includes(k as any)));
+        if (multiParts.length > 0) {
+          resolvedCorrectKey = Array.from(new Set(multiParts)).sort().join(', ');
+        }
+      }
+      if (!resolvedCorrectKey) {
+        resolvedCorrectKey = resolveToOptionKey(q.correctAnswer) || (activeOptionKeys[0] || 'A');
+      }
 
       qAnswers.forEach(ans => {
         const rawAns = (ans.studentAnswer || '').trim();
@@ -680,9 +692,15 @@ export class AnalyticsService {
         }
 
         const isMulti = effectiveAns.includes(',');
-        const multiKeys = isMulti
-          ? effectiveAns.split(',').map(p => resolveToOptionKey(p.trim())).filter((k): k is 'A' | 'B' | 'C' | 'D' | 'E' => Boolean(k && activeOptionKeys.includes(k as any)))
-          : [];
+        let multiKeys: Array<'A' | 'B' | 'C' | 'D' | 'E'> = [];
+        if (isMulti) {
+          const parts = effectiveAns.split(/(?<=\.)\s*,\s*|,\s+(?=[A-Z])/).map(p => p.trim()).filter(Boolean);
+          multiKeys = Array.from(new Set(
+            parts
+              .map(p => resolveToOptionKey(p))
+              .filter((k): k is 'A' | 'B' | 'C' | 'D' | 'E' => Boolean(k && activeOptionKeys.includes(k as any)))
+          ));
+        }
 
         const isAnsCorrect = Boolean(
           ans.isCorrect ||
