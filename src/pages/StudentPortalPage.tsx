@@ -637,6 +637,76 @@ export const StudentPortalPage: React.FC = () => {
     return null;
   };
 
+  // Mapel aktif (tanpa mapel yang sudah dihapus seperti BIND)
+  const activeSubjects = useMemo(() => {
+    return allSubjects.filter(s => (s.code || '').toUpperCase().trim() !== 'BIND');
+  }, [allSubjects]);
+
+  // Mapel yang diizinkan tampil di Try Out — dibatasi ketat ke daftar mapel wadah paket (exam_package_subjects).
+  // Ini mencegah mapel lain (INF, IPA, dll.) ikut masuk di grafik, rekap, dan komposit skor Try Out.
+  const tryoutScopeSubjects = useMemo(() => {
+    if (isSumatifPackage) return activeSubjects;
+
+    // 1. Ambil dari activePackage.subjects jika tersedia
+    if (activePackage?.subjects && activePackage.subjects.length > 0) {
+      const allowedIds = new Set(activePackage.subjects.map(ps => ps.subjectId));
+      const filtered = activeSubjects.filter(s => allowedIds.has(s.id));
+      if (filtered.length > 0) return filtered;
+    }
+
+    // 2. Ambil dari tryout-tryout yang terikat ke wadah/paket Try Out aktif ini
+    const targetTryouts = activePackage
+      ? allTryouts.filter(t => t.packageId === activePackage.id || (activePackage.code && t.code.toLowerCase().startsWith(activePackage.code.toLowerCase())))
+      : allTryouts.filter(t => t.assessmentType === 'TRYOUT' || !t.assessmentType);
+
+    const tryoutSubjectIds = new Set<string>();
+    targetTryouts.forEach(t => {
+      if (t.subjectId) tryoutSubjectIds.add(t.subjectId);
+      if (Array.isArray(t.externalSubjectIds)) t.externalSubjectIds.forEach(id => tryoutSubjectIds.add(id));
+      if (Array.isArray(t.externalSubjects)) {
+        t.externalSubjects.forEach(name => {
+          const matched = allSubjects.find(s => s.name.toLowerCase().trim() === name.toLowerCase().trim() || s.code.toLowerCase().trim() === name.toLowerCase().trim());
+          if (matched) tryoutSubjectIds.add(matched.id);
+        });
+      }
+      const tTitle = (t.title || '').toLowerCase();
+      const tCode = (t.code || '').toLowerCase();
+      allSubjects.forEach(s => {
+        const sName = s.name.toLowerCase().trim();
+        const sCode = s.code.toLowerCase().trim();
+        if ((sName && tTitle.includes(sName)) || (sCode && (tTitle.includes(sCode) || tCode.includes(sCode)))) {
+          tryoutSubjectIds.add(s.id);
+        }
+      });
+    });
+
+    if (tryoutSubjectIds.size > 0) {
+      const filtered = activeSubjects.filter(s => tryoutSubjectIds.has(s.id));
+      if (filtered.length > 0) return filtered;
+    }
+
+    // 3. Fallback: hanya mapel yang memiliki riwayat skor nyata pada tryout wadah ini
+    const scoredSubjectIds = new Set<string>();
+    allScores.forEach(s => {
+      if (targetTryouts.some(t => t.id === s.tryoutId)) {
+        if (s.subjectScores) {
+          Object.keys(s.subjectScores).forEach(k => {
+            const matched = allSubjects.find(sub => sub.id === k || sub.code.toLowerCase() === k.toLowerCase() || sub.name.toLowerCase() === k.toLowerCase());
+            if (matched) scoredSubjectIds.add(matched.id);
+          });
+        }
+      }
+    });
+    if (scoredSubjectIds.size > 0) {
+      const filtered = activeSubjects.filter(s => scoredSubjectIds.has(s.id));
+      if (filtered.length > 0) return filtered;
+    }
+
+    // 4. Default aman untuk Try Out standar (hanya Bahasa Indonesia & Matematika)
+    const defaultToSubs = activeSubjects.filter(s => s.code === 'BIN' || s.code === 'MAT');
+    return defaultToSubs.length > 0 ? defaultToSubs : activeSubjects.slice(0, 2);
+  }, [activeSubjects, activePackage, isSumatifPackage, allTryouts, allSubjects, allScores]);
+
   // Per-Subject Mini Scorecard for Active Tryout - MENAMPILKAN HANYA MAPEL YANG RELEVAN TANPA NILAI DUMMY 75.0!
   const activeTryoutSubjectCards = useMemo(() => {
     if (!activeTryout) return [];
@@ -755,76 +825,6 @@ export const StudentPortalPage: React.FC = () => {
     if (sc >= 65) return { label: 'Cukup', grade: 'C', badge: 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800' };
     return { label: 'Perlu Peningkatan', grade: 'D', badge: 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-800' };
   }, [activeScore]);
-
-  // Mapel aktif (tanpa mapel yang sudah dihapus seperti BIND)
-  const activeSubjects = useMemo(() => {
-    return allSubjects.filter(s => (s.code || '').toUpperCase().trim() !== 'BIND');
-  }, [allSubjects]);
-
-  // Mapel yang diizinkan tampil di Try Out — dibatasi ketat ke daftar mapel wadah paket (exam_package_subjects).
-  // Ini mencegah mapel lain (INF, IPA, dll.) ikut masuk di grafik, rekap, dan komposit skor Try Out.
-  const tryoutScopeSubjects = useMemo(() => {
-    if (isSumatifPackage) return activeSubjects;
-
-    // 1. Ambil dari activePackage.subjects jika tersedia
-    if (activePackage?.subjects && activePackage.subjects.length > 0) {
-      const allowedIds = new Set(activePackage.subjects.map(ps => ps.subjectId));
-      const filtered = activeSubjects.filter(s => allowedIds.has(s.id));
-      if (filtered.length > 0) return filtered;
-    }
-
-    // 2. Ambil dari tryout-tryout yang terikat ke wadah/paket Try Out aktif ini
-    const targetTryouts = activePackage
-      ? allTryouts.filter(t => t.packageId === activePackage.id || (activePackage.code && t.code.toLowerCase().startsWith(activePackage.code.toLowerCase())))
-      : allTryouts.filter(t => t.assessmentType === 'TRYOUT' || !t.assessmentType);
-
-    const tryoutSubjectIds = new Set<string>();
-    targetTryouts.forEach(t => {
-      if (t.subjectId) tryoutSubjectIds.add(t.subjectId);
-      if (Array.isArray(t.externalSubjectIds)) t.externalSubjectIds.forEach(id => tryoutSubjectIds.add(id));
-      if (Array.isArray(t.externalSubjects)) {
-        t.externalSubjects.forEach(name => {
-          const matched = allSubjects.find(s => s.name.toLowerCase().trim() === name.toLowerCase().trim() || s.code.toLowerCase().trim() === name.toLowerCase().trim());
-          if (matched) tryoutSubjectIds.add(matched.id);
-        });
-      }
-      const tTitle = (t.title || '').toLowerCase();
-      const tCode = (t.code || '').toLowerCase();
-      allSubjects.forEach(s => {
-        const sName = s.name.toLowerCase().trim();
-        const sCode = s.code.toLowerCase().trim();
-        if ((sName && tTitle.includes(sName)) || (sCode && (tTitle.includes(sCode) || tCode.includes(sCode)))) {
-          tryoutSubjectIds.add(s.id);
-        }
-      });
-    });
-
-    if (tryoutSubjectIds.size > 0) {
-      const filtered = activeSubjects.filter(s => tryoutSubjectIds.has(s.id));
-      if (filtered.length > 0) return filtered;
-    }
-
-    // 3. Fallback: hanya mapel yang memiliki riwayat skor nyata pada tryout wadah ini
-    const scoredSubjectIds = new Set<string>();
-    allScores.forEach(s => {
-      if (targetTryouts.some(t => t.id === s.tryoutId)) {
-        if (s.subjectScores) {
-          Object.keys(s.subjectScores).forEach(k => {
-            const matched = allSubjects.find(sub => sub.id === k || sub.code.toLowerCase() === k.toLowerCase() || sub.name.toLowerCase() === k.toLowerCase());
-            if (matched) scoredSubjectIds.add(matched.id);
-          });
-        }
-      }
-    });
-    if (scoredSubjectIds.size > 0) {
-      const filtered = activeSubjects.filter(s => scoredSubjectIds.has(s.id));
-      if (filtered.length > 0) return filtered;
-    }
-
-    // 4. Default aman untuk Try Out standar (hanya Bahasa Indonesia & Matematika)
-    const defaultToSubs = activeSubjects.filter(s => s.code === 'BIN' || s.code === 'MAT');
-    return defaultToSubs.length > 0 ? defaultToSubs : activeSubjects.slice(0, 2);
-  }, [activeSubjects, activePackage, isSumatifPackage, allTryouts, allSubjects, allScores]);
 
   // Pengelompokan Siklus Try Out (TO 1, TO 2, TO 3, ...) — dihitung dari SELURUH tryout agar
   // konsisten dengan pengelompokan yang dikontrol Guru Mapel dan mencakup semua siklus aktif.
