@@ -21,6 +21,7 @@ interface ExamPackagesSectionProps {
   currentUser: any;
   onNavigate?: (path: string) => void;
   onShowToast: (msg: string) => void;
+  onOpenGFormGuide?: () => void;
 }
 
 export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
@@ -30,7 +31,8 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
   academicYears,
   currentUser,
   onNavigate,
-  onShowToast
+  onShowToast,
+  onOpenGFormGuide
 }) => {
   const [packages, setPackages] = useState<ExamPackage[]>(() => dbService.getExamPackages());
   const [, setSyncTick] = useState(0);
@@ -433,13 +435,26 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={handleOpenCreateModal}
-          className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-2xl shadow-sm transition-all cursor-pointer shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Buat Paket Ujian Baru</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {onOpenGFormGuide && (
+            <button
+              onClick={onOpenGFormGuide}
+              className="flex items-center gap-2 px-3.5 py-2.5 bg-teal-50 dark:bg-teal-950/60 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 text-xs font-bold rounded-2xl shadow-2xs transition-all cursor-pointer"
+              title="Buka Skrip & Panduan Integrasi Google Form"
+            >
+              <Sparkles className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+              <span>Panduan & Skrip G-Form</span>
+            </button>
+          )}
+
+          <button
+            onClick={handleOpenCreateModal}
+            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-2xl shadow-sm transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Buat Paket Ujian Baru</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -1367,6 +1382,25 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
                   placeholder="https://forms.google.com/..."
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl"
                 />
+              </div>
+
+              <div className="p-3 bg-teal-50 dark:bg-teal-950/30 rounded-xl border border-teal-200 dark:border-teal-900 text-[11px] text-teal-800 dark:text-teal-300 flex items-center justify-between">
+                <div>
+                  <strong>Skrip Google Form Otomatis:</strong>
+                  <p className="text-[10px] text-teal-700 dark:text-teal-400 mt-0.5">Mendukung soal acak, pilihan A-E, PGK, dan kunci jawaban presisi.</p>
+                </div>
+                {onOpenGFormGuide && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingSubjectItem(null);
+                      onOpenGFormGuide();
+                    }}
+                    className="px-2.5 py-1 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-[10px] font-bold shrink-0 ml-2 shadow-2xs cursor-pointer"
+                  >
+                    Buka Skrip
+                  </button>
+                )}
               </div>
 
               <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl border border-emerald-200 dark:border-emerald-900 text-[11px] text-emerald-800 dark:text-emerald-300">

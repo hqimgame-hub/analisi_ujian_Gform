@@ -16,6 +16,7 @@ import {
 } from '../types/database';
 import { getDynamicTryoutStageOptions } from '../utils/tryoutGroupUtils';
 import { ExamPackagesSection } from '../components/admin/ExamPackagesSection';
+import { GoogleFormIntegrationSection } from '../components/admin/GoogleFormIntegrationSection';
 import * as XLSX from 'xlsx';
 
 interface AdminAppPageProps {
@@ -26,6 +27,7 @@ interface AdminAppPageProps {
 type AdminTab =
   | 'DASHBOARD'
   | 'PACKAGES'
+  | 'GFORM_GUIDE'
   | 'USERS'
   | 'STUDENTS'
   | 'CLASSES'
@@ -1058,6 +1060,7 @@ export const AdminAppPage: React.FC<AdminAppPageProps> = ({ currentUser, onNavig
   const navItems: NavItem[] = [
     { key: 'DASHBOARD', label: 'Ringkasan Master Data', icon: Layers },
     { key: 'PACKAGES', label: 'Paket Ujian (Wadah)', icon: FolderKanban, count: (examPackages || []).length },
+    { key: 'GFORM_GUIDE', label: 'Panduan & Skrip G-Form', icon: Sparkles },
     { key: 'USERS', label: 'Pengguna & Wali Kelas', icon: Users, count: teachers.length },
     { key: 'STUDENTS', label: 'Data Siswa', icon: UserCheck, count: students.length },
     { key: 'CLASSES', label: 'Kelas & Roster Sekolah', icon: School, count: classes.length },
@@ -1240,6 +1243,14 @@ export const AdminAppPage: React.FC<AdminAppPageProps> = ({ currentUser, onNavig
                     </button>
 
                     <button
+                      onClick={() => handleTabChange('GFORM_GUIDE')}
+                      className="px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-teal-950 font-bold text-xs rounded-xl transition-colors shadow-sm cursor-pointer flex items-center gap-2"
+                    >
+                      <Sparkles className="w-4 h-4 text-teal-900" />
+                      <span>Panduan & Skrip G-Form</span>
+                    </button>
+
+                    <button
                       onClick={() => handleTabChange('USERS')}
                       className="px-4 py-2.5 bg-indigo-700/80 hover:bg-indigo-600 text-white font-bold text-xs rounded-xl border border-indigo-500/40 transition-colors shadow-sm cursor-pointer flex items-center gap-2"
                     >
@@ -1393,6 +1404,14 @@ export const AdminAppPage: React.FC<AdminAppPageProps> = ({ currentUser, onNavig
               currentUser={currentUser}
               onNavigate={onNavigate}
               onShowToast={(msg) => triggerToast(msg, 'success')}
+              onOpenGFormGuide={() => handleTabChange('GFORM_GUIDE')}
+            />
+          )}
+
+          {/* TAB: PANDUAN & SKRIP INTEGRASI GOOGLE FORM */}
+          {!isLoading && activeTab === 'GFORM_GUIDE' && (
+            <GoogleFormIntegrationSection
+              onShowToast={(msg, type) => triggerToast(msg, type || 'success')}
             />
           )}
 
