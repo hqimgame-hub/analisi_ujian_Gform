@@ -647,10 +647,9 @@ export const StudentPortalPage: React.FC = () => {
 
     let relevantSubjects: Subject[] = [];
 
-    // Set mapel yang diizinkan oleh wadah/paket (pembatas utama untuk TRYOUT package)
-    // Jika paket memiliki daftar mapel (exam_package_subjects), hanya mapel itu yang boleh muncul
-    const pkgAllowedSubjIds = (activePackage?.subjects && activePackage.subjects.length > 0 && !isSumatifPackage)
-      ? new Set(activePackage.subjects.map(ps => ps.subjectId))
+    // Batasan mapel resmi Try Out (hanya mapel dalam lingkup wadah TO aktif)
+    const allowedSubjIds = !isSumatifPackage
+      ? new Set(tryoutScopeSubjects.map(s => s.id))
       : null;
 
     // 1. Tryout Eksternal
@@ -676,8 +675,8 @@ export const StudentPortalPage: React.FC = () => {
     //    baru fallback ke soal (agar mapel lain di luar wadah tidak ikut muncul)
     else {
       // 3a. Jika wadah punya daftar mapel, gunakan itu sebagai sumber kebenaran
-      if (pkgAllowedSubjIds && pkgAllowedSubjIds.size > 0) {
-        relevantSubjects = allSubjects.filter(s => pkgAllowedSubjIds.has(s.id));
+      if (allowedSubjIds && allowedSubjIds.size > 0) {
+        relevantSubjects = allSubjects.filter(s => allowedSubjIds.has(s.id));
       }
       // 3b. Jika tidak ada definisi mapel di wadah, baru cari dari butir soal
       if (relevantSubjects.length === 0) {
@@ -697,23 +696,25 @@ export const StudentPortalPage: React.FC = () => {
         scoreKeys.includes(s.name.toLowerCase().trim()) ||
         scoreKeys.includes(s.code.toLowerCase().trim())
       );
-      // Batasi ke mapel yang diizinkan wadah jika ada
-      if (pkgAllowedSubjIds && pkgAllowedSubjIds.size > 0) {
-        fromScore = fromScore.filter(s => pkgAllowedSubjIds.has(s.id));
+      if (allowedSubjIds && allowedSubjIds.size > 0) {
+        fromScore = fromScore.filter(s => allowedSubjIds.has(s.id));
       }
       relevantSubjects = fromScore;
     }
 
-    // 5. Cek dari wadah/paket jika tryout terikat ke wadah tertentu (sudah tercakup di #3a, ini safety net)
-    if (relevantSubjects.length === 0 && activePackage?.subjects && activePackage.subjects.length > 0) {
-      const pkgSubjIds = new Set(activePackage.subjects.map(ps => ps.subjectId));
-      relevantSubjects = allSubjects.filter(s => pkgSubjIds.has(s.id));
+    // 5. Cek dari wadah/paket jika tryout terikat ke wadah tertentu (safety net)
+    if (relevantSubjects.length === 0 && allowedSubjIds && allowedSubjIds.size > 0) {
+      relevantSubjects = allSubjects.filter(s => allowedSubjIds.has(s.id));
     }
 
-    // 6. Fallback spesifik jika tryout umum tanpa metadata
+    // 6. Fallback spesifik jika tryout umum tanpa metadata: gunakan tryoutScopeSubjects
     if (relevantSubjects.length === 0) {
-      const mathOrBin = allSubjects.filter(s => s.code === 'MAT' || s.code === 'BIN');
-      relevantSubjects = mathOrBin.length > 0 ? mathOrBin : allSubjects.slice(0, 2);
+      relevantSubjects = tryoutScopeSubjects.slice(0, 2);
+    }
+
+    // Saring akhir agar TIDAK PERNAH memunculkan mapel di luar wadah Try Out
+    if (allowedSubjIds && allowedSubjIds.size > 0) {
+      relevantSubjects = relevantSubjects.filter(s => allowedSubjIds.has(s.id));
     }
 
     return relevantSubjects.map(subj => {
@@ -760,6 +761,71 @@ export const StudentPortalPage: React.FC = () => {
     return allSubjects.filter(s => (s.code || '').toUpperCase().trim() !== 'BIND');
   }, [allSubjects]);
 
+  // Mapel yang diizinkan tampil di Try Out — dibatasi ketat ke daftar mapel wadah paket (exam_package_subjects).
+  // Ini mencegah mapel lain (INF, IPA, dll.) ikut masuk di grafik, rekap, dan komposit skor Try Out.
+  const tryoutScopeSubjects = useMemo(() => {
+    if (isSumatifPackage) return activeSubjects;
+
+    // 1. Ambil dari activePackage.subjects jika tersedia
+    if (activePackage?.subjects && activePackage.subjects.length > 0) {
+      const allowedIds = new Set(activePackage.subjects.map(ps => ps.subjectId));
+      const filtered = activeSubjects.filter(s => allowedIds.has(s.id));
+      if (filtered.length > 0) return filtered;
+    }
+
+    // 2. Ambil dari tryout-tryout yang terikat ke wadah/paket Try Out aktif ini
+    const targetTryouts = activePackage
+      ? allTryouts.filter(t => t.packageId === activePackage.id || (activePackage.code && t.code.toLowerCase().startsWith(activePackage.code.toLowerCase())))
+      : allTryouts.filter(t => t.assessmentType === 'TRYOUT' || !t.assessmentType);
+
+    const tryoutSubjectIds = new Set<string>();
+    targetTryouts.forEach(t => {
+      if (t.subjectId) tryoutSubjectIds.add(t.subjectId);
+      if (Array.isArray(t.externalSubjectIds)) t.externalSubjectIds.forEach(id => tryoutSubjectIds.add(id));
+      if (Array.isArray(t.externalSubjects)) {
+        t.externalSubjects.forEach(name => {
+          const matched = allSubjects.find(s => s.name.toLowerCase().trim() === name.toLowerCase().trim() || s.code.toLowerCase().trim() === name.toLowerCase().trim());
+          if (matched) tryoutSubjectIds.add(matched.id);
+        });
+      }
+      const tTitle = (t.title || '').toLowerCase();
+      const tCode = (t.code || '').toLowerCase();
+      allSubjects.forEach(s => {
+        const sName = s.name.toLowerCase().trim();
+        const sCode = s.code.toLowerCase().trim();
+        if ((sName && tTitle.includes(sName)) || (sCode && (tTitle.includes(sCode) || tCode.includes(sCode)))) {
+          tryoutSubjectIds.add(s.id);
+        }
+      });
+    });
+
+    if (tryoutSubjectIds.size > 0) {
+      const filtered = activeSubjects.filter(s => tryoutSubjectIds.has(s.id));
+      if (filtered.length > 0) return filtered;
+    }
+
+    // 3. Fallback: hanya mapel yang memiliki riwayat skor nyata pada tryout wadah ini
+    const scoredSubjectIds = new Set<string>();
+    allScores.forEach(s => {
+      if (targetTryouts.some(t => t.id === s.tryoutId)) {
+        if (s.subjectScores) {
+          Object.keys(s.subjectScores).forEach(k => {
+            const matched = allSubjects.find(sub => sub.id === k || sub.code.toLowerCase() === k.toLowerCase() || sub.name.toLowerCase() === k.toLowerCase());
+            if (matched) scoredSubjectIds.add(matched.id);
+          });
+        }
+      }
+    });
+    if (scoredSubjectIds.size > 0) {
+      const filtered = activeSubjects.filter(s => scoredSubjectIds.has(s.id));
+      if (filtered.length > 0) return filtered;
+    }
+
+    // 4. Default aman untuk Try Out standar (hanya Bahasa Indonesia & Matematika)
+    const defaultToSubs = activeSubjects.filter(s => s.code === 'BIN' || s.code === 'MAT');
+    return defaultToSubs.length > 0 ? defaultToSubs : activeSubjects.slice(0, 2);
+  }, [activeSubjects, activePackage, isSumatifPackage, allTryouts, allSubjects, allScores]);
+
   // Pengelompokan Siklus Try Out (TO 1, TO 2, TO 3, ...) — dihitung dari SELURUH tryout agar
   // konsisten dengan pengelompokan yang dikontrol Guru Mapel dan mencakup semua siklus aktif.
   const tryoutStageGroups = useMemo<TryoutStageGroup[]>(() => {
@@ -786,7 +852,7 @@ export const StudentPortalPage: React.FC = () => {
 
     return tryoutStageGroups.map(stage => {
       const studentComposite = getStudentStageCompositeScore(
-        verifiedStudent.id, stage, activeSubjects, scoresByStudentAndTryout, answersByStudentAndTryout, allQuestions
+        verifiedStudent.id, stage, tryoutScopeSubjects, scoresByStudentAndTryout, answersByStudentAndTryout, allQuestions
       );
 
       // Rata-rata gabungan kelas
@@ -794,7 +860,7 @@ export const StudentPortalPage: React.FC = () => {
       const subjectClassBuckets: Record<string, number[]> = {};
       classmates.forEach(cm => {
         const res = getStudentStageCompositeScore(
-          cm.id, stage, activeSubjects, scoresByStudentAndTryout, answersByStudentAndTryout, allQuestions
+          cm.id, stage, tryoutScopeSubjects, scoresByStudentAndTryout, answersByStudentAndTryout, allQuestions
         );
         if (res.compositeScore !== null) classCompositeValues.push(res.compositeScore);
         Object.entries(res.subjectScores).forEach(([sid, val]) => {
@@ -811,7 +877,7 @@ export const StudentPortalPage: React.FC = () => {
         subjectClassAverages[sid] = avg(vals);
       });
 
-      const subjectBreakdownLabel = activeSubjects
+      const subjectBreakdownLabel = tryoutScopeSubjects
         .filter(s => studentComposite.subjectScores[s.id] !== undefined)
         .map(s => `${s.code}: ${studentComposite.subjectScores[s.id].toFixed(1)}`)
         .join(' · ');
@@ -826,12 +892,12 @@ export const StudentPortalPage: React.FC = () => {
         subjectBreakdownLabel,
       };
     });
-  }, [tryoutStageGroups, verifiedStudent, allStudents, activeSubjects, scoresByStudentAndTryout, answersByStudentAndTryout, allQuestions]);
+  }, [tryoutStageGroups, verifiedStudent, allStudents, tryoutScopeSubjects, scoresByStudentAndTryout, answersByStudentAndTryout, allQuestions]);
 
   // Build real subject recap matrix rows per Siklus TO (menghitung rata-rata hanya dari siklus dengan data valid)
   const subjectRecapRows: SubjectRecapRow[] = useMemo(() => {
     if (!verifiedStudent) return [];
-    return activeSubjects.map(subj => {
+    return tryoutScopeSubjects.map(subj => {
       const toScores: Record<string, number> = {};
       const validScores: number[] = [];
 
@@ -870,19 +936,21 @@ export const StudentPortalPage: React.FC = () => {
       const hasScore = Object.values(r.toScores).some(v => v > 0);
       if (hasScore) return true;
 
-      // 2. Jika wadah Tryout memiliki daftar mapel spesifik, sertakan mapel wadah tersebut
-      if (activePackage?.subjects && activePackage.subjects.length > 0) {
-        return activePackage.subjects.some(ps => ps.subjectId === r.subject.id);
+      // 2. Jika mapel termasuk dalam lingkup resmi wadah Try Out, sertakan mapel wadah tersebut
+      if (tryoutScopeSubjects.some(s => s.id === r.subject.id)) {
+        return true;
       }
 
       return false;
     });
-  }, [activeSubjects, tryoutStageGroups, verifiedStudent, scoresByStudentAndTryout, answersByStudentAndTryout, allQuestions, activePackage]);
+  }, [tryoutScopeSubjects, tryoutStageGroups, verifiedStudent, scoresByStudentAndTryout, answersByStudentAndTryout, allQuestions]);
 
   // Daftar mata pelajaran yang secara nyata ditampilkan dalam rekap Try Out (menghindari mapel kosong/non-TO)
   const recapDisplaySubjects = useMemo(() => {
-    return subjectRecapRows.map(r => r.subject);
-  }, [subjectRecapRows]);
+    const list = subjectRecapRows.map(r => r.subject);
+    if (list.length > 0) return list;
+    return tryoutScopeSubjects;
+  }, [subjectRecapRows, tryoutScopeSubjects]);
 
   // PDF Export
   const handleDownloadPDF = () => {
@@ -1914,7 +1982,7 @@ export const StudentPortalPage: React.FC = () => {
                 {/* 2. SUBJECT RECAP SECTION (Grafik Per-Mapel + Tabel Rekapitulasi Lengkap) */}
                 <SubjectRecapSection
                   student={verifiedStudent}
-                  subjects={recapDisplaySubjects.length > 0 ? recapDisplaySubjects : activeSubjects}
+                  subjects={recapDisplaySubjects.length > 0 ? recapDisplaySubjects : tryoutScopeSubjects}
                   progressHistory={progressHistory}
                   subjectRecapRows={subjectRecapRows}
                   onOpenSubjectExplanations={subjId => {
@@ -2232,7 +2300,7 @@ export const StudentPortalPage: React.FC = () => {
                           Semua Mapel ({publishedExplanations.length})
                         </button>
 
-                        {allSubjects.map(s => {
+                        {(isSumatifPackage ? allSubjects : tryoutScopeSubjects).map(s => {
                           const count = publishedExplanations.filter(e => isMatchExpSub(e.subjectId, s.id)).length;
                           const isSel = explanationSubjectFilter === s.id;
                           return (

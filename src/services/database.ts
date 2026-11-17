@@ -274,6 +274,56 @@ export class DatabaseService {
       }
     }
 
+    // 9. Pastikan seluruh ExamPackage memiliki subjects terkonfigurasi (dari tryout terhubung jika belum terisi)
+    if (this.state.examPackages && this.state.examPackages.length > 0) {
+      this.state.examPackages.forEach(pkg => {
+        if (!pkg.subjects || pkg.subjects.length === 0) {
+          const linkedTryouts = (this.state.tryouts || []).filter(t =>
+            t.packageId === pkg.id || (pkg.code && t.code.toLowerCase().startsWith(pkg.code.toLowerCase()))
+          );
+          const foundSubjectIds = new Set<string>();
+          linkedTryouts.forEach(t => {
+            if (t.subjectId) foundSubjectIds.add(t.subjectId);
+            if (Array.isArray(t.externalSubjectIds)) t.externalSubjectIds.forEach(id => foundSubjectIds.add(id));
+            if (Array.isArray(t.externalSubjects)) {
+              t.externalSubjects.forEach(name => {
+                const matched = (this.state.subjects || []).find(
+                  s => s.name.toLowerCase().trim() === name.toLowerCase().trim() || s.code.toLowerCase().trim() === name.toLowerCase().trim()
+                );
+                if (matched) foundSubjectIds.add(matched.id);
+              });
+            }
+            const tTitle = (t.title || '').toLowerCase();
+            const tCode = (t.code || '').toLowerCase();
+            (this.state.subjects || []).forEach(s => {
+              const sName = s.name.toLowerCase().trim();
+              const sCode = s.code.toLowerCase().trim();
+              if ((sName && tTitle.includes(sName)) || (sCode && (tTitle.includes(sCode) || tCode.includes(sCode)))) {
+                foundSubjectIds.add(s.id);
+              }
+            });
+          });
+
+          if (foundSubjectIds.size > 0) {
+            pkg.subjects = Array.from(foundSubjectIds).map(subId => {
+              const subObj = (this.state.subjects || []).find(s => s.id === subId);
+              return {
+                id: generateUuid(),
+                packageId: pkg.id,
+                subjectId: subId,
+                totalQuestions: 40,
+                durationMinutes: 60,
+                passingGrade: subObj?.passingGrade || 75,
+                syncStatus: 'SYNCED',
+                updatedAt: new Date().toISOString(),
+              };
+            });
+            changed = true;
+          }
+        }
+      });
+    }
+
     if (changed) {
       this.persistState();
       console.info('[DB] Migrasi ID lokal ke UUID standar berhasil dilakukan.');
@@ -1504,6 +1554,39 @@ export class DatabaseService {
         tryoutQuestions: Array.isArray(rawState.tryoutQuestions) ? rawState.tryoutQuestions : (Array.isArray(rawState.tryout_questions) ? rawState.tryout_questions : (this.state.tryoutQuestions || [])),
         auditLogs: Array.isArray(rawState.auditLogs) ? rawState.auditLogs : (Array.isArray(rawState.audit_logs) ? rawState.audit_logs : this.state.auditLogs),
       };
+
+      // Normalisasi & link exam_package_subjects jika ada dalam berkas cadangan
+      const rawPkgSubs = Array.isArray(rawState.examPackageSubjects)
+        ? rawState.examPackageSubjects
+        : (Array.isArray(rawState.exam_package_subjects) ? rawState.exam_package_subjects : (Array.isArray((parsed as any).exam_package_subjects) ? (parsed as any).exam_package_subjects : []));
+
+      if (rawPkgSubs.length > 0 && Array.isArray(this.state.examPackages)) {
+        this.state.examPackages = this.state.examPackages.map(pkg => {
+          const subs = rawPkgSubs.filter((s: any) => s.package_id === pkg.id || s.packageId === pkg.id);
+          if (subs.length > 0) {
+            return {
+              ...pkg,
+              assessmentType: (pkg.assessmentType as any) || (pkg as any).assessment_type || 'TRYOUT',
+              subjects: subs.map((s: any) => ({
+                id: s.id || generateUuid(),
+                packageId: s.package_id || s.packageId || pkg.id,
+                subjectId: s.subject_id || s.subjectId,
+                teacherId: s.teacher_id || s.teacherId,
+                googleFormUrl: s.google_form_url || s.googleFormUrl,
+                googleSheetUrl: s.google_sheet_url || s.googleSheetUrl,
+                answerKey: Array.isArray(s.answer_key) ? s.answer_key : (Array.isArray(s.answerKey) ? s.answerKey : []),
+                totalQuestions: Number(s.total_questions || s.totalQuestions) || 40,
+                durationMinutes: Number(s.duration_minutes || s.durationMinutes) || 60,
+                passingGrade: Number(s.passing_grade || s.passingGrade) || 75,
+                syncStatus: s.sync_status || s.syncStatus || 'SYNCED',
+                lastUpdatedBy: s.last_updated_by || s.lastUpdatedBy,
+                updatedAt: s.updated_at || s.updatedAt,
+              })),
+            };
+          }
+          return pkg;
+        });
+      }
 
       const prof = parsed.schoolProfile || (Array.isArray(parsed.school_profile) ? parsed.school_profile[0] : parsed.school_profile);
       if (prof) {
