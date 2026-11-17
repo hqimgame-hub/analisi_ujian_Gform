@@ -628,6 +628,16 @@ export class GoogleIntegrationService {
       rawValues.push(rawKeyCell);
     }
 
+    // Helper untuk mengecek apakah suatu string memuat token huruf E sah (bukan kata biasa yang mengandung huruf 'e')
+    const isExplicitLetterE = (val: string | undefined | null): boolean => {
+      if (!val) return false;
+      const clean = val.replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim().toUpperCase();
+      if (clean === 'E') return true;
+      if (/^[E][\.\)\:\-\s]/.test(clean)) return true;
+      const parts = clean.split(',').map(s => s.trim());
+      return parts.includes('E');
+    };
+
     // 0. Deteksi komprehensif apakah butir soal ini adalah Benar / Salah (True/False):
     const headerIsBS = /(?:\[\s*pernya?taan|soal\s*benar|benar\s*(?:atau|\/)\s*salah|true\s*(?:or|\/)\s*false)/i.test(header) ||
       /\b(?:benar|salah)\b.*\[.*\]/i.test(header);
@@ -804,6 +814,8 @@ export class GoogleIntegrationService {
 
     // Ekstraksi token kandidat untuk PG biasa: gunakan splitPgkSentenceTokens agar koma kalimat tidak terbelah
     const candidateTokens: string[] = [];
+    const tokenFrequency = new Map<string, number>();
+
     rawCandidates.forEach(val => {
       const trimmedVal = val.trim();
       if (!trimmedVal || ['-', 'KOSONG', 'NULL', 'N/A', 'TIDAK DIJAWAB', 'BELUM DIJAWAB'].includes(trimmedVal.toUpperCase())) {
@@ -811,9 +823,15 @@ export class GoogleIntegrationService {
       }
       const parts = this.splitPgkSentenceTokens(trimmedVal);
       if (parts.length > 1) {
-        parts.forEach(p => candidateTokens.push(p));
+        parts.forEach(p => {
+          candidateTokens.push(p);
+          const up = p.trim().toUpperCase();
+          tokenFrequency.set(up, (tokenFrequency.get(up) || 0) + 1);
+        });
       } else {
         candidateTokens.push(trimmedVal);
+        const up = trimmedVal.trim().toUpperCase();
+        tokenFrequency.set(up, (tokenFrequency.get(up) || 0) + 1);
       }
     });
 
@@ -845,6 +863,36 @@ export class GoogleIntegrationService {
         unprefixedSpreadsheetTexts.push(trimmedVal);
       }
     });
+
+    // PENTING: Pengurutan cerdas untuk opsi tanpa prefix huruf (misal soal Matematika/Sains: 4, 5, 6, 7):
+    // Dalam kaidah penulisan soal ujian nasional/sekolah, pilihan berbentuk angka atau besaran selalu diurutkan menaik (ascending).
+    // Dengan mengurutkan numerik, A=4, B=5, C=6, D=7 dan kuncinya D (7) menjadi 100% konsisten dengan naskah asli Google Form!
+    const isNumericCandidate = (str: string): boolean => {
+      const clean = str.replace(/[\u200B-\u200D\uFEFF]/g, '').trim().replace(',', '.');
+      return /^[-+]?\d+(?:\.\d+)?(?:\s*[a-zA-Z%°/]+)?$/.test(clean);
+    };
+
+    const extractNumericValue = (str: string): number => {
+      const match = str.replace(',', '.').match(/[-+]?\d+(?:\.\d+)?/);
+      return match ? parseFloat(match[0]) : NaN;
+    };
+
+    const allNumeric = unprefixedSpreadsheetTexts.length >= 2 &&
+      unprefixedSpreadsheetTexts.every(isNumericCandidate) &&
+      !unprefixedSpreadsheetTexts.some(s => isNaN(extractNumericValue(s)));
+
+    if (allNumeric) {
+      // Urutkan nilai numerik secara menaik (ascending)
+      unprefixedSpreadsheetTexts.sort((a, b) => extractNumericValue(a) - extractNumericValue(b));
+    } else if (unprefixedSpreadsheetTexts.length > 4 && explicitPrefixMatches.size === 0) {
+      // Jika variasi teks lebih dari 4 (bukan numerik), pilih 4 variasi teks dengan frekuensi tertinggi
+      // agar respon typo atau anomali tidak menciptakan opsi E fiktif pada jenjang SMP
+      unprefixedSpreadsheetTexts.sort((a, b) => {
+        const freqA = tokenFrequency.get(a.trim().toUpperCase()) || 0;
+        const freqB = tokenFrequency.get(b.trim().toUpperCase()) || 0;
+        return freqB - freqA;
+      });
+    }
 
     // Masukkan seluruh opsi eksplisit dari prefix sheet
     explicitPrefixMatches.forEach((txt, letter) => {
@@ -880,21 +928,16 @@ export class GoogleIntegrationService {
     }
 
     // 3. Tentukan jumlah opsi aktif secara dinamis:
-    let activeOptionKeys: Array<'A' | 'B' | 'C' | 'D' | 'E'> = ['A', 'B', 'C', 'D'];
-
-    // Untuk soal Pilihan Ganda (PG / PGK / Menjodohkan):
-    // Opsi E HANYA AKTIF jika ada bukti sah eksplisit (bukan variasi teks ke-5 yang mungkin merupakan typo/anomali):
+    // Standar SMP adalah 4 opsi (A, B, C, D).
+    // Opsi E HANYA AKTIF jika ada bukti sah eksplisit (prefix 'E' atau kunci memuat huruf 'E'):
     const hasEvidenceOfOptionE =
       explicitPrefixMatches.has('E') ||
-      (rawKeyCell && (rawKeyCell.trim().toUpperCase() === 'E' || /^[E][\.\)\:\-\s]/i.test(rawKeyCell.trim()))) ||
-      (existingCorrectAnswer && (existingCorrectAnswer.trim().toUpperCase() === 'E' || /^[E][\.\)\:\-\s]/i.test(existingCorrectAnswer.trim()))) ||
-      (Array.isArray(sanitizedExistingOptions) && sanitizedExistingOptions.some(o => o.key.toUpperCase() === 'E' && !isPlaceholderText(o.text, 'E')));
+      isExplicitLetterE(rawKeyCell) ||
+      isExplicitLetterE(existingCorrectAnswer);
 
-    if (hasEvidenceOfOptionE) {
-      activeOptionKeys = ['A', 'B', 'C', 'D', 'E'];
-    } else {
-      activeOptionKeys = ['A', 'B', 'C', 'D'];
-    }
+    const activeOptionKeys: Array<'A' | 'B' | 'C' | 'D' | 'E'> = hasEvidenceOfOptionE
+      ? ['A', 'B', 'C', 'D', 'E']
+      : ['A', 'B', 'C', 'D'];
 
     const finalOptions = activeOptionKeys.map(k => {
       // Prioritaskan teks dari keyToText, fallback ke existingOptions, lalu placeholder
@@ -1573,6 +1616,36 @@ export class GoogleIntegrationService {
           isAnswerKeyAccount: true,
         };
         break;
+      }
+    }
+
+    // 3. Fallback cerdas: Jika belum ada akun kunci khusus, deteksi dari kolom Skor Google Form Quiz.
+    // Baris peserta yang memiliki skor sempurna (100 / 100 atau skor tertinggi) memuat kunci jawaban resmi Google Form!
+    if (!detectedKeyRow && mappingConfig.scoreColumn) {
+      for (const row of parsedRows) {
+        const rawScore = row[mappingConfig.scoreColumn];
+        if (!rawScore) continue;
+        const cleanScore = String(rawScore).trim();
+        const slashMatch = cleanScore.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
+        if (slashMatch) {
+          const num = parseFloat(slashMatch[1]);
+          const den = parseFloat(slashMatch[2]);
+          if (den > 0 && num / den === 1.0) {
+            detectedKeyRow = row;
+            const rName = extractRowName(row) || 'Peserta Skor Sempurna (100%)';
+            detectedKeyStudent = {
+              id: 'temp-perfect-score-key',
+              nisn: extractRowNisn(row) || '0000000000',
+              nis: 'KUNCI',
+              name: `${rName} [Kunci Google Form]`,
+              gender: 'L',
+              classId: '',
+              targetScore: 100,
+              isAnswerKeyAccount: true,
+            };
+            break;
+          }
+        }
       }
     }
 

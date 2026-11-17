@@ -362,12 +362,19 @@ export class AnalyticsService {
       } else {
         // Untuk soal Pilihan Ganda: jangan biarkan opsi terpotong menjadi A-B hanya karena 0 pemilih!
         // Opsi E HANYA aktif jika terdapat bukti sah opsi E (bukan variasi teks typo / respon non-standar):
+        const isExplicitKeyE = (val: string | undefined | null): boolean => {
+          if (!val) return false;
+          const clean = val.replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim().toUpperCase();
+          if (clean === 'E') return true;
+          if (/^[E][\.\)\:\-\s]/.test(clean)) return true;
+          const parts = clean.split(',').map(s => s.trim());
+          return parts.includes('E');
+        };
+
         const hasOptionE =
           validOptionKeys.includes('E') &&
           (
-            (q.correctAnswer || '').trim().toUpperCase() === 'E' ||
-            (q.correctAnswer || '').includes('E') ||
-            (Array.isArray(q.options) && q.options.some(o => o.key.toUpperCase() === 'E' && !o.text.toUpperCase().startsWith('PILIHAN ') && !['CAMPURAN', 'DIAFAN', 'MODERN', '6 CM', 'IBU', 'PAGI HARI'].includes(o.text.trim().toUpperCase()))) ||
+            isExplicitKeyE(q.correctAnswer) ||
             qAnswers.some(a => {
               const raw = (a.studentAnswer || '').trim().toUpperCase();
               return raw === 'E' || raw.startsWith('E.') || raw.startsWith('E)') || raw.startsWith('E -') || raw.startsWith('OPSI E') || raw.startsWith('PILIHAN E') || raw.startsWith('OPTION E');

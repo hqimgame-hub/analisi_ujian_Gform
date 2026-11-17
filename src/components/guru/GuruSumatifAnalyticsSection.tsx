@@ -521,9 +521,9 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
         const dVal = qs.discriminationIndex ?? 0;
         const isReview = qs.isReviewRecommended;
 
-        const optKeys = (Array.isArray(matchingQ?.options) && matchingQ.options.length > 0)
-          ? matchingQ.options.map(o => o.key.toUpperCase()).filter(k => ['A', 'B', 'C', 'D', 'E'].includes(k))
-          : ['A', 'B', 'C', 'D'];
+        const isKeyE = correctKey === 'E' || /^[E][\.\)\:\-\s]/.test(correctKey) || correctKey.split(',').map(s => s.trim()).includes('E');
+        const hasValidE = isKeyE || (Array.isArray(matchingQ?.options) && matchingQ.options.some(o => o.key.toUpperCase() === 'E' && o.text && !o.text.toLowerCase().startsWith('pilihan') && !['CAMPURAN', 'DIAFAN', 'MODERN', '6 CM', 'IBU', 'PAGI HARI'].includes(o.text.trim().toUpperCase())));
+        const optKeys = hasValidE ? ['A', 'B', 'C', 'D', 'E'] : ['A', 'B', 'C', 'D'];
         const otherKeys = optKeys.filter(k => k !== correctKey);
 
         // Coba ambil distribusi nyata dari DB answers terlebih dahulu (akurat)
@@ -552,8 +552,7 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
                 } else if (a.isCorrect && optKeys.includes(correctKey)) {
                   distCounts[correctKey] = (distCounts[correctKey] || 0) + 1;
                 } else {
-                  const unassigned = otherKeys.find(k => (distCounts[k] || 0) === 0) || otherKeys[0] || 'A';
-                  distCounts[unassigned] = (distCounts[unassigned] || 0) + 1;
+                  distCounts['KOSONG'] = (distCounts['KOSONG'] || 0) + 1;
                 }
               }
             });
@@ -1739,10 +1738,11 @@ export const GuruSumatifAnalyticsSection: React.FC<GuruSumatifAnalyticsSectionPr
                                     ? (qa as any).options.map((o: any) => o.key.toUpperCase()).filter((k: string) => ['A', 'B', 'C', 'D', 'E'].includes(k))
                                     : ['A', 'B', 'C', 'D'];
 
+                                  const cleanKeyStr = (qa.correctAnswer || '').replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim().toUpperCase();
+                                  const isExplicitKeyE = cleanKeyStr === 'E' || /^[E][\.\)\:\-\s]/.test(cleanKeyStr) || cleanKeyStr.split(',').map(s => s.trim()).includes('E');
                                   const hasEvidenceOfOptionE =
-                                    (qa.correctAnswer || '').toUpperCase().includes('E') ||
-                                    (Array.isArray((qa as any).options) && (qa as any).options.some((o: any) => o.key.toUpperCase() === 'E' && o.text && !o.text.toLowerCase().startsWith('pilihan') && !['CAMPURAN', 'DIAFAN', 'MODERN', '6 CM', 'IBU', 'PAGI HARI'].includes(o.text.trim().toUpperCase()))) ||
-                                    ((qa.distractorStats?.['E']?.count || 0) > 0 && validKeys.includes('E'));
+                                    isExplicitKeyE ||
+                                    ((qa.distractorStats?.['E']?.count || 0) > 0 && validKeys.includes('E') && (Array.isArray((qa as any).options) && (qa as any).options.some((o: any) => o.key.toUpperCase() === 'E' && o.text && !o.text.toLowerCase().startsWith('pilihan') && !['CAMPURAN', 'DIAFAN', 'MODERN', '6 CM', 'IBU', 'PAGI HARI'].includes(o.text.trim().toUpperCase()))));
 
                                   renderKeys = hasEvidenceOfOptionE ? ['A', 'B', 'C', 'D', 'E'] : ['A', 'B', 'C', 'D'];
                                 }

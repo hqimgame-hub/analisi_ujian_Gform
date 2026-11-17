@@ -5541,10 +5541,11 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                                             ? (qa as any).options.map((o: any) => o.key.toUpperCase()).filter((k: string) => ['A', 'B', 'C', 'D', 'E'].includes(k))
                                             : ['A', 'B', 'C', 'D'];
 
+                                          const cleanKeyStr = (qa.correctAnswer || '').replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim().toUpperCase();
+                                          const isExplicitKeyE = cleanKeyStr === 'E' || /^[E][\.\)\:\-\s]/.test(cleanKeyStr) || cleanKeyStr.split(',').map(s => s.trim()).includes('E');
                                           const hasEvidenceOfOptionE =
-                                            (qa.correctAnswer || '').toUpperCase().includes('E') ||
-                                            (Array.isArray((qa as any).options) && (qa as any).options.some((o: any) => o.key.toUpperCase() === 'E' && o.text && !o.text.toLowerCase().startsWith('pilihan') && !['CAMPURAN', 'DIAFAN', 'MODERN', '6 CM', 'IBU', 'PAGI HARI'].includes(o.text.trim().toUpperCase()))) ||
-                                            ((qa.distractorStats?.['E']?.count || 0) > 0 && validKeys.includes('E'));
+                                            isExplicitKeyE ||
+                                            ((qa.distractorStats?.['E']?.count || 0) > 0 && validKeys.includes('E') && (qa as any).options?.some((o: any) => o.key.toUpperCase() === 'E' && o.text && !o.text.toLowerCase().startsWith('pilihan') && !['CAMPURAN', 'DIAFAN', 'MODERN', '6 CM', 'IBU', 'PAGI HARI'].includes(o.text.trim().toUpperCase())));
 
                                           renderKeys = hasEvidenceOfOptionE ? ['A', 'B', 'C', 'D', 'E'] : ['A', 'B', 'C', 'D'];
                                         }

@@ -1111,10 +1111,11 @@ export const ItemAnalysisVisualizer: React.FC<ItemAnalysisVisualizerProps> = ({
                                 ? item.options.map((o: any) => o.key.toUpperCase()).filter((k: string) => ['A', 'B', 'C', 'D', 'E'].includes(k))
                                 : ['A', 'B', 'C', 'D'];
 
+                              const cleanKeyStr = (item.correctAnswer || '').replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim().toUpperCase();
+                              const isExplicitKeyE = cleanKeyStr === 'E' || /^[E][\.\)\:\-\s]/.test(cleanKeyStr) || cleanKeyStr.split(',').map((s: string) => s.trim()).includes('E');
                               const hasEvidenceOfOptionE =
-                                (item.correctAnswer || '').toUpperCase().includes('E') ||
-                                (Array.isArray(item.options) && item.options.some((o: any) => o.key.toUpperCase() === 'E' && o.text && !o.text.toLowerCase().startsWith('pilihan') && !['CAMPURAN', 'DIAFAN', 'MODERN', '6 CM', 'IBU', 'PAGI HARI'].includes(o.text.trim().toUpperCase()))) ||
-                                ((item.distractorStats?.['E']?.count || item.distractorCounts?.['E'] || 0) > 0 && validKeys.includes('E'));
+                                isExplicitKeyE ||
+                                ((item.distractorStats?.['E']?.count || item.distractorCounts?.['E'] || 0) > 0 && validKeys.includes('E') && (Array.isArray(item.options) && item.options.some((o: any) => o.key.toUpperCase() === 'E' && o.text && !o.text.toLowerCase().startsWith('pilihan') && !['CAMPURAN', 'DIAFAN', 'MODERN', '6 CM', 'IBU', 'PAGI HARI'].includes(o.text.trim().toUpperCase()))));
 
                               renderKeys = hasEvidenceOfOptionE ? ['A', 'B', 'C', 'D', 'E'] : ['A', 'B', 'C', 'D'];
                             }
