@@ -3843,7 +3843,7 @@ export class DatabaseService {
       }
     }
 
-    if (result.length === 0) {
+    if (result.length === 0 && (!tryoutId || tryoutId === 'ALL')) {
       result = this.state.questions;
     }
 
@@ -3875,7 +3875,7 @@ export class DatabaseService {
       this.state.students,
       this.state.classes,
       this.state.tryouts,
-      (this.state.tryouts.find(t => t.id === effectiveTryoutId)?.isExternal ? tryoutQuestions : (tryoutQuestions.length > 0 ? tryoutQuestions : this.state.questions)),
+      tryoutQuestions,
       this.state.materials,
       this.state.competencies,
       this.state.answers,
@@ -3920,7 +3920,7 @@ export class DatabaseService {
       this.state.tryouts,
       this.state.academicYears,
       this.state.scores,
-      (this.state.tryouts.find(t => t.id === effectiveTryoutId)?.isExternal ? tryoutQuestions : (tryoutQuestions.length > 0 ? tryoutQuestions : this.state.questions)),
+      tryoutQuestions,
       this.state.answers,
       this.state.materials,
       this.state.competencies,

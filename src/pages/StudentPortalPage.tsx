@@ -31,6 +31,7 @@ export const StudentPortalPage: React.FC = () => {
   const [nisnInput, setNisnInput] = useState('');
   const [selectedTryoutId, setSelectedTryoutId] = useState('');
   const [selectedPackageId, setSelectedPackageId] = useState<string>('ALL');
+  const [selectedSumatifSubjectId, setSelectedSumatifSubjectId] = useState<string>('');
 
   // Verified Session & Data State
   const [verifiedStudent, setVerifiedStudent] = useState<Student | null>(null);
@@ -343,105 +344,6 @@ export const StudentPortalPage: React.FC = () => {
     }
   }, [selectedTryoutId, verifiedStudent, allScores]);
 
-  // Real Database Student Analytics (menggunakan selectedTryoutId dan reaktif)
-  const studentAnalytics = useMemo(() => {
-    if (!verifiedStudent || !selectedTryoutId) return null;
-    return dbService.getStudentAnalytics(verifiedStudent.id, selectedTryoutId);
-  }, [verifiedStudent, selectedTryoutId, dbVersion]);
-
-  // Kumpulkan semua ID tryout yang berada dalam satu stage/siklus yang sama (misal semua tryout "TO 2")
-  const stageSiblingTryoutIds = useMemo(() => {
-    if (!selectedTryoutId) return new Set<string>();
-    const currentTo = tryouts.find(t => t.id === selectedTryoutId || t.code === selectedTryoutId) || allTryouts.find(t => t.id === selectedTryoutId || t.code === selectedTryoutId);
-    if (!currentTo) return new Set<string>([selectedTryoutId]);
-
-    const examPkgs = dbService.getExamPackages();
-    const groupKey = resolveTryoutGroup(currentTo, allTryouts, examPkgs);
-    const ids = new Set<string>([currentTo.id]);
-    if (currentTo.code) ids.add(currentTo.code);
-
-    if (groupKey && groupKey !== TRYOUT_GROUP_NONE) {
-      allTryouts.forEach(t => {
-        if (resolveTryoutGroup(t, allTryouts, examPkgs) === groupKey) {
-          ids.add(t.id);
-          if (t.code) ids.add(t.code);
-        }
-      });
-    }
-
-    return ids;
-  }, [selectedTryoutId, tryouts, allTryouts]);
-
-  // Published Explanations for selected Tryout stage / group
-  const publishedExplanations = useMemo(() => {
-    return allExplanations.filter(e => {
-      if (e.status !== 'PUBLISHED') return false;
-      if (stageSiblingTryoutIds.has(e.tryoutId)) return true;
-      if (e.tryoutId === selectedTryoutId) return true;
-      const targetTo = allTryouts.find(t => t.id === selectedTryoutId);
-      return Boolean(targetTo && (e.tryoutId === targetTo.code || e.tryoutId === targetTo.id));
-    });
-  }, [allExplanations, selectedTryoutId, stageSiblingTryoutIds, allTryouts]);
-
-  // Ranking & Tie-Breaker Calculation (Multi-tier: Total Score -> Total Correct -> Math Correct)
-  const mathSubject = allSubjects.find(s => s.code === 'MAT' || s.name.toLowerCase().includes('matematika')) || allSubjects[0];
-  const mathSubjectId = mathSubject?.id || 'subj-mat';
-  const mathQuestionIds = useMemo(() => new Set(allQuestions.filter(q => q.subjectId === mathSubjectId).map(q => q.id)), [allQuestions, mathSubjectId]);
-
-  const getMathCorrectCount = (studentId: string, tryoutId: string): number => {
-    const studentAnswers = dbService.getAnswers().filter(a => a.studentId === studentId && a.tryoutId === tryoutId);
-    return studentAnswers.filter(a => mathQuestionIds.has(a.questionId) && a.isCorrect).length;
-  };
-
-  const sortScoresWithTieBreaker = (scoreList: Score[], tryoutId: string) => {
-    return [...scoreList].sort((a, b) => {
-      // 1. Primary: calculatedScore desc
-      if (b.calculatedScore !== a.calculatedScore) {
-        return b.calculatedScore - a.calculatedScore;
-      }
-      // 2. Tie-breaker 1: totalCorrect desc
-      if (b.totalCorrect !== a.totalCorrect) {
-        return (b.totalCorrect ?? 0) - (a.totalCorrect ?? 0);
-      }
-      // 3. Tie-breaker 2: Math correct count desc
-      const bMath = getMathCorrectCount(b.studentId, tryoutId);
-      const aMath = getMathCorrectCount(a.studentId, tryoutId);
-      return bMath - aMath;
-    });
-  };
-
-  // Rank Overall (Angkatan/Paralel)
-  const allScoresForActiveTryout = useMemo(() => {
-    return allScores.filter(s => s.tryoutId === selectedTryoutId);
-  }, [allScores, selectedTryoutId]);
-
-  const rankedOverall = useMemo(() => {
-    return sortScoresWithTieBreaker(allScoresForActiveTryout, selectedTryoutId);
-  }, [allScoresForActiveTryout, selectedTryoutId]);
-
-  const overallRankIndex = verifiedStudent ? rankedOverall.findIndex(s => s.studentId === verifiedStudent.id) : -1;
-  const overallRank = overallRankIndex !== -1 ? overallRankIndex + 1 : 1;
-  const overallTotalStudents = Math.max(1, rankedOverall.length);
-
-  // Rank Class
-  const classStudents = useMemo(() => {
-    return verifiedStudent ? allStudents.filter(st => st.classId === verifiedStudent.classId) : [];
-  }, [verifiedStudent, allStudents]);
-
-  const classStudentIds = useMemo(() => new Set(classStudents.map(st => st.id)), [classStudents]);
-
-  const classScoresForActiveTryout = useMemo(() => {
-    return allScoresForActiveTryout.filter(s => classStudentIds.has(s.studentId));
-  }, [allScoresForActiveTryout, classStudentIds]);
-
-  const rankedClass = useMemo(() => {
-    return sortScoresWithTieBreaker(classScoresForActiveTryout, selectedTryoutId);
-  }, [classScoresForActiveTryout, selectedTryoutId]);
-
-  const classRankIndex = verifiedStudent ? rankedClass.findIndex(s => s.studentId === verifiedStudent.id) : -1;
-  const classRank = classRankIndex !== -1 ? classRankIndex + 1 : 1;
-  const classTotalStudents = Math.max(1, rankedClass.length);
-
   // Student class metadata
   const studentClassObj = verifiedStudent ? allClasses.find(c => c.id === verifiedStudent.classId) : null;
   const studentClassName = studentClassObj?.name || 'Kelas Siswa';
@@ -538,6 +440,164 @@ export const StudentPortalPage: React.FC = () => {
     );
   }, [verifiedStudent, studentClassObj, activePackage, isSumatifPackage, allScores, allSubjects, allTryouts]);
 
+  // Auto-pilih mata pelajaran pertama yang relevan untuk asesmen sumatif
+  useEffect(() => {
+    if (isSumatifPackage && activePackage?.subjects && activePackage.subjects.length > 0) {
+      const isValid = activePackage.subjects.some(s => s.subjectId === selectedSumatifSubjectId);
+      if (!isValid) {
+        setSelectedSumatifSubjectId(activePackage.subjects[0].subjectId);
+      }
+    }
+  }, [isSumatifPackage, activePackage, selectedSumatifSubjectId]);
+
+  // Tryout yang cocok dengan mapel sumatif yang dipilih (jika ada lembar ujian spesifik)
+  const activeSumatifTryout = useMemo(() => {
+    if (!isSumatifPackage || !activePackage || !selectedSumatifSubjectId) return null;
+    const pkgCode = (activePackage.code || '').toLowerCase().trim();
+    const pkgId = activePackage.id.toLowerCase().trim();
+    const subId = selectedSumatifSubjectId.toLowerCase().trim();
+    return tryouts.find(t => {
+      const tPkg = (t.packageId || '').toLowerCase().trim();
+      const tCode = (t.code || '').toLowerCase().trim();
+      const tSub = (t.subjectId || '').toLowerCase().trim();
+      return (tPkg === pkgId || (pkgCode && tCode.startsWith(pkgCode))) && tSub === subId;
+    }) || null;
+  }, [isSumatifPackage, activePackage, selectedSumatifSubjectId, tryouts]);
+
+  // Target Tryout ID untuk tab lembar butir soal
+  const effectiveQuestionSheetTryoutId = useMemo(() => {
+    if (isSumatifPackage) {
+      return activeSumatifTryout?.id || '';
+    }
+    return selectedTryoutId;
+  }, [isSumatifPackage, activeSumatifTryout, selectedTryoutId]);
+
+  // Real Database Student Analytics (menggunakan effectiveQuestionSheetTryoutId dan reaktif)
+  const studentAnalytics = useMemo(() => {
+    if (!verifiedStudent || !effectiveQuestionSheetTryoutId) return null;
+    return dbService.getStudentAnalytics(verifiedStudent.id, effectiveQuestionSheetTryoutId);
+  }, [verifiedStudent, effectiveQuestionSheetTryoutId, dbVersion]);
+
+  // Cache jawaban seluruh siswa dan Hash Map O(1) untuk optimasi performa klik
+  const allAnswersCache = useMemo(() => dbService.getAnswers(), [dbVersion, allScores]);
+
+  const scoresByStudentAndTryout = useMemo(() => {
+    const map = new Map<string, Score>();
+    allScores.forEach(s => map.set(`${s.studentId}_${s.tryoutId}`, s));
+    return map;
+  }, [allScores]);
+
+  const answersByStudentAndTryout = useMemo(() => {
+    const map = new Map<string, Answer[]>();
+    allAnswersCache.forEach(a => {
+      const key = `${a.studentId}_${a.tryoutId}`;
+      let list = map.get(key);
+      if (!list) {
+        list = [];
+        map.set(key, list);
+      }
+      list.push(a);
+    });
+    return map;
+  }, [allAnswersCache]);
+
+  // Kumpulkan semua ID tryout yang berada dalam satu stage/siklus yang sama (misal semua tryout "TO 2")
+  const stageSiblingTryoutIds = useMemo(() => {
+    if (!selectedTryoutId) return new Set<string>();
+    const currentTo = tryouts.find(t => t.id === selectedTryoutId || t.code === selectedTryoutId) || allTryouts.find(t => t.id === selectedTryoutId || t.code === selectedTryoutId);
+    if (!currentTo) return new Set<string>([selectedTryoutId]);
+
+    const examPkgs = dbService.getExamPackages();
+    const groupKey = resolveTryoutGroup(currentTo, allTryouts, examPkgs);
+    const ids = new Set<string>([currentTo.id]);
+    if (currentTo.code) ids.add(currentTo.code);
+
+    if (groupKey && groupKey !== TRYOUT_GROUP_NONE) {
+      allTryouts.forEach(t => {
+        if (resolveTryoutGroup(t, allTryouts, examPkgs) === groupKey) {
+          ids.add(t.id);
+          if (t.code) ids.add(t.code);
+        }
+      });
+    }
+
+    return ids;
+  }, [selectedTryoutId, tryouts, allTryouts]);
+
+  // Published Explanations for selected Tryout stage / group
+  const publishedExplanations = useMemo(() => {
+    return allExplanations.filter(e => {
+      if (e.status !== 'PUBLISHED') return false;
+      if (stageSiblingTryoutIds.has(e.tryoutId)) return true;
+      if (e.tryoutId === selectedTryoutId) return true;
+      const targetTo = allTryouts.find(t => t.id === selectedTryoutId);
+      return Boolean(targetTo && (e.tryoutId === targetTo.code || e.tryoutId === targetTo.id));
+    });
+  }, [allExplanations, selectedTryoutId, stageSiblingTryoutIds, allTryouts]);
+
+  // Ranking & Tie-Breaker Calculation (Multi-tier: Total Score -> Total Correct -> Math Correct)
+  const mathSubject = allSubjects.find(s => s.code === 'MAT' || s.name.toLowerCase().includes('matematika')) || allSubjects[0];
+  const mathSubjectId = mathSubject?.id || 'subj-mat';
+  const mathQuestionIds = useMemo(() => new Set(allQuestions.filter(q => q.subjectId === mathSubjectId).map(q => q.id)), [allQuestions, mathSubjectId]);
+
+  const sortScoresWithTieBreaker = (scoreList: Score[], tryoutId: string) => {
+    const mathCountMap = new Map<string, number>();
+    scoreList.forEach(s => {
+      if (!mathCountMap.has(s.studentId)) {
+        const studentAnswers = answersByStudentAndTryout.get(`${s.studentId}_${tryoutId}`) || [];
+        const cnt = studentAnswers.filter(a => mathQuestionIds.has(a.questionId) && a.isCorrect).length;
+        mathCountMap.set(s.studentId, cnt);
+      }
+    });
+
+    return [...scoreList].sort((a, b) => {
+      // 1. Primary: calculatedScore desc
+      if (b.calculatedScore !== a.calculatedScore) {
+        return b.calculatedScore - a.calculatedScore;
+      }
+      // 2. Tie-breaker 1: totalCorrect desc
+      if (b.totalCorrect !== a.totalCorrect) {
+        return (b.totalCorrect ?? 0) - (a.totalCorrect ?? 0);
+      }
+      // 3. Tie-breaker 2: Math correct count desc
+      const bMath = mathCountMap.get(b.studentId) || 0;
+      const aMath = mathCountMap.get(a.studentId) || 0;
+      return bMath - aMath;
+    });
+  };
+
+  // Rank Overall (Angkatan/Paralel)
+  const allScoresForActiveTryout = useMemo(() => {
+    return allScores.filter(s => s.tryoutId === selectedTryoutId);
+  }, [allScores, selectedTryoutId]);
+
+  const rankedOverall = useMemo(() => {
+    return sortScoresWithTieBreaker(allScoresForActiveTryout, selectedTryoutId);
+  }, [allScoresForActiveTryout, selectedTryoutId]);
+
+  const overallRankIndex = verifiedStudent ? rankedOverall.findIndex(s => s.studentId === verifiedStudent.id) : -1;
+  const overallRank = overallRankIndex !== -1 ? overallRankIndex + 1 : 1;
+  const overallTotalStudents = Math.max(1, rankedOverall.length);
+
+  // Rank Class
+  const classStudents = useMemo(() => {
+    return verifiedStudent ? allStudents.filter(st => st.classId === verifiedStudent.classId) : [];
+  }, [verifiedStudent, allStudents]);
+
+  const classStudentIds = useMemo(() => new Set(classStudents.map(st => st.id)), [classStudents]);
+
+  const classScoresForActiveTryout = useMemo(() => {
+    return allScoresForActiveTryout.filter(s => classStudentIds.has(s.studentId));
+  }, [allScoresForActiveTryout, classStudentIds]);
+
+  const rankedClass = useMemo(() => {
+    return sortScoresWithTieBreaker(classScoresForActiveTryout, selectedTryoutId);
+  }, [classScoresForActiveTryout, selectedTryoutId]);
+
+  const classRankIndex = verifiedStudent ? rankedClass.findIndex(s => s.studentId === verifiedStudent.id) : -1;
+  const classRank = classRankIndex !== -1 ? classRankIndex + 1 : 1;
+  const classTotalStudents = Math.max(1, rankedClass.length);
+
   // Helper untuk mengekstrak skor mapel dari Score object dengan matching multi-key (id, nama, kode)
   const resolveSubjectScoreFromScoreObj = (
     scoreObj: Score | null | undefined,
@@ -582,7 +642,7 @@ export const StudentPortalPage: React.FC = () => {
     if (!activeTryout) return [];
 
     const studentAnswers = verifiedStudent
-      ? dbService.getAnswers().filter(a => a.studentId === verifiedStudent.id && a.tryoutId === activeTryout.id)
+      ? (answersByStudentAndTryout.get(`${verifiedStudent.id}_${activeTryout.id}`) || [])
       : [];
 
     let relevantSubjects: Subject[] = [];
@@ -625,9 +685,16 @@ export const StudentPortalPage: React.FC = () => {
       );
     }
 
-    // 5. Fallback jika tryout umum
+    // 5. Cek dari wadah/paket jika tryout terikat ke wadah tertentu
+    if (relevantSubjects.length === 0 && activePackage?.subjects && activePackage.subjects.length > 0) {
+      const pkgSubjIds = new Set(activePackage.subjects.map(ps => ps.subjectId));
+      relevantSubjects = allSubjects.filter(s => pkgSubjIds.has(s.id));
+    }
+
+    // 6. Fallback spesifik jika tryout umum tanpa metadata
     if (relevantSubjects.length === 0) {
-      relevantSubjects = allSubjects.slice(0, 4);
+      const mathOrBin = allSubjects.filter(s => s.code === 'MAT' || s.code === 'BIN');
+      relevantSubjects = mathOrBin.length > 0 ? mathOrBin : allSubjects.slice(0, 2);
     }
 
     return relevantSubjects.map(subj => {
@@ -650,7 +717,7 @@ export const StudentPortalPage: React.FC = () => {
         hasRealScore: scoreVal !== null,
       };
     });
-  }, [activeTryout, activeScore, verifiedStudent, allSubjects, allQuestions]);
+  }, [activeTryout, activeScore, verifiedStudent, allSubjects, allQuestions, activePackage, answersByStudentAndTryout]);
 
   // Class Benchmark metrics
   const classScoresNumbers = classScoresForActiveTryout.map(s => s.calculatedScore);
@@ -685,8 +752,6 @@ export const StudentPortalPage: React.FC = () => {
     return allGroups.length > 0 ? allGroups : studentGroups;
   }, [allTryouts, allScores, verifiedStudent, dbVersion]);
 
-  const allAnswersCache = useMemo(() => dbService.getAnswers(), [dbVersion, allScores]);
-
   const formatStageDate = (iso: string): string => {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return '';
@@ -702,7 +767,7 @@ export const StudentPortalPage: React.FC = () => {
 
     return tryoutStageGroups.map(stage => {
       const studentComposite = getStudentStageCompositeScore(
-        verifiedStudent.id, stage, activeSubjects, allScores, allAnswersCache, allQuestions
+        verifiedStudent.id, stage, activeSubjects, scoresByStudentAndTryout, answersByStudentAndTryout, allQuestions
       );
 
       // Rata-rata gabungan kelas
@@ -710,7 +775,7 @@ export const StudentPortalPage: React.FC = () => {
       const subjectClassBuckets: Record<string, number[]> = {};
       classmates.forEach(cm => {
         const res = getStudentStageCompositeScore(
-          cm.id, stage, activeSubjects, allScores, allAnswersCache, allQuestions
+          cm.id, stage, activeSubjects, scoresByStudentAndTryout, answersByStudentAndTryout, allQuestions
         );
         if (res.compositeScore !== null) classCompositeValues.push(res.compositeScore);
         Object.entries(res.subjectScores).forEach(([sid, val]) => {
@@ -742,7 +807,7 @@ export const StudentPortalPage: React.FC = () => {
         subjectBreakdownLabel,
       };
     });
-  }, [tryoutStageGroups, verifiedStudent, allStudents, activeSubjects, allScores, allAnswersCache, allQuestions]);
+  }, [tryoutStageGroups, verifiedStudent, allStudents, activeSubjects, scoresByStudentAndTryout, answersByStudentAndTryout, allQuestions]);
 
   // Build real subject recap matrix rows per Siklus TO (menghitung rata-rata hanya dari siklus dengan data valid)
   const subjectRecapRows: SubjectRecapRow[] = useMemo(() => {
@@ -753,7 +818,7 @@ export const StudentPortalPage: React.FC = () => {
 
       tryoutStageGroups.forEach(stage => {
         const score = getStudentStageSubjectScore(
-          verifiedStudent.id, subj, stage, allScores, allAnswersCache, allQuestions
+          verifiedStudent.id, subj, stage, scoresByStudentAndTryout, answersByStudentAndTryout, allQuestions
         );
         if (score !== null) {
           toScores[stage.groupKey] = score;
@@ -782,9 +847,23 @@ export const StudentPortalPage: React.FC = () => {
         trend,
       };
     }).filter(r => {
-      return Object.values(r.toScores).some(v => v > 0) || activeSubjects.length <= 12;
+      // 1. Tampilkan jika memiliki skor nyata (> 0) di salah satu siklus TO
+      const hasScore = Object.values(r.toScores).some(v => v > 0);
+      if (hasScore) return true;
+
+      // 2. Jika wadah Tryout memiliki daftar mapel spesifik, sertakan mapel wadah tersebut
+      if (activePackage?.subjects && activePackage.subjects.length > 0) {
+        return activePackage.subjects.some(ps => ps.subjectId === r.subject.id);
+      }
+
+      return false;
     });
-  }, [activeSubjects, tryoutStageGroups, verifiedStudent, allScores, allAnswersCache, allQuestions]);
+  }, [activeSubjects, tryoutStageGroups, verifiedStudent, scoresByStudentAndTryout, answersByStudentAndTryout, allQuestions, activePackage]);
+
+  // Daftar mata pelajaran yang secara nyata ditampilkan dalam rekap Try Out (menghindari mapel kosong/non-TO)
+  const recapDisplaySubjects = useMemo(() => {
+    return subjectRecapRows.map(r => r.subject);
+  }, [subjectRecapRows]);
 
   // PDF Export
   const handleDownloadPDF = () => {
@@ -1816,7 +1895,7 @@ export const StudentPortalPage: React.FC = () => {
                 {/* 2. SUBJECT RECAP SECTION (Grafik Per-Mapel + Tabel Rekapitulasi Lengkap) */}
                 <SubjectRecapSection
                   student={verifiedStudent}
-                  subjects={activeSubjects}
+                  subjects={recapDisplaySubjects.length > 0 ? recapDisplaySubjects : activeSubjects}
                   progressHistory={progressHistory}
                   subjectRecapRows={subjectRecapRows}
                   onOpenSubjectExplanations={subjId => {
@@ -1838,59 +1917,118 @@ export const StudentPortalPage: React.FC = () => {
 
             {/* TAB 3: REKAP BUTIR SOAL YANG DIKERJAKAN */}
             {portalTab === 'QUESTION_SHEET' && (
-              studentAnalytics && studentAnalytics.questionPerformance.length > 0 ? (
-                <StudentQuestionSheet
-                  questions={allQuestions}
-                  questionPerformance={studentAnalytics.questionPerformance}
-                  subjects={allSubjects}
-                  explanations={publishedExplanations}
-                  onWatchVideo={(url, title) => {
-                    setSelectedVideoUrl(url);
-                    setSelectedVideoTitle(title);
-                  }}
-                  activeTryoutCode={activeTryout ? `${getFriendlyTryoutStageLabel(activeTryout, displayTryouts)} (${activeTryout.title})` : 'Try Out'}
-                  tryouts={displayTryouts}
-                  selectedTryoutId={selectedTryoutId}
-                  onSelectTryout={id => setSelectedTryoutId(id)}
-                />
-              ) : (
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 sm:p-12 text-center space-y-4 animate-fade-in shadow-xs">
-                  <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto">
-                    <BookOpen className="w-8 h-8" />
+              <div className="space-y-4 animate-fade-in">
+                {/* Selector Mapel untuk Mode SAT/SAS */}
+                {isSumatifPackage && activePackage?.subjects && activePackage.subjects.length > 0 && (
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                        <BookOpen className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                          Pilih Mata Pelajaran {activePackage.assessmentType}
+                        </span>
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                          Pilih bidang studi untuk melihat rincian butir soal atau evaluasi capaian
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 max-w-full">
+                      {activePackage.subjects.map(ps => {
+                        const sObj = allSubjects.find(s => s.id === ps.subjectId);
+                        const isSelected = ps.subjectId === selectedSumatifSubjectId;
+                        const sScore = sumatifProfile?.subjectScores.find(item => item.subjectId === ps.subjectId);
+                        return (
+                          <button
+                            key={ps.subjectId}
+                            type="button"
+                            onClick={() => setSelectedSumatifSubjectId(ps.subjectId)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                              isSelected
+                                ? 'bg-indigo-600 text-white shadow-xs'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                            }`}
+                          >
+                            <span>{sObj?.code || 'MAPEL'}</span>
+                            {sScore && (
+                              <span className={`text-[10px] px-1 rounded ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-mono'}`}>
+                                {sScore.score}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="max-w-md mx-auto space-y-2">
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                      {activeTryout?.isExternal ? 'Rekapitulasi Nilai Kolektif / Try Out Eksternal' : 'Lembar Soal Belum Tersedia'}
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                      {activeTryout?.isExternal
-                        ? `Paket '${activeTryout.title}' diolah langsung dari rekapitulasi nilai kolektif multi-mapel sekolah tanpa formulir lembar soal per butir. Silakan cek rincian nilai tiap mapel pada tab Rapor & Skor TO atau Grafik & Rekap Mapel.`
-                        : `Belum ada butir soal yang dipublikasikan untuk paket ujian ${activeTryout?.title || ''}. Silakan hubungi guru mata pelajaran terkait.`}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setPortalTab('REPORT')}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition cursor-pointer"
-                    >
-                      Lihat Nilai di Tab Rapor
-                    </button>
-                    {displayTryouts.find(t => !t.isExternal && t.id !== selectedTryoutId) && (
+                )}
+
+                {studentAnalytics && studentAnalytics.questionPerformance.length > 0 ? (
+                  <StudentQuestionSheet
+                    questions={allQuestions}
+                    questionPerformance={studentAnalytics.questionPerformance}
+                    subjects={allSubjects}
+                    explanations={publishedExplanations}
+                    onWatchVideo={(url, title) => {
+                      setSelectedVideoUrl(url);
+                      setSelectedVideoTitle(title);
+                    }}
+                    activeTryoutCode={
+                      isSumatifPackage
+                        ? `${activePackage?.title || 'Asesmen Sumatif'} — ${allSubjects.find(s => s.id === selectedSumatifSubjectId)?.name || 'Mata Pelajaran'}`
+                        : (activeTryout ? `${getFriendlyTryoutStageLabel(activeTryout, displayTryouts)} (${activeTryout.title})` : 'Try Out')
+                    }
+                    tryouts={displayTryouts}
+                    selectedTryoutId={selectedTryoutId}
+                    onSelectTryout={id => setSelectedTryoutId(id)}
+                  />
+                ) : (
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 sm:p-12 text-center space-y-4 animate-fade-in shadow-xs">
+                    <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto">
+                      <BookOpen className="w-8 h-8" />
+                    </div>
+                    <div className="max-w-md mx-auto space-y-2">
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+                        {isSumatifPackage
+                          ? `Lembar Butir Soal Belum Tersedia untuk ${allSubjects.find(s => s.id === selectedSumatifSubjectId)?.name || 'Mata Pelajaran Ini'}`
+                          : (activeTryout?.isExternal ? 'Rekapitulasi Nilai Kolektif / Try Out Eksternal' : 'Lembar Soal Belum Tersedia')}
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        {isSumatifPackage ? (
+                          (() => {
+                            const curSubj = allSubjects.find(s => s.id === selectedSumatifSubjectId);
+                            const curScore = sumatifProfile?.subjectScores.find(item => item.subjectId === selectedSumatifSubjectId);
+                            return `Nilai ${curSubj?.name || 'mata pelajaran ini'} siswa ${verifiedStudent?.name || ''} tercatat resmi sebesar ${curScore?.score ?? 0} (${curScore?.isPassed ? 'Tuntas KKTP' : 'Remedial'}). Data nilai ini diinput oleh guru pengampu melalui rekapitulasi nilai rapor murni sekolah tanpa formulir lembar soal per butir. Silakan cek rincian nilai di Tab Rapor.`;
+                          })()
+                        ) : activeTryout?.isExternal
+                          ? `Paket '${activeTryout.title}' diolah langsung dari rekapitulasi nilai kolektif multi-mapel sekolah tanpa formulir lembar soal per butir. Silakan cek rincian nilai tiap mapel pada tab Rapor & Skor TO atau Grafik & Rekap Mapel.`
+                          : `Belum ada butir soal yang dipublikasikan untuk paket ujian ${activeTryout?.title || ''}. Silakan hubungi guru mata pelajaran terkait.`}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
                       <button
                         type="button"
-                        onClick={() => {
-                          const internalTo = displayTryouts.find(t => !t.isExternal);
-                          if (internalTo) setSelectedTryoutId(internalTo.id);
-                        }}
-                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition cursor-pointer"
+                        onClick={() => setPortalTab('REPORT')}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition cursor-pointer"
                       >
-                        Beralih ke TO Internal Berbutir Soal
+                        Lihat Nilai di Tab Rapor
                       </button>
-                    )}
+                      {!isSumatifPackage && displayTryouts.find(t => !t.isExternal && t.id !== selectedTryoutId) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const internalTo = displayTryouts.find(t => !t.isExternal);
+                            if (internalTo) setSelectedTryoutId(internalTo.id);
+                          }}
+                          className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition cursor-pointer"
+                        >
+                          Beralih ke TO Internal Berbutir Soal
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )
+                )}
+              </div>
             )}
 
             {/* TAB 4: PUSAT MEDIA PEMBAHASAN RESMI (PDF & VIDEO YOUTUBE) */}

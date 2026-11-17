@@ -3,7 +3,7 @@ import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell
 } from 'recharts';
-import { Award, AlertTriangle, CheckCircle2, XCircle, TrendingUp, BookOpen, ShieldAlert } from 'lucide-react';
+import { Award, AlertTriangle, CheckCircle2, XCircle, TrendingUp, BookOpen, ShieldAlert, Info, Compass } from 'lucide-react';
 import { StudentSumatifProfile } from '../../services/sumatifAnalytics';
 
 interface StudentSumatifViewProps {
@@ -12,6 +12,17 @@ interface StudentSumatifViewProps {
 
 export const StudentSumatifView: React.FC<StudentSumatifViewProps> = ({ profile }) => {
   const isSAT = profile.packageType === 'SAT';
+
+  // Analisis diagnosis kompetensi untuk keterangan grafik radar
+  const sortedByScore = [...profile.subjectScores].filter(s => s.score > 0).sort((a, b) => b.score - a.score);
+  const highestSubj = sortedByScore[0];
+  const remedialSubjs = profile.subjectScores.filter(s => !s.isPassed);
+  const lowestSubj = remedialSubjs.length > 0
+    ? [...remedialSubjs].sort((a, b) => a.score - b.score)[0]
+    : sortedByScore[sortedByScore.length - 1];
+
+  const scoreSpread = (highestSubj?.score || 0) - (lowestSubj?.score || 0);
+  const isWellBalanced = profile.passedCount === profile.subjectScores.length && scoreSpread <= 20;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -121,6 +132,60 @@ export const StudentSumatifView: React.FC<StudentSumatifViewProps> = ({ profile 
                 />
               </RadarChart>
             </ResponsiveContainer>
+          </div>
+
+          {/* ── KETERANGAN & PANDUAN INTERPRETASI GRAFIK RADAR ── */}
+          <div className="mt-4 pt-3.5 border-t border-slate-100 dark:border-slate-800 space-y-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
+              <Info className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+              <span>Panduan Membaca Profil Keseimbangan Kompetensi</span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+              Jaring radar menggambarkan peta penguasaan materi antarmata pelajaran. Bentuk bidang yang semakin melebar ke luar mendekati skala 100 mencerminkan ketuntasan materi yang prima, sedangkan lekukan ke arah dalam menandakan mata pelajaran prioritas pendampingan/remedial.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-xs">
+              <div className="p-2.5 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider block">
+                    Kekuatan Utama (Top Mastery)
+                  </span>
+                  <div className="font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                    {highestSubj ? `${highestSubj.subjectName} (${highestSubj.score})` : 'Belum Terdata'}
+                  </div>
+                  <span className="text-[10px] text-emerald-700 dark:text-emerald-400">
+                    {highestSubj ? 'Penguasaan materi sangat prima' : '-'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-[10px] font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wider block">
+                    Fokus Pendampingan (Prioritas)
+                  </span>
+                  <div className="font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                    {lowestSubj ? `${lowestSubj.subjectName} (${lowestSubj.score})` : 'Semua Mapel Tuntas'}
+                  </div>
+                  <span className="text-[10px] text-amber-700 dark:text-amber-400">
+                    {remedialSubjs.length > 0 ? `${remedialSubjs.length} mapel di bawah KKTP` : 'Seluruh mapel memenuhi KKTP'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-slate-500 dark:text-slate-400 px-1 pt-1 border-t border-slate-100 dark:border-slate-800/80">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block" />
+                <span>Area Ungu: Capaian Nilai Siswa</span>
+              </div>
+              <div className="flex items-center gap-1.5 font-medium">
+                <Compass className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Status Keseimbangan: <strong className="text-slate-700 dark:text-slate-300">{isWellBalanced ? 'Kompetensi Sangat Seimbang' : 'Perlu Penguatan Sebagian Mapel'}</strong></span>
+              </div>
+            </div>
           </div>
         </div>
 

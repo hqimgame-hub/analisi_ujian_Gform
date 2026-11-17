@@ -617,37 +617,52 @@ export function getStudentStageSubjectScore(
   studentId: string,
   subj: Subject,
   stage: TryoutStageGroup,
-  allScores: Score[],
-  allAnswers?: Answer[],
+  allScores: Score[] | Map<string, Score>,
+  allAnswers?: Answer[] | Map<string, Answer[]>,
   allQuestions?: Question[]
 ): number | null {
   const subjQuestions = allQuestions ? allQuestions.filter(q => q.subjectId === subj.id) : undefined;
 
+  const findScore = (tId: string): Score | undefined => {
+    if (allScores instanceof Map) {
+      return allScores.get(`${studentId}_${tId}`);
+    }
+    return allScores.find(s => s.studentId === studentId && s.tryoutId === tId);
+  };
+
+  const findAnswers = (tId: string): Answer[] | undefined => {
+    if (!allAnswers) return undefined;
+    if (allAnswers instanceof Map) {
+      return allAnswers.get(`${studentId}_${tId}`) || [];
+    }
+    return allAnswers.filter(a => a.studentId === studentId && a.tryoutId === tId);
+  };
+
   // Prioritaskan tryout yang secara spesifik terhubung ke mapel ini
   const directTryout = stage.subjectTryoutMap[subj.id];
   if (directTryout) {
-    const scoreObj = allScores.find(
-      s => s.studentId === studentId && s.tryoutId === directTryout.id
-    );
-    const studentAnswers = allAnswers
-      ? allAnswers.filter(a => a.studentId === studentId && a.tryoutId === directTryout.id)
-      : undefined;
-    const val = extractSubjectScoreFromScoreRecord(
-      scoreObj,
-      directTryout,
-      subj,
-      studentAnswers,
-      subjQuestions
-    );
-    if (val !== null) return val;
+    const scoreObj = findScore(directTryout.id);
+    if (scoreObj) {
+      const studentAnswers = (!directTryout.isExternal && !directTryout.subjectId && typeof scoreObj.calculatedScore !== 'number')
+        ? findAnswers(directTryout.id)
+        : undefined;
+      const val = extractSubjectScoreFromScoreRecord(
+        scoreObj,
+        directTryout,
+        subj,
+        studentAnswers,
+        subjQuestions
+      );
+      if (val !== null) return val;
+    }
   }
 
   // Cek seluruh tryout anggota di dalam stage ini
   for (const to of stage.tryouts) {
-    const scoreObj = allScores.find(s => s.studentId === studentId && s.tryoutId === to.id);
+    const scoreObj = findScore(to.id);
     if (!scoreObj) continue;
-    const studentAnswers = allAnswers
-      ? allAnswers.filter(a => a.studentId === studentId && a.tryoutId === to.id)
+    const studentAnswers = (!to.isExternal && !to.subjectId && typeof scoreObj.calculatedScore !== 'number')
+      ? findAnswers(to.id)
       : undefined;
     const val = extractSubjectScoreFromScoreRecord(
       scoreObj,
@@ -670,8 +685,8 @@ export function getStudentStageCompositeScore(
   studentId: string,
   stage: TryoutStageGroup,
   subjects: Subject[],
-  allScores: Score[],
-  allAnswers?: Answer[],
+  allScores: Score[] | Map<string, Score>,
+  allAnswers?: Answer[] | Map<string, Answer[]>,
   allQuestions?: Question[]
 ): {
   compositeScore: number | null;
@@ -702,7 +717,12 @@ export function getStudentStageCompositeScore(
   // Fallback jika tryout di stage belum terpetakan ke subjectId mana pun namun siswa punya skor
   if (validValues.length === 0) {
     stage.tryouts.forEach(to => {
-      const sc = allScores.find(s => s.studentId === studentId && s.tryoutId === to.id);
+      let sc: Score | undefined;
+      if (allScores instanceof Map) {
+        sc = allScores.get(`${studentId}_${to.id}`);
+      } else {
+        sc = allScores.find(s => s.studentId === studentId && s.tryoutId === to.id);
+      }
       if (sc && typeof sc.calculatedScore === 'number') {
         validValues.push(sc.calculatedScore);
       }
