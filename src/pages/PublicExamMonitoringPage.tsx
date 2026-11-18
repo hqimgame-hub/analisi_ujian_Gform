@@ -3,7 +3,8 @@ import {
   GraduationCap, RefreshCw, Search, Filter, CheckCircle2,
   Clock, AlertCircle, ArrowUpDown, ChevronDown, Lock,
   Sparkles, Users, Award, BookOpen, ArrowLeft, EyeOff,
-  Check, School, ShieldAlert, BarChart3, Calendar, X
+  Check, School, ShieldAlert, BarChart3, Calendar, X,
+  LayoutGrid, Table
 } from 'lucide-react';
 import { dbService } from '../services/database';
 import { LiveMonitoringPayload, StudentMonitoringItem } from '../types/database';
@@ -20,6 +21,23 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
   const [payload, setPayload] = useState<LiveMonitoringPayload>(() => dbService.getLiveMonitoringData());
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // View Mode: TABLE (Desktop/Standard) or CARDS (Responsive Mobile)
+  const [viewMode, setViewMode] = useState<'TABLE' | 'CARDS'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('live_monitoring_view_mode');
+      if (saved === 'TABLE' || saved === 'CARDS') return saved;
+      return window.innerWidth < 640 ? 'CARDS' : 'TABLE';
+    }
+    return 'TABLE';
+  });
+
+  const handleSetViewMode = (mode: 'TABLE' | 'CARDS') => {
+    setViewMode(mode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('live_monitoring_view_mode', mode);
+    }
+  };
 
   // Filters & Sorting state
   const [searchQuery, setSearchQuery] = useState('');
@@ -206,16 +224,16 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
           </div>
 
           {/* Action Header: Back to login & Refresh button */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
             <button
               onClick={handleManualRefresh}
               disabled={isRefreshing}
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="flex-1 sm:flex-none justify-center px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               title="Perbarui data terbaru"
             >
               <RefreshCw className={`w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Segarkan</span>
-              <span className="text-[10px] font-normal text-slate-400 dark:text-slate-500">
+              <span>Segarkan</span>
+              <span className="text-[10px] font-normal text-slate-400 dark:text-slate-500 hidden sm:inline">
                 ({payload.lastSyncedAt})
               </span>
             </button>
@@ -225,7 +243,7 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
                 if (onNavigate) onNavigate('/login');
                 else window.location.href = '/login';
               }}
-              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+              className="flex-1 sm:flex-none justify-center px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Login Portal</span>
@@ -332,22 +350,22 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
         {/* SUBJECT TABS BAR */}
         {/* ========================================================= */}
         <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
-          <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
               <BookOpen className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
               <span>Mata Pelajaran Ujian ({payload.subjects.length} Mapel)</span>
             </div>
 
             {/* Mobile Subject Dropdown Shortcut */}
-            <div className="sm:hidden w-40">
+            <div className="sm:hidden w-full">
               <select
                 value={selectedSubjectId}
                 onChange={e => handleSelectSubject(e.target.value)}
-                className="w-full text-xs font-semibold py-1.5 px-2 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100"
+                className="w-full text-xs font-semibold py-2 px-3 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 {payload.subjects.map(sub => (
                   <option key={sub.id} value={sub.id}>
-                    {sub.name}
+                    {sub.name} ({sub.submittedCount}/{sub.totalStudents} Selesai)
                   </option>
                 ))}
               </select>
@@ -477,9 +495,9 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
             </div>
           </div>
 
-          {/* Quick Filter Buttons (Semua / Sudah Selesai / Belum Selesai) */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
-            <div className="flex items-center gap-1.5">
+          {/* Quick Filter Buttons & View Mode Switcher */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-slate-400 dark:text-slate-500 text-[11px] font-semibold mr-1">
                 Filter Status:
               </span>
@@ -502,7 +520,7 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
                 }`}
               >
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Sudah Selesai ({summary.submittedCount})</span>
+                <span>Sudah ({summary.submittedCount})</span>
               </button>
               <button
                 onClick={() => setStatusFilter('UNSUBMITTED')}
@@ -513,172 +531,352 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
                 }`}
               >
                 <Clock className="w-3.5 h-3.5 text-rose-500" />
-                <span>Belum Mengerjakan ({summary.unsubmittedCount})</span>
+                <span>Belum ({summary.unsubmittedCount})</span>
               </button>
             </div>
 
-            <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-              Menampilkan <strong>{filteredStudents.length}</strong> dari {payload.students.length} siswa
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+              <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                <strong>{filteredStudents.length}</strong> / {payload.students.length} siswa
+              </div>
+
+              {/* View Switcher: Tabel vs Kartu HP */}
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => handleSetViewMode('TABLE')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    viewMode === 'TABLE'
+                      ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-2xs font-bold'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
+                  title="Tampilan Tabel Standar"
+                >
+                  <Table className="w-3.5 h-3.5" />
+                  <span>Tabel</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetViewMode('CARDS')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    viewMode === 'CARDS'
+                      ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-2xs font-bold'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
+                  title="Tampilan Kartu Ringkas (Optimal untuk Layar HP)"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span>Kartu HP</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
         {/* ========================================================= */}
-        {/* TABEL HASIL & REKAP REALTIME */}
+        {/* DATA MONITORING: TABEL & KARTU RESPONSIVE */}
         {/* ========================================================= */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
-          <div className="overflow-x-auto max-h-[600px] overflow-y-auto scrollbar-thin">
-            <table className="w-full text-left text-xs border-collapse">
-              {/* Sticky Table Header */}
-              <thead className="sticky top-0 z-20 bg-slate-100 dark:bg-slate-800/90 backdrop-blur-xs text-slate-700 dark:text-slate-300 uppercase tracking-wider font-bold text-[11px] border-b border-slate-200 dark:border-slate-700">
-                <tr>
-                  <th className="py-3 px-3 w-12 text-center">No</th>
-                  <th className="py-3 px-4 min-w-[220px] sticky left-0 z-30 bg-slate-100 dark:bg-slate-800 shadow-xs">
-                    Nama Siswa
-                  </th>
-                  <th className="py-3 px-3 w-28">NISN</th>
-                  <th className="py-3 px-3 w-28">Kelas</th>
-                  <th className="py-3 px-4 min-w-[170px]">Status Pengerjaan</th>
-                  <th className="py-3 px-4 w-32 text-right">
-                    {payload.config.hideScores ? 'Nilai Siswa' : 'Skor Akhir'}
-                  </th>
-                </tr>
-              </thead>
-
-              {/* Table Body */}
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
-                {filteredStudents.length === 0 ? (
+          
+          {viewMode === 'TABLE' ? (
+            /* ======================================================= */
+            /* MODE 1: TABEL LENGKAP (No, NISN, Nama, JK, Kelas, Status, Nilai) */
+            /* ======================================================= */
+            <div className="overflow-x-auto max-h-[600px] overflow-y-auto scrollbar-thin">
+              <table className="w-full text-left text-xs border-collapse">
+                {/* Sticky Table Header */}
+                <thead className="sticky top-0 z-20 bg-slate-100 dark:bg-slate-800/95 backdrop-blur-xs text-slate-700 dark:text-slate-300 uppercase tracking-wider font-bold text-[11px] border-b border-slate-200 dark:border-slate-700">
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400 space-y-2">
-                      <AlertCircle className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
-                      <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">
-                        Tidak ada data siswa yang cocok dengan filter yang dipilih
-                      </p>
-                      <button
-                        onClick={() => {
-                          setSearchQuery('');
-                          setSelectedGrade('ALL');
-                          setSelectedClassId('ALL');
-                          setStatusFilter('ALL');
-                        }}
-                        className="text-xs text-indigo-600 dark:text-indigo-400 underline font-medium cursor-pointer"
-                      >
-                        Reset Seluruh Filter
-                      </button>
-                    </td>
+                    <th className="py-3 px-3 w-12 text-center">No</th>
+                    <th className="py-3 px-3 w-28 font-mono">NISN</th>
+                    <th className="py-3 px-4 min-w-[200px]">Nama Siswa</th>
+                    <th className="py-3 px-3 w-24 text-center">Jenis Kelamin</th>
+                    <th className="py-3 px-3 w-24 text-center">Kelas</th>
+                    <th className="py-3 px-4 min-w-[170px]">Status Pengerjaan</th>
+                    <th className="py-3 px-4 w-32 text-right">
+                      {payload.config.hideScores ? 'Nilai Siswa' : 'Skor Akhir'}
+                    </th>
                   </tr>
-                ) : (
-                  filteredStudents.map((st, idx) => {
+                </thead>
+
+                {/* Table Body */}
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
+                  {filteredStudents.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400 space-y-2">
+                        <AlertCircle className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
+                        <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">
+                          Tidak ada data siswa yang cocok dengan filter yang dipilih
+                        </p>
+                        <button
+                          onClick={() => {
+                            setSearchQuery('');
+                            setSelectedGrade('ALL');
+                            setSelectedClassId('ALL');
+                            setStatusFilter('ALL');
+                          }}
+                          className="text-xs text-indigo-600 dark:text-indigo-400 underline font-medium cursor-pointer"
+                        >
+                          Reset Seluruh Filter
+                        </button>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredStudents.map((st, idx) => {
+                      const isPassed = typeof st.score === 'number' && typeof st.passingGrade === 'number'
+                        ? st.score >= st.passingGrade
+                        : true;
+
+                      return (
+                        <tr
+                          key={st.studentId}
+                          className={`transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 ${
+                            !st.isSubmitted ? 'bg-rose-50/20 dark:bg-rose-950/10' : ''
+                          }`}
+                        >
+                          {/* 1. No */}
+                          <td className="py-3 px-3 text-center text-slate-400 text-[11px] font-mono">
+                            {idx + 1}
+                          </td>
+
+                          {/* 2. NISN */}
+                          <td className="py-3 px-3 text-slate-600 dark:text-slate-400 font-mono text-[11px]">
+                            {st.nisn || '—'}
+                          </td>
+
+                          {/* 3. Nama Siswa */}
+                          <td className="py-3 px-4 font-semibold text-slate-900 dark:text-slate-100">
+                            <span className="truncate block max-w-[220px] sm:max-w-none" title={st.name}>
+                              {st.name}
+                            </span>
+                          </td>
+
+                          {/* 4. Jenis Kelamin */}
+                          <td className="py-3 px-3 text-center">
+                            <span
+                              className={`inline-flex items-center justify-center px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                st.gender === 'L'
+                                  ? 'bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-950/80 dark:text-blue-300 dark:border-blue-900/60'
+                                  : st.gender === 'P'
+                                  ? 'bg-rose-50 text-rose-600 border border-rose-200 dark:bg-rose-950/80 dark:text-rose-300 dark:border-rose-900/60'
+                                  : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                              }`}
+                              title={st.gender === 'L' ? 'Laki-laki' : st.gender === 'P' ? 'Perempuan' : 'Belum Ditentukan'}
+                            >
+                              {st.gender === 'L' ? 'L' : st.gender === 'P' ? 'P' : '-'}
+                            </span>
+                          </td>
+
+                          {/* 5. Kelas */}
+                          <td className="py-3 px-3 text-center text-slate-700 dark:text-slate-300 font-semibold">
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px]">
+                              {st.className}
+                            </span>
+                          </td>
+
+                          {/* 6. Status Pengerjaan */}
+                          <td className="py-3 px-4">
+                            {st.isSubmitted ? (
+                              <div className="space-y-0.5">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                  Sudah Selesai
+                                </span>
+                                {st.submittedAt && (
+                                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
+                                    {new Date(st.submittedAt).toLocaleTimeString('id-ID', {
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}{' '}
+                                    WIB
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50">
+                                <Clock className="w-3.5 h-3.5 text-rose-500" />
+                                Belum Mengerjakan
+                              </span>
+                            )}
+                          </td>
+
+                          {/* 7. Nilai Siswa / Sensor Nilai */}
+                          <td className="py-3 px-4 text-right">
+                            {payload.config.hideScores ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                                <Lock className="w-3 h-3 text-slate-400" />
+                                Dirahasiakan
+                              </span>
+                            ) : st.isSubmitted && typeof st.score === 'number' ? (
+                              <div className="space-y-0.5">
+                                <span
+                                  className={`text-sm font-black font-mono ${
+                                    isPassed
+                                      ? 'text-emerald-600 dark:text-emerald-400'
+                                      : 'text-rose-600 dark:text-rose-400'
+                                  }`}
+                                >
+                                  {st.score}
+                                </span>
+                                <p className="text-[10px] text-slate-400">
+                                  KKM: {st.passingGrade || 75}
+                                </p>
+                              </div>
+                            ) : (
+                              <span className="text-slate-300 dark:text-slate-600 font-mono font-bold">
+                                —
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            /* ======================================================= */
+            /* MODE 2: KARTU HP (Responsive Touch Card Grid)           */
+            /* ======================================================= */
+            <div className="p-3 sm:p-4 max-h-[650px] overflow-y-auto scrollbar-thin">
+              {filteredStudents.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 space-y-2">
+                  <AlertCircle className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
+                  <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">
+                    Tidak ada data siswa yang cocok dengan filter yang dipilih
+                  </p>
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSelectedGrade('ALL');
+                      setSelectedClassId('ALL');
+                      setStatusFilter('ALL');
+                    }}
+                    className="text-xs text-indigo-600 dark:text-indigo-400 underline font-medium cursor-pointer"
+                  >
+                    Reset Seluruh Filter
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
+                  {filteredStudents.map((st, idx) => {
                     const isPassed = typeof st.score === 'number' && typeof st.passingGrade === 'number'
                       ? st.score >= st.passingGrade
                       : true;
 
                     return (
-                      <tr
+                      <div
                         key={st.studentId}
-                        className={`transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 ${
-                          !st.isSubmitted ? 'bg-rose-50/20 dark:bg-rose-950/10' : ''
+                        className={`p-3.5 rounded-2xl border transition-all text-xs space-y-2.5 ${
+                          st.isSubmitted
+                            ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-2xs hover:border-slate-300 dark:hover:border-slate-700'
+                            : 'bg-rose-50/30 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/50'
                         }`}
                       >
-                        {/* No */}
-                        <td className="py-3 px-3 text-center text-slate-400 text-[11px] font-mono">
-                          {idx + 1}
-                        </td>
-
-                        {/* Nama Siswa (Sticky Left on Horizontal Scroll) */}
-                        <td className="py-3 px-4 sticky left-0 z-10 bg-white dark:bg-slate-900 font-semibold text-slate-900 dark:text-slate-100 shadow-xs">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                                st.gender === 'L'
-                                  ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/80 dark:text-blue-300'
-                                  : 'bg-rose-50 text-rose-600 dark:bg-rose-950/80 dark:text-rose-300'
-                              }`}
-                            >
-                              {st.gender}
+                        {/* Header Kartu: No, Kelas, JK, & Status */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                              #{idx + 1}
                             </span>
-                            <span className="truncate max-w-[200px] sm:max-w-[280px]" title={st.name}>
-                              {st.name}
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                              {st.className}
+                            </span>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                                st.gender === 'L'
+                                  ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/80 dark:text-blue-300 border border-blue-200 dark:border-blue-900/60'
+                                  : st.gender === 'P'
+                                  ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60'
+                                  : 'bg-slate-100 text-slate-500'
+                              }`}
+                              title={st.gender === 'L' ? 'Laki-laki' : st.gender === 'P' ? 'Perempuan' : 'Belum Ditentukan'}
+                            >
+                              {st.gender === 'L' ? 'Laki-laki' : st.gender === 'P' ? 'Perempuan' : '-'}
                             </span>
                           </div>
-                        </td>
 
-                        {/* NISN */}
-                        <td className="py-3 px-3 text-slate-500 dark:text-slate-400 font-mono text-[11px]">
-                          {st.nisn}
-                        </td>
-
-                        {/* Kelas */}
-                        <td className="py-3 px-3 text-slate-700 dark:text-slate-300 font-semibold">
-                          <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px]">
-                            {st.className}
-                          </span>
-                        </td>
-
-                        {/* Status Pengerjaan */}
-                        <td className="py-3 px-4">
+                          {/* Status Badge */}
                           {st.isSubmitted ? (
-                            <div className="space-y-0.5">
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                                Sudah Selesai
-                              </span>
-                              {st.submittedAt && (
-                                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
-                                  {new Date(st.submittedAt).toLocaleTimeString('id-ID', {
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}{' '}
-                                  WIB
-                                </p>
-                              )}
-                            </div>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                              Selesai
+                            </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50">
-                              <Clock className="w-3.5 h-3.5 text-rose-500" />
-                              Belum Mengerjakan
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50">
+                              <Clock className="w-3 h-3 text-rose-500" />
+                              Belum
                             </span>
                           )}
-                        </td>
+                        </div>
 
-                        {/* Nilai Akhir / Sensor Nilai */}
-                        <td className="py-3 px-4 text-right">
-                          {payload.config.hideScores ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
-                              <Lock className="w-3 h-3 text-slate-400" />
-                              Dirahasiakan
-                            </span>
-                          ) : st.isSubmitted && typeof st.score === 'number' ? (
-                            <div className="space-y-0.5">
-                              <span
-                                className={`text-sm font-black font-mono ${
-                                  isPassed
-                                    ? 'text-emerald-600 dark:text-emerald-400'
-                                    : 'text-rose-600 dark:text-rose-400'
-                                }`}
-                              >
-                                {st.score}
+                        {/* Nama Siswa & NISN */}
+                        <div>
+                          <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100 leading-snug">
+                            {st.name}
+                          </h4>
+                          <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mt-0.5">
+                            NISN: {st.nisn || '—'}
+                          </p>
+                        </div>
+
+                        {/* Footer Kartu: Waktu & Nilai */}
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px]">
+                          <div>
+                            {st.isSubmitted && st.submittedAt ? (
+                              <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1 text-[10px] font-mono">
+                                <Clock className="w-3 h-3 text-slate-400" />
+                                {new Date(st.submittedAt).toLocaleTimeString('id-ID', {
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })} WIB
                               </span>
-                              <p className="text-[10px] text-slate-400">
-                                KKM: {st.passingGrade || 75}
-                              </p>
-                            </div>
-                          ) : (
-                            <span className="text-slate-300 dark:text-slate-600 font-mono font-bold">
-                              —
-                            </span>
-                          )}
-                        </td>
-                      </tr>
+                            ) : (
+                              <span className="text-rose-500 text-[10px] font-medium">
+                                Menunggu pengerjaan...
+                              </span>
+                            )}
+                          </div>
+
+                          <div>
+                            {payload.config.hideScores ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                                <Lock className="w-2.5 h-2.5 text-slate-400" />
+                                Dirahasiakan
+                              </span>
+                            ) : st.isSubmitted && typeof st.score === 'number' ? (
+                              <div className="text-right">
+                                <span
+                                  className={`font-black font-mono text-sm ${
+                                    isPassed
+                                      ? 'text-emerald-600 dark:text-emerald-400'
+                                      : 'text-rose-600 dark:text-rose-400'
+                                  }`}
+                                >
+                                  {st.score}
+                                </span>
+                                <span className="text-[9px] text-slate-400 ml-1">
+                                  (KKM {st.passingGrade || 75})
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-300 dark:text-slate-600 font-mono font-bold">
+                                —
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Table Footer */}
-          <div className="p-4 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 dark:text-slate-400 gap-2">
+          <div className="p-3.5 sm:p-4 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 dark:text-slate-400 gap-2">
             <div>
               Status Keterangan:{' '}
               <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold mr-3">
