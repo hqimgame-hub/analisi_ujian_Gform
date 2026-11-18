@@ -411,7 +411,7 @@ function fromSupabaseTryout(row: Record<string, unknown>): Tryout {
 }
 
 function toSupabaseSchoolProfile(sp: SchoolProfile): Record<string, unknown> {
-  return {
+  const payload: Record<string, unknown> = {
     id: 'default',
     name: sp.name,
     sub_header: sp.subHeader || '',
@@ -422,9 +422,26 @@ function toSupabaseSchoolProfile(sp: SchoolProfile): Record<string, unknown> {
     logo_url: sp.logoUrl || null,
     updated_at: new Date().toISOString(),
   };
+  if (sp.liveMonitoringConfig) {
+    payload.live_monitoring_config = sp.liveMonitoringConfig;
+  }
+  return payload;
 }
 
 function fromSupabaseSchoolProfile(row: Record<string, unknown>): SchoolProfile {
+  let liveMonitoringConfig: any = undefined;
+  if (row.live_monitoring_config) {
+    if (typeof row.live_monitoring_config === 'string') {
+      try {
+        liveMonitoringConfig = JSON.parse(row.live_monitoring_config);
+      } catch {
+        // ignore
+      }
+    } else if (typeof row.live_monitoring_config === 'object') {
+      liveMonitoringConfig = row.live_monitoring_config;
+    }
+  }
+
   return {
     name: String(row.name || ''),
     subHeader: String(row.sub_header || ''),
@@ -433,6 +450,7 @@ function fromSupabaseSchoolProfile(row: Record<string, unknown>): SchoolProfile 
     principalNip: String(row.principal_nip || ''),
     academicYear: String(row.academic_year || ''),
     logoUrl: row.logo_url ? String(row.logo_url) : undefined,
+    liveMonitoringConfig,
   };
 }
 
@@ -2066,11 +2084,12 @@ class SupabaseDbService {
         .upsert(payload, { onConflict: 'id' });
 
       if (error) {
-        // Fallback jika kolom logo_url belum ditambahkan di SQL Supabase oleh admin
-        if (error.message && error.message.includes('logo_url')) {
-          this.log('Kolom logo_url belum ada di tabel school_profile Supabase. Mencoba upsert tanpa kolom logo_url...', 'warn');
+        // Fallback jika kolom logo_url atau live_monitoring_config belum ditambahkan di SQL Supabase oleh admin
+        if (error.message && (error.message.includes('logo_url') || error.message.includes('live_monitoring_config'))) {
+          this.log('Kolom logo_url/live_monitoring_config belum ada di tabel school_profile Supabase. Mencoba upsert fallback...', 'warn');
           const fallbackPayload = { ...payload };
           delete fallbackPayload.logo_url;
+          delete fallbackPayload.live_monitoring_config;
           const { error: fallbackError } = await supabase
             .from('school_profile')
             .upsert(fallbackPayload, { onConflict: 'id' });

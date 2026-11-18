@@ -182,7 +182,7 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
               </div>
             )}
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60">
                   <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
                   Live Monitoring
@@ -190,6 +190,11 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
                 <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 hidden sm:inline">
                   • Real-Time Assessment
                 </span>
+                {payload.gradeLevels && payload.gradeLevels.length > 1 && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                    Serentak Kelas {payload.gradeLevels.join(', ')} ({payload.classes.length} Rombel)
+                  </span>
+                )}
               </div>
               <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-white mt-0.5">
                 {payload.title}
@@ -423,7 +428,9 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
                 }}
                 className="w-full py-2 px-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-900 dark:text-slate-100"
               >
-                <option value="ALL">Semua Angkatan / Jenjang</option>
+                <option value="ALL">
+                  {payload.gradeLevels.length > 1 ? `Semua Jenjang (Kelas ${payload.gradeLevels.join(', ')})` : 'Semua Angkatan / Jenjang'}
+                </option>
                 {payload.gradeLevels.map(gr => (
                   <option key={gr} value={gr}>
                     Tingkat {gr}

@@ -461,12 +461,14 @@ export interface SchoolProfile {
   principalNip: string;
   academicYear: string;
   logoUrl?: string;
+  liveMonitoringConfig?: LiveMonitoringConfig;
 }
 
 export interface LiveMonitoringConfig {
   isEnabled: boolean;
   targetType: 'EXAM_PACKAGE' | 'TRYOUT_STAGE';
-  targetId: string; // packageId or groupKey ('TO 1', 'TO 2', etc.)
+  targetId: string; // packageId or groupKey ('TO 1', 'TO 2', etc.) or 'ALL_SAT' | 'ALL_SAS'
+  targetPackageIds?: string[]; // array of package IDs when monitoring multiple packages (e.g. SAT Kelas 7, 8, 9)
   hideScores: boolean;
   lastUpdated?: string;
 }

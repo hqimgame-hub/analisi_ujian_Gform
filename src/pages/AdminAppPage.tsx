@@ -6,7 +6,7 @@ import {
   Layers, ChevronLeft, ChevronRight, Check, AlertTriangle,
   FileSpreadsheet, Sparkles, Download, Upload, UserPlus,
   Award, FileText, ArrowRight, FolderKanban, ChevronDown, ChevronUp, Cloud, Key,
-  Radio, EyeOff, ExternalLink, LogIn
+  Radio, EyeOff, ExternalLink, LogIn, Save, CheckCheck
 } from 'lucide-react';
 import { dbService } from '../services/database';
 import { authService } from '../services/auth';
@@ -81,6 +81,9 @@ export const AdminAppPage: React.FC<AdminAppPageProps> = ({ currentUser, onNavig
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => dbService.getState().auditLogs || []);
   const [examPackages, setExamPackages] = useState<ExamPackage[]>(() => dbService.getExamPackages());
   const [monitoringConfig, setMonitoringConfig] = useState<LiveMonitoringConfig>(() => dbService.getLiveMonitoringConfig());
+  const [draftMonitoringConfig, setDraftMonitoringConfig] = useState<LiveMonitoringConfig>(() => dbService.getLiveMonitoringConfig());
+  const [isSavingMonitoring, setIsSavingMonitoring] = useState<boolean>(false);
+  const [lastSavedMonitoringTime, setLastSavedMonitoringTime] = useState<string>('');
 
   // Modals State
   const [modalType, setModalType] = useState<
@@ -190,6 +193,53 @@ export const AdminAppPage: React.FC<AdminAppPageProps> = ({ currentUser, onNavig
   // Cloud Sync State
   const [cloudSyncing, setCloudSyncing] = useState(false);
   const [cloudSyncResult, setCloudSyncResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  // Sinkronkan paket ujian SAT / SAS dan Try Out secara terpisah
+  const satSasPackages = useMemo(() => {
+    return (examPackages || []).filter(p => p.assessmentType === 'SAT' || p.assessmentType === 'SAS');
+  }, [examPackages]);
+
+  const tryoutPackages = useMemo(() => {
+    return (examPackages || []).filter(p => p.assessmentType === 'TRYOUT');
+  }, [examPackages]);
+
+  // Cek apakah ada perubahan konfigurasi live monitoring yang belum disimpan
+  const hasMonitoringChanges = useMemo(() => {
+    return (
+      draftMonitoringConfig.isEnabled !== monitoringConfig.isEnabled ||
+      draftMonitoringConfig.targetType !== monitoringConfig.targetType ||
+      draftMonitoringConfig.targetId !== monitoringConfig.targetId ||
+      draftMonitoringConfig.hideScores !== monitoringConfig.hideScores ||
+      JSON.stringify(draftMonitoringConfig.targetPackageIds || []) !== JSON.stringify(monitoringConfig.targetPackageIds || [])
+    );
+  }, [draftMonitoringConfig, monitoringConfig]);
+
+  const handleSaveMonitoringConfig = () => {
+    setIsSavingMonitoring(true);
+    try {
+      const updated = dbService.updateLiveMonitoringConfig(draftMonitoringConfig, currentUser);
+      setMonitoringConfig(updated);
+      setDraftMonitoringConfig(updated);
+      const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      setLastSavedMonitoringTime(timeStr);
+
+      const targetDesc = updated.targetType === 'EXAM_PACKAGE'
+        ? (updated.targetPackageIds && updated.targetPackageIds.length > 1
+            ? `${updated.targetPackageIds.length} Paket Ujian (Lintas Jenjang)`
+            : (satSasPackages.find(p => p.id === updated.targetId)?.title || updated.targetId))
+        : `Siklus ${updated.targetId}`;
+
+      triggerToast(
+        updated.isEnabled
+          ? `✓ Pengaturan Live Monitoring DISIMPAN! Portal publik AKTIF (${targetDesc}). Tombol 'Pantau Live Rekap Ujian' sekarang tampil di halaman login.`
+          : '✓ Pengaturan Live Monitoring DISIMPAN! Portal publik dinonaktifkan.'
+      );
+    } catch (err: any) {
+      triggerToast(`Gagal menyimpan live monitoring: ${err.message || 'Terjadi kesalahan'}`);
+    } finally {
+      setIsSavingMonitoring(false);
+    }
+  };
   const [realtimeConnected, setRealtimeConnected] = useState(false);
 
   // Assign Wali Kelas State
@@ -2478,9 +2528,9 @@ export const AdminAppPage: React.FC<AdminAppPageProps> = ({ currentUser, onNavig
                   {/* Status Badge */}
                   <div className="flex items-center gap-2 shrink-0">
                     {monitoringConfig.isEnabled ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-full text-xs font-bold">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-full text-xs font-bold shadow-2xs">
                         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                        Portal Publik Aktif
+                        Portal Publik Aktif (Muncul di Login)
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-full text-xs font-medium">
@@ -2490,84 +2540,253 @@ export const AdminAppPage: React.FC<AdminAppPageProps> = ({ currentUser, onNavig
                   </div>
                 </div>
 
-                {/* Saklar 1: Toggle Aktifkan Portal */}
-                <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
-                      Akses Halaman Publik Tanpa Login
-                    </h4>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                      Bila diaktifkan, tombol pintas <strong>"Pantau Live Ujian"</strong> akan muncul di halaman Login portal siswa.
-                    </p>
+                {/* Saklar 1: Toggle Aktifkan Portal & Tampilkan Tombol di Login */}
+                <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                          Akses Halaman Publik &amp; Tombol di Halaman Login
+                        </h4>
+                        {draftMonitoringConfig.isEnabled ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            TOMBOL AKTIF DI LOGIN
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                            TIDAK TAMPIL DI LOGIN
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                        Bila diaktifkan, tombol pintas <strong>"Pantau Live Rekap Ujian"</strong> akan otomatis muncul di halaman Login portal siswa sehingga pengawas ruangan, guru, dan siswa dapat memantau secara langsung.
+                      </p>
+                    </div>
+
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={draftMonitoringConfig.isEnabled}
+                        onChange={e => {
+                          setDraftMonitoringConfig(prev => ({ ...prev, isEnabled: e.target.checked }));
+                        }}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
+                    </label>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                    <input
-                      type="checkbox"
-                      checked={monitoringConfig.isEnabled}
-                      onChange={e => {
-                        const updated = dbService.updateLiveMonitoringConfig({ isEnabled: e.target.checked }, currentUser);
-                        setMonitoringConfig(updated);
-                        triggerToast(e.target.checked ? 'Portal Live Rekap (/rekap) AKTIF!' : 'Portal Live Rekap dinonaktifkan.');
-                      }}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
-                  </label>
+
+                  {/* Pratinjau Tombol di Halaman Login */}
+                  {draftMonitoringConfig.isEnabled && (
+                    <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-dashed border-indigo-200 dark:border-indigo-900/60 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-bold text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5">
+                          <Radio className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
+                          Pratinjau Tombol Pintas di Halaman Login (/login):
+                        </span>
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                          <Check className="w-3 h-3" />
+                          <span>Siap Ditampilkan di Login</span>
+                        </span>
+                      </div>
+                      <div className="py-2.5 px-3 bg-gradient-to-r from-rose-500/10 via-rose-500/5 to-indigo-500/10 border border-rose-300 dark:border-rose-800/80 rounded-xl flex items-center justify-between pointer-events-none opacity-90">
+                        <div className="flex items-center gap-2.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping inline-block" />
+                          <div>
+                            <p className="text-xs font-bold text-slate-900 dark:text-slate-100">Pantau Live Rekap Ujian</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                              {draftMonitoringConfig.targetType === 'EXAM_PACKAGE'
+                                ? (draftMonitoringConfig.targetPackageIds && draftMonitoringConfig.targetPackageIds.length > 1
+                                    ? 'SAT Terpadu (Kelas 7, 8, 9) · Real-time'
+                                    : (satSasPackages.find(p => p.id === draftMonitoringConfig.targetId)?.title || 'Asesmen Sekolah') + ' · Real-time')
+                                : `Siklus ${draftMonitoringConfig.targetId} · Real-time`}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-xs font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                          <span>Buka</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Target Asesmen yang Dipantau */}
                 <div className="space-y-3">
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                    Pilih Target Asesmen / Sesi yang Dipantau Hari Ini:
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                      Pilih Target Asesmen / Sesi yang Dipantau Hari Ini:
+                    </label>
+                    <span className="text-[11px] text-slate-400">
+                      Klik pilihan di bawah lalu klik tombol <strong>"Simpan &amp; Terapkan"</strong>
+                    </span>
+                  </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* Mode 1: Paket SAT / SAS */}
+                    {/* Mode 1: Paket SAT / SAS (Khusus SAT/SAS, Bebas dari TO) */}
                     <div
                       onClick={() => {
-                        const defaultPkg = examPackages[0]?.id || '';
-                        const updated = dbService.updateLiveMonitoringConfig({
+                        const defaultPkg = satSasPackages[0]?.id || '';
+                        const satIds = satSasPackages.filter(p => p.assessmentType === 'SAT').map(p => p.id);
+                        setDraftMonitoringConfig(prev => ({
+                          ...prev,
                           targetType: 'EXAM_PACKAGE',
-                          targetId: defaultPkg
-                        }, currentUser);
-                        setMonitoringConfig(updated);
+                          targetId: satIds.length > 0 ? 'ALL_SAT' : defaultPkg,
+                          targetPackageIds: satIds.length > 0 ? satIds : (defaultPkg ? [defaultPkg] : [])
+                        }));
                       }}
-                      className={`p-3.5 rounded-xl border cursor-pointer transition-all ${monitoringConfig.targetType === 'EXAM_PACKAGE' ? 'bg-indigo-50/70 dark:bg-indigo-950/40 border-indigo-500 ring-2 ring-indigo-500/20' : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-slate-300'}`}
+                      className={`p-3.5 rounded-xl border cursor-pointer transition-all ${draftMonitoringConfig.targetType === 'EXAM_PACKAGE' ? 'bg-indigo-50/70 dark:bg-indigo-950/40 border-indigo-500 ring-2 ring-indigo-500/20' : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-slate-300'}`}
                     >
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
                           <FolderKanban className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                           Paket Ujian (SAT / SAS)
                         </span>
-                        {monitoringConfig.targetType === 'EXAM_PACKAGE' && (
+                        {draftMonitoringConfig.targetType === 'EXAM_PACKAGE' && (
                           <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                         )}
                       </div>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mb-2.5">
-                        Memantau wadah paket semesteran terpadu yang membawahi banyak mata pelajaran sekaligus.
+                        Memantau wadah paket semesteran (SAT / SAS) terpadu. Mendukung pemantauan sekaligus serentak untuk Kelas 7, 8, dan 9.
                       </p>
 
-                      {monitoringConfig.targetType === 'EXAM_PACKAGE' && (
-                        <div onClick={e => e.stopPropagation()}>
-                          <select
-                            value={monitoringConfig.targetId}
-                            onChange={e => {
-                              const updated = dbService.updateLiveMonitoringConfig({ targetId: e.target.value }, currentUser);
-                              setMonitoringConfig(updated);
-                              triggerToast('Target paket ujian diperbarui.');
-                            }}
-                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-900 dark:text-slate-100"
-                          >
-                            {examPackages.length === 0 ? (
-                              <option value="">(Belum ada Paket Ujian dibuat)</option>
-                            ) : (
-                              examPackages.map(pkg => (
-                                <option key={pkg.id} value={pkg.id}>
-                                  {pkg.title} ({pkg.assessmentType}) — {pkg.subjects?.length || 0} Mapel
-                                </option>
-                              ))
-                            )}
-                          </select>
+                      {draftMonitoringConfig.targetType === 'EXAM_PACKAGE' && (
+                        <div onClick={e => e.stopPropagation()} className="space-y-2.5 pt-2 border-t border-indigo-200/50 dark:border-indigo-900/50">
+                          {satSasPackages.length === 0 ? (
+                            <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-lg text-[11px] text-amber-700 dark:text-amber-300">
+                              Belum ada Paket Ujian SAT atau SAS dibuat. Anda dapat membuatnya di tab <strong>Paket Ujian (Wadah)</strong>.
+                            </div>
+                          ) : (
+                            <>
+                              {/* Tombol Preset Cepat */}
+                              <div className="flex items-center justify-between gap-1.5">
+                                <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">
+                                  Pilih Jenjang yang Dipantau:
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const allIds = satSasPackages.map(p => p.id);
+                                      setDraftMonitoringConfig(prev => ({
+                                        ...prev,
+                                        targetType: 'EXAM_PACKAGE',
+                                        targetId: 'ALL_SAT',
+                                        targetPackageIds: allIds
+                                      }));
+                                    }}
+                                    className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors cursor-pointer"
+                                    title="Pilih semua jenjang agar pengawas dapat memantau serentak kelas 7, 8, dan 9"
+                                  >
+                                    Pilih Semua Jenjang (7, 8, 9)
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Checklist Paket Ujian SAT / SAS */}
+                              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                                {satSasPackages.map(pkg => {
+                                  const isSelected = Boolean(
+                                    (draftMonitoringConfig.targetPackageIds && draftMonitoringConfig.targetPackageIds.includes(pkg.id)) ||
+                                    (draftMonitoringConfig.targetId === 'ALL_SAT' && pkg.assessmentType === 'SAT') ||
+                                    (draftMonitoringConfig.targetId === 'ALL_SAS' && pkg.assessmentType === 'SAS') ||
+                                    draftMonitoringConfig.targetId === pkg.id
+                                  );
+
+                                  const togglePkg = () => {
+                                    const currentIds = draftMonitoringConfig.targetPackageIds || (
+                                      draftMonitoringConfig.targetId === 'ALL_SAT'
+                                        ? satSasPackages.filter(p => p.assessmentType === 'SAT').map(p => p.id)
+                                        : draftMonitoringConfig.targetId === 'ALL_SAS'
+                                        ? satSasPackages.filter(p => p.assessmentType === 'SAS').map(p => p.id)
+                                        : draftMonitoringConfig.targetId ? [draftMonitoringConfig.targetId] : []
+                                    );
+
+                                    let nextIds: string[];
+                                    if (currentIds.includes(pkg.id)) {
+                                      nextIds = currentIds.filter(id => id !== pkg.id);
+                                    } else {
+                                      nextIds = [...currentIds, pkg.id];
+                                    }
+
+                                    if (nextIds.length === 0) {
+                                      nextIds = [pkg.id];
+                                    }
+
+                                    const allSatIds = satSasPackages.filter(p => p.assessmentType === 'SAT').map(p => p.id);
+                                    const isAllSat = allSatIds.length > 0 && allSatIds.every(id => nextIds.includes(id));
+
+                                    setDraftMonitoringConfig(prev => ({
+                                      ...prev,
+                                      targetType: 'EXAM_PACKAGE',
+                                      targetId: isAllSat ? 'ALL_SAT' : (nextIds.length === 1 ? nextIds[0] : nextIds.join(',')),
+                                      targetPackageIds: nextIds
+                                    }));
+                                  };
+
+                                  return (
+                                    <div
+                                      key={pkg.id}
+                                      onClick={togglePkg}
+                                      className={`p-2 rounded-lg border flex items-center justify-between cursor-pointer transition-all ${
+                                        isSelected
+                                          ? 'bg-white dark:bg-slate-900 border-indigo-500 shadow-2xs ring-1 ring-indigo-500/30'
+                                          : 'bg-white/60 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 hover:border-slate-300'
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <input
+                                          type="checkbox"
+                                          checked={isSelected}
+                                          onChange={() => {}}
+                                          className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-700 pointer-events-none"
+                                        />
+                                        <div>
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                                              {pkg.title}
+                                            </span>
+                                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
+                                              {pkg.assessmentType}
+                                            </span>
+                                          </div>
+                                          <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                                            {pkg.targetGrades && pkg.targetGrades.length > 0 ? `Tingkat ${pkg.targetGrades.join(', ')}` : ''} · {pkg.targetClassIds?.length || 0} Rombel · {pkg.subjects?.length || 0} Mapel
+                                          </p>
+                                        </div>
+                                      </div>
+                                      {isSelected && (
+                                        <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1 shrink-0">
+                                          <Check className="w-3 h-3" />
+                                          <span>Dipantau</span>
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              {/* Ringkasan Jenjang Terpilih */}
+                              {(() => {
+                                const selectedCount = (draftMonitoringConfig.targetPackageIds && draftMonitoringConfig.targetPackageIds.length) || 1;
+                                return (
+                                  <div className="p-2 bg-indigo-100/70 dark:bg-indigo-950/70 rounded-lg text-[11px] text-indigo-900 dark:text-indigo-200 flex items-center justify-between">
+                                    <span className="font-semibold flex items-center gap-1.5">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400" />
+                                      {selectedCount > 1
+                                        ? `${selectedCount} Paket SAT/SAS terpilih (Pantau Serentak)`
+                                        : '1 Paket SAT/SAS terpilih'}
+                                    </span>
+                                    <span className="font-bold text-[10px] uppercase text-indigo-600 dark:text-indigo-400">
+                                      {selectedCount > 1 ? 'Lintas Jenjang' : 'Single Jenjang'}
+                                    </span>
+                                  </div>
+                                );
+                              })()}
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
@@ -2575,20 +2794,21 @@ export const AdminAppPage: React.FC<AdminAppPageProps> = ({ currentUser, onNavig
                     {/* Mode 2: Siklus Try Out (TO 1, TO 2, TO 3) */}
                     <div
                       onClick={() => {
-                        const updated = dbService.updateLiveMonitoringConfig({
+                        setDraftMonitoringConfig(prev => ({
+                          ...prev,
                           targetType: 'TRYOUT_STAGE',
-                          targetId: 'TO 1'
-                        }, currentUser);
-                        setMonitoringConfig(updated);
+                          targetId: 'TO 1',
+                          targetPackageIds: undefined
+                        }));
                       }}
-                      className={`p-3.5 rounded-xl border cursor-pointer transition-all ${monitoringConfig.targetType === 'TRYOUT_STAGE' ? 'bg-indigo-50/70 dark:bg-indigo-950/40 border-indigo-500 ring-2 ring-indigo-500/20' : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-slate-300'}`}
+                      className={`p-3.5 rounded-xl border cursor-pointer transition-all ${draftMonitoringConfig.targetType === 'TRYOUT_STAGE' ? 'bg-indigo-50/70 dark:bg-indigo-950/40 border-indigo-500 ring-2 ring-indigo-500/20' : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-slate-300'}`}
                     >
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
                           <Layers className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                           Siklus Try Out (TO)
                         </span>
-                        {monitoringConfig.targetType === 'TRYOUT_STAGE' && (
+                        {draftMonitoringConfig.targetType === 'TRYOUT_STAGE' && (
                           <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                         )}
                       </div>
@@ -2596,14 +2816,19 @@ export const AdminAppPage: React.FC<AdminAppPageProps> = ({ currentUser, onNavig
                         Memantau pelaksanaan Try Out berkala per siklus (TO 1, TO 2, TO 3, dst.) lintas guru mapel.
                       </p>
 
-                      {monitoringConfig.targetType === 'TRYOUT_STAGE' && (
-                        <div onClick={e => e.stopPropagation()}>
+                      {draftMonitoringConfig.targetType === 'TRYOUT_STAGE' && (
+                        <div onClick={e => e.stopPropagation()} className="space-y-2 pt-2 border-t border-indigo-200/50 dark:border-indigo-900/50">
+                          <label className="block text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">
+                            Pilih Siklus Try Out:
+                          </label>
                           <select
-                            value={monitoringConfig.targetId}
+                            value={draftMonitoringConfig.targetId}
                             onChange={e => {
-                              const updated = dbService.updateLiveMonitoringConfig({ targetId: e.target.value }, currentUser);
-                              setMonitoringConfig(updated);
-                              triggerToast(`Target siklus Try Out diatur ke ${e.target.value}`);
+                              setDraftMonitoringConfig(prev => ({
+                                ...prev,
+                                targetId: e.target.value,
+                                targetPackageIds: undefined
+                              }));
                             }}
                             className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-900 dark:text-slate-100"
                           >
@@ -2629,7 +2854,7 @@ export const AdminAppPage: React.FC<AdminAppPageProps> = ({ currentUser, onNavig
                       </h4>
                     </div>
                     <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                      {monitoringConfig.hideScores ? (
+                      {draftMonitoringConfig.hideScores ? (
                         <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
                           <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                           <span><strong>AKTIF:</strong> Hanya menampilkan status pengerjaan (Sudah Selesai / Belum Mengerjakan). Angka nilai dirahasiakan.</span>
@@ -2645,11 +2870,9 @@ export const AdminAppPage: React.FC<AdminAppPageProps> = ({ currentUser, onNavig
                   <label className="relative inline-flex items-center cursor-pointer shrink-0">
                     <input
                       type="checkbox"
-                      checked={monitoringConfig.hideScores}
+                      checked={draftMonitoringConfig.hideScores}
                       onChange={e => {
-                        const updated = dbService.updateLiveMonitoringConfig({ hideScores: e.target.checked }, currentUser);
-                        setMonitoringConfig(updated);
-                        triggerToast(e.target.checked ? 'Mode sensor nilai DIAKTIFKAN (Hanya status)' : 'Mode sensor nilai DINONAKTIFKAN (Nilai terbuka)');
+                        setDraftMonitoringConfig(prev => ({ ...prev, hideScores: e.target.checked }));
                       }}
                       className="sr-only peer"
                     />
@@ -2657,23 +2880,74 @@ export const AdminAppPage: React.FC<AdminAppPageProps> = ({ currentUser, onNavig
                   </label>
                 </div>
 
-                {/* Direct Link Preview */}
-                <div className="flex items-center justify-between pt-2 text-xs">
+                {/* ========================================================= */}
+                {/* TOMBOL SIMPAN & KONFIRMASI PERUBAHAN MONITORING */}
+                {/* ========================================================= */}
+                <div className="p-4 bg-slate-100/70 dark:bg-slate-950/80 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-center gap-2.5">
+                    {hasMonitoringChanges ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800 animate-pulse">
+                        <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                        <span>Ada perubahan wadah/status yang belum disimpan — klik tombol Simpan &amp; Terapkan</span>
+                      </span>
+                    ) : lastSavedMonitoringTime ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                        <CheckCheck className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                        <span>Pengaturan Telah Disimpan &amp; Aktif di Semua Perangkat ({lastSavedMonitoringTime})</span>
+                      </span>
+                    ) : (
+                      <span className="text-xs font-medium text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${monitoringConfig.isEnabled ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                        <span>Status Tersimpan: <strong>{monitoringConfig.isEnabled ? 'Portal Aktif (Muncul di Login)' : 'Portal Nonaktif'}</strong></span>
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveMonitoringConfig}
+                    disabled={isSavingMonitoring}
+                    className={`w-full sm:w-auto px-6 py-2.5 rounded-xl font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      hasMonitoringChanges
+                        ? 'bg-indigo-600 hover:bg-indigo-700 text-white ring-2 ring-indigo-500/50 scale-[1.02]'
+                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    }`}
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{isSavingMonitoring ? 'Menyimpan & Menerapkan...' : 'Simpan & Terapkan Pengaturan'}</span>
+                  </button>
+                </div>
+
+                {/* Direct Link Preview & Action Links */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-2 text-xs border-t border-slate-100 dark:border-slate-800/80 gap-2">
                   <span className="text-slate-500 dark:text-slate-400">
                     Tautan publik:{' '}
                     <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">
                       /rekap
                     </span>
+                    {' '}· Bebas diakses siswa, guru, dan pengawas ruangan tanpa login bila portal aktif
                   </span>
-                  <a
-                    href="/rekap"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-semibold rounded-lg transition-colors cursor-pointer"
-                  >
-                    <span>Buka Halaman Rekap</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <a
+                      href="/login?preview=true"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold rounded-lg transition-colors cursor-pointer"
+                      title="Buka halaman login di tab baru untuk memverifikasi tombol"
+                    >
+                      <LogIn className="w-3.5 h-3.5" />
+                      <span>Uji Halaman Login</span>
+                    </a>
+                    <a
+                      href="/rekap"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-semibold rounded-lg transition-colors cursor-pointer"
+                    >
+                      <span>Buka Live Rekap</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
                 </div>
               </div>
 

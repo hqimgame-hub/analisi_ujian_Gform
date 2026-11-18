@@ -46,6 +46,10 @@ function AppContent() {
   // Auto-redirect authenticated staff users from login/root to their primary dashboard
   useEffect(() => {
     if (currentUser && (currentPath === '/' || currentPath === '/login' || currentPath === '/index.html')) {
+      if (typeof window !== 'undefined' && window.location.search.includes('preview=true')) {
+        // Mode pratinjau halaman login untuk admin/pengawas (tidak dialihkan ke dashboard)
+        return;
+      }
       const teacherObj = dbService.getTeacherByUserId(currentUser);
       const isWaliKelas = currentUser.role === 'WALI_KELAS' || !!teacherObj?.isWaliKelas;
       if (currentUser.role === 'ADMIN') {

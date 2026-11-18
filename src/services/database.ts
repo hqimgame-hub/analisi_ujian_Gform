@@ -341,6 +341,16 @@ export class DatabaseService {
           } catch (e) {
             console.warn('[DB] Storage event sync failed:', e);
           }
+        } else if (event.key === LIVE_MONITORING_CACHE_KEY && event.newValue) {
+          try {
+            const parsed = JSON.parse(event.newValue);
+            if (parsed && typeof parsed === 'object') {
+              this.state.liveMonitoringConfig = parsed;
+              this.notifyListeners();
+            }
+          } catch (e) {
+            console.warn('[DB] Live monitoring storage sync failed:', e);
+          }
         }
       });
     }
@@ -1861,7 +1871,13 @@ export class DatabaseService {
       current.principalName !== cloudProfile.principalName ||
       current.principalNip !== cloudProfile.principalNip ||
       current.academicYear !== cloudProfile.academicYear ||
-      current.logoUrl !== cloudProfile.logoUrl;
+      current.logoUrl !== cloudProfile.logoUrl ||
+      JSON.stringify(current.liveMonitoringConfig || null) !== JSON.stringify(cloudProfile.liveMonitoringConfig || null);
+
+    if (cloudProfile.liveMonitoringConfig) {
+      this.state.liveMonitoringConfig = cloudProfile.liveMonitoringConfig;
+      this.saveCachedLiveMonitoringConfig(cloudProfile.liveMonitoringConfig);
+    }
 
     if (hasDiff) {
       const merged: SchoolProfile = { ...current, ...cloudProfile };
@@ -2137,6 +2153,21 @@ export class DatabaseService {
     };
     this.state.liveMonitoringConfig = updated;
     this.saveCachedLiveMonitoringConfig(updated);
+
+    // Sinkronkan juga ke schoolProfile agar tersinkron ke seluruh perangkat via Supabase
+    if (this.state.schoolProfile) {
+      this.state.schoolProfile = {
+        ...this.state.schoolProfile,
+        liveMonitoringConfig: updated
+      };
+      this.saveCachedSchoolProfile(this.state.schoolProfile);
+      if (this.supabaseSyncEnabled || sdb.isAvailable()) {
+        sdb.syncSchoolProfile(this.state.schoolProfile).catch(err => {
+          console.warn('[DB] syncSchoolProfile for liveMonitoring error:', err);
+        });
+      }
+    }
+
     this.persistState();
     this.notifyListeners();
     if (currentUser) {
@@ -2172,32 +2203,79 @@ export class DatabaseService {
     }>();
 
     if (config.targetType === 'EXAM_PACKAGE') {
-      const pkg = allPackages.find(p => p.id === config.targetId) || allPackages[0];
-      if (pkg) {
-        title = pkg.title;
-        assessmentType = pkg.assessmentType || 'TRYOUT';
-        subTitle = `Paket ${assessmentType} · TP ${this.getSchoolProfile().academicYear}`;
-        targetClassIds = pkg.targetClassIds || [];
-        targetGrades = pkg.targetGrades || [];
+      let selectedPackages: ExamPackage[] = [];
+      if (config.targetPackageIds && config.targetPackageIds.length > 0) {
+        selectedPackages = allPackages.filter(p => config.targetPackageIds!.includes(p.id));
+      } else if (config.targetId === 'ALL_SAT') {
+        selectedPackages = allPackages.filter(p => p.assessmentType === 'SAT' && p.status === 'ACTIVE');
+        if (selectedPackages.length === 0) selectedPackages = allPackages.filter(p => p.assessmentType === 'SAT');
+      } else if (config.targetId === 'ALL_SAS') {
+        selectedPackages = allPackages.filter(p => p.assessmentType === 'SAS' && p.status === 'ACTIVE');
+        if (selectedPackages.length === 0) selectedPackages = allPackages.filter(p => p.assessmentType === 'SAS');
+      } else if (config.targetId && config.targetId.includes(',')) {
+        const ids = config.targetId.split(',').map(s => s.trim());
+        selectedPackages = allPackages.filter(p => ids.includes(p.id));
+      } else if (config.targetId) {
+        const single = allPackages.find(p => p.id === config.targetId);
+        if (single) selectedPackages = [single];
+      }
 
-        (pkg.subjects || []).forEach(ps => {
-          const sub = this.state.subjects.find(s => s.id === ps.subjectId);
-          if (sub) {
-            const matchingTryouts = allTryouts.filter(t =>
-              (t.packageId === pkg.id && (t.subjectId === sub.id || !t.subjectId)) ||
-              (t.packageId === pkg.id && t.title.toLowerCase().includes(sub.name.toLowerCase()))
-            );
-            const tryoutIds = matchingTryouts.map(t => t.id);
-            if (tryoutIds.length === 0) {
-              const anyPkgTryout = allTryouts.find(t => t.packageId === pkg.id);
-              if (anyPkgTryout) tryoutIds.push(anyPkgTryout.id);
+      if (selectedPackages.length === 0 && allPackages.length > 0) {
+        const satPkgs = allPackages.filter(p => p.assessmentType === 'SAT');
+        selectedPackages = satPkgs.length > 0 ? satPkgs : [allPackages[0]];
+      }
+
+      if (selectedPackages.length > 0) {
+        if (selectedPackages.length === 1) {
+          title = selectedPackages[0].title;
+          assessmentType = selectedPackages[0].assessmentType || 'TRYOUT';
+          subTitle = `Paket ${assessmentType} · TP ${this.getSchoolProfile().academicYear}`;
+        } else {
+          // Multi-package: gabungan jenjang (misal Kelas 7, 8, dan 9 serentak)
+          const allGrades = Array.from(new Set(selectedPackages.flatMap(p => p.targetGrades || []))).filter(Boolean).sort();
+          assessmentType = selectedPackages[0].assessmentType || 'SAT';
+          const gradeLabel = allGrades.length > 0 ? `Kelas ${allGrades.join(', ')}` : 'Lintas Jenjang';
+          title = `${assessmentType} Terpadu (${gradeLabel})`;
+          subTitle = `Asesmen Serentak (${selectedPackages.length} Paket Ujian) · TP ${this.getSchoolProfile().academicYear}`;
+        }
+
+        const classIdSet = new Set<string>();
+        const gradeSet = new Set<string>();
+        selectedPackages.forEach(p => {
+          (p.targetClassIds || []).forEach(cid => classIdSet.add(cid));
+          (p.targetGrades || []).forEach(g => gradeSet.add(g));
+        });
+        targetClassIds = Array.from(classIdSet);
+        targetGrades = Array.from(gradeSet);
+
+        // Agregasi seluruh mapel dari paket-paket terpilih
+        selectedPackages.forEach(pkg => {
+          (pkg.subjects || []).forEach(ps => {
+            const sub = this.state.subjects.find(s => s.id === ps.subjectId);
+            if (sub) {
+              const matchingTryouts = allTryouts.filter(t =>
+                (t.packageId === pkg.id && (t.subjectId === sub.id || !t.subjectId)) ||
+                (t.packageId === pkg.id && t.title.toLowerCase().includes(sub.name.toLowerCase()))
+              );
+              const tryoutIds = matchingTryouts.map(t => t.id);
+              if (tryoutIds.length === 0) {
+                const anyPkgTryout = allTryouts.find(t => t.packageId === pkg.id);
+                if (anyPkgTryout) tryoutIds.push(anyPkgTryout.id);
+              }
+              const existing = subjectItemsMap.get(sub.id);
+              if (existing) {
+                tryoutIds.forEach(id => {
+                  if (!existing.tryoutIds.includes(id)) existing.tryoutIds.push(id);
+                });
+              } else {
+                subjectItemsMap.set(sub.id, {
+                  subject: sub,
+                  tryoutIds,
+                  passingGrade: ps.passingGrade || sub.passingGrade || 75
+                });
+              }
             }
-            subjectItemsMap.set(sub.id, {
-              subject: sub,
-              tryoutIds,
-              passingGrade: ps.passingGrade || sub.passingGrade || 75
-            });
-          }
+          });
         });
       }
     } else {

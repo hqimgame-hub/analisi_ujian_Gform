@@ -227,7 +227,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       Pantau Live Rekap Ujian
                     </p>
                     <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                      Cek kehadiran &amp; progres siswa real-time
+                      {monitoringConfig.targetType === 'EXAM_PACKAGE'
+                        ? (monitoringConfig.targetPackageIds && monitoringConfig.targetPackageIds.length > 1
+                            ? 'SAT Terpadu (Kelas 7, 8, 9) · Cek kehadiran & progres real-time'
+                            : 'Cek kehadiran & progres siswa real-time')
+                        : `Siklus ${monitoringConfig.targetId} · Cek kehadiran & progres siswa`}
                     </p>
                   </div>
                 </div>
