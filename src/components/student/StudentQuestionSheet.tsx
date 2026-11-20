@@ -17,6 +17,7 @@ interface StudentQuestionSheetProps {
   tryouts?: Tryout[];
   selectedTryoutId?: string;
   onSelectTryout?: (tryoutId: string) => void;
+  hideSubjectFilter?: boolean;
 }
 
 export const StudentQuestionSheet: React.FC<StudentQuestionSheetProps> = ({
@@ -29,6 +30,7 @@ export const StudentQuestionSheet: React.FC<StudentQuestionSheetProps> = ({
   tryouts,
   selectedTryoutId,
   onSelectTryout,
+  hideSubjectFilter = false,
 }) => {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'CORRECT' | 'INCORRECT' | 'UNANSWERED'>('ALL');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('ALL');
@@ -361,17 +363,19 @@ export const StudentQuestionSheet: React.FC<StudentQuestionSheetProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Subject Selector */}
-            <select
-              value={selectedSubjectId}
-              onChange={e => { setSelectedSubjectId(e.target.value); setSelectedQuestionNumber(null); }}
-              className="px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="ALL">Semua Mata Pelajaran</option>
-              {subjects.map(s => (
-                <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
-              ))}
-            </select>
+            {/* Subject Selector (Hanya muncul jika tidak disembunyikan/bukan mode mapel tunggal seperti SAT) */}
+            {!hideSubjectFilter && (
+              <select
+                value={selectedSubjectId}
+                onChange={e => { setSelectedSubjectId(e.target.value); setSelectedQuestionNumber(null); }}
+                className="px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="ALL">Semua Mata Pelajaran</option>
+                {subjects.map(s => (
+                  <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
+                ))}
+              </select>
+            )}
 
             {/* Search Input */}
             <div className="relative">

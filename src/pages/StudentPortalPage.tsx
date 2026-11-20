@@ -456,18 +456,53 @@ export const StudentPortalPage: React.FC = () => {
     const pkgCode = (activePackage.code || '').toLowerCase().trim();
     const pkgId = activePackage.id.toLowerCase().trim();
     const subId = selectedSumatifSubjectId.toLowerCase().trim();
-    return tryouts.find(t => {
+    const targetSubObj = allSubjects.find(s => s.id.toLowerCase().trim() === subId);
+    const targetSubCode = (targetSubObj?.code || '').toLowerCase().trim();
+    const targetSubName = (targetSubObj?.name || '').toLowerCase().trim();
+
+    // 1. Prioritas utama: cari tryout di dalam wadah yang subjectId persis sama
+    const exactSubMatch = tryouts.find(t => {
       const tPkg = (t.packageId || '').toLowerCase().trim();
       const tCode = (t.code || '').toLowerCase().trim();
       const tSub = (t.subjectId || '').toLowerCase().trim();
-      return (tPkg === pkgId || (pkgCode && tCode.startsWith(pkgCode))) && tSub === subId;
-    }) || null;
-  }, [isSumatifPackage, activePackage, selectedSumatifSubjectId, tryouts]);
+      const isPkg = tPkg === pkgId || (pkgCode && tCode.startsWith(pkgCode)) || t.id.toLowerCase() === pkgId;
+      return isPkg && tSub === subId;
+    });
+    if (exactSubMatch) return exactSubMatch;
+
+    // 2. Prioritas kedua: cari tryout di dalam wadah yang title/code memuat nama/kode mapel
+    const nameCodeMatch = tryouts.find(t => {
+      const tPkg = (t.packageId || '').toLowerCase().trim();
+      const tCode = (t.code || '').toLowerCase().trim();
+      const tTitle = (t.title || '').toLowerCase().trim();
+      const isPkg = tPkg === pkgId || (pkgCode && tCode.startsWith(pkgCode)) || t.id.toLowerCase() === pkgId;
+      if (!isPkg) return false;
+      return (targetSubCode && (tCode.includes(targetSubCode) || tTitle.includes(targetSubCode))) ||
+             (targetSubName && tTitle.includes(targetSubName));
+    });
+    if (nameCodeMatch) return nameCodeMatch;
+
+    // 3. Prioritas ketiga: cari tryout apa pun dalam paket ini yang memiliki data jawaban/skor untuk siswa ini
+    const pkgTryouts = tryouts.filter(t => {
+      const tPkg = (t.packageId || '').toLowerCase().trim();
+      const tCode = (t.code || '').toLowerCase().trim();
+      return tPkg === pkgId || (pkgCode && tCode.startsWith(pkgCode)) || t.id.toLowerCase() === pkgId;
+    });
+
+    if (verifiedStudent) {
+      const toWithAnswers = pkgTryouts.find(t =>
+        allScores.some(s => s.studentId === verifiedStudent.id && s.tryoutId === t.id)
+      );
+      if (toWithAnswers) return toWithAnswers;
+    }
+
+    return pkgTryouts[0] || null;
+  }, [isSumatifPackage, activePackage, selectedSumatifSubjectId, tryouts, allSubjects, verifiedStudent, allScores]);
 
   // Target Tryout ID untuk tab lembar butir soal
   const effectiveQuestionSheetTryoutId = useMemo(() => {
     if (isSumatifPackage) {
-      return activeSumatifTryout?.id || '';
+      return activeSumatifTryout?.id || selectedTryoutId || '';
     }
     return selectedTryoutId;
   }, [isSumatifPackage, activeSumatifTryout, selectedTryoutId]);
@@ -475,8 +510,30 @@ export const StudentPortalPage: React.FC = () => {
   // Real Database Student Analytics (menggunakan effectiveQuestionSheetTryoutId dan reaktif)
   const studentAnalytics = useMemo(() => {
     if (!verifiedStudent || !effectiveQuestionSheetTryoutId) return null;
-    return dbService.getStudentAnalytics(verifiedStudent.id, effectiveQuestionSheetTryoutId);
-  }, [verifiedStudent, effectiveQuestionSheetTryoutId, dbVersion]);
+    const analytics = dbService.getStudentAnalytics(verifiedStudent.id, effectiveQuestionSheetTryoutId);
+    if (!analytics) return null;
+
+    // Pada mode SAT/SAS dengan mapel terpilih, jika tryout memuat multi-mapel atau tidak difilter per mapel,
+    // filter rincian questionPerformance agar strictly sesuai mata pelajaran yang dipilih di header SAT
+    if (isSumatifPackage && selectedSumatifSubjectId && analytics.questionPerformance?.length > 0) {
+      const targetSub = selectedSumatifSubjectId.toLowerCase().trim();
+      const filteredQp = analytics.questionPerformance.filter(qp => {
+        const qObj = allQuestions.find(q => q.id === qp.questionId);
+        if (!qObj) return true;
+        return (qObj.subjectId || '').toLowerCase().trim() === targetSub;
+      });
+
+      // Hanya gunakan filtered jika ada butir soal yang match
+      if (filteredQp.length > 0) {
+        return {
+          ...analytics,
+          questionPerformance: filteredQp,
+        };
+      }
+    }
+
+    return analytics;
+  }, [verifiedStudent, effectiveQuestionSheetTryoutId, dbVersion, isSumatifPackage, selectedSumatifSubjectId, allQuestions]);
 
   // Cache jawaban seluruh siswa dan Hash Map O(1) untuk optimasi performa klik
   const allAnswersCache = useMemo(() => dbService.getAnswers(), [dbVersion, allScores]);
@@ -2068,6 +2125,7 @@ export const StudentPortalPage: React.FC = () => {
                     tryouts={displayTryouts}
                     selectedTryoutId={selectedTryoutId}
                     onSelectTryout={id => setSelectedTryoutId(id)}
+                    hideSubjectFilter={isSumatifPackage}
                   />
                 ) : (
                   <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 sm:p-12 text-center space-y-4 animate-fade-in shadow-xs">
