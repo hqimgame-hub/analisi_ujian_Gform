@@ -393,12 +393,12 @@ export const StudentPortalPage: React.FC = () => {
     if (studentPackages.length > 0) {
       const isValid = studentPackages.some(p => p.id === selectedPackageId);
       if (!isValid || selectedPackageId === 'ALL') {
+        const activeSumatif = studentPackages.find(p => p.status === 'ACTIVE' && (p.assessmentType === 'SAT' || p.assessmentType === 'SAS'));
         const pkgWithScore = studentPackages.find(p =>
           allScores.some(s => s.studentId === verifiedStudent?.id && tryouts.some(t => (t.packageId === p.id || (p.code && t.code.toLowerCase().startsWith(p.code.toLowerCase()))) && t.id === s.tryoutId))
         );
-        const activeSumatif = studentPackages.find(p => p.status === 'ACTIVE' && (p.assessmentType === 'SAT' || p.assessmentType === 'SAS'));
         const firstActive = studentPackages.find(p => p.status === 'ACTIVE');
-        setSelectedPackageId(pkgWithScore?.id || activeSumatif?.id || firstActive?.id || studentPackages[0].id);
+        setSelectedPackageId(activeSumatif?.id || pkgWithScore?.id || firstActive?.id || studentPackages[0].id);
       }
     }
   }, [studentPackages, verifiedStudent?.id, allScores, tryouts]);
@@ -482,7 +482,7 @@ export const StudentPortalPage: React.FC = () => {
     });
     if (nameCodeMatch) return nameCodeMatch;
 
-    // 3. Prioritas ketiga: cari tryout apa pun dalam paket ini yang memiliki data jawaban/skor untuk siswa ini
+    // 3. Prioritas ketiga: cari tryout khusus wadah SAT/SAS ini yang memiliki data jawaban/skor untuk siswa ini
     const pkgTryouts = tryouts.filter(t => {
       const tPkg = (t.packageId || '').toLowerCase().trim();
       const tCode = (t.code || '').toLowerCase().trim();
@@ -500,9 +500,10 @@ export const StudentPortalPage: React.FC = () => {
   }, [isSumatifPackage, activePackage, selectedSumatifSubjectId, tryouts, allSubjects, verifiedStudent, allScores]);
 
   // Target Tryout ID untuk tab lembar butir soal
+  // PERHATIKAN: Pada wadah SAT/SAS, HARUS KEDAP / ISOLATED. JANGAN PERNAH fallback ke selectedTryoutId jika tryout bukan bagian dari wadah SAT!
   const effectiveQuestionSheetTryoutId = useMemo(() => {
     if (isSumatifPackage) {
-      return activeSumatifTryout?.id || selectedTryoutId || '';
+      return activeSumatifTryout?.id || '';
     }
     return selectedTryoutId;
   }, [isSumatifPackage, activeSumatifTryout, selectedTryoutId]);
@@ -2143,7 +2144,13 @@ export const StudentPortalPage: React.FC = () => {
                           (() => {
                             const curSubj = allSubjects.find(s => s.id === selectedSumatifSubjectId);
                             const curScore = sumatifProfile?.subjectScores.find(item => item.subjectId === selectedSumatifSubjectId);
-                            return `Nilai ${curSubj?.name || 'mata pelajaran ini'} siswa ${verifiedStudent?.name || ''} tercatat resmi sebesar ${curScore?.score ?? 0} (${curScore?.isPassed ? 'Tuntas KKTP' : 'Remedial'}). Data nilai ini diinput oleh guru pengampu melalui rekapitulasi nilai rapor murni sekolah tanpa formulir lembar soal per butir. Silakan cek rincian nilai di Tab Rapor.`;
+                            const hasSumatifScore = curScore && curScore.score > 0;
+
+                            if (hasSumatifScore) {
+                              return `Nilai ${curSubj?.name || 'mata pelajaran ini'} siswa ${verifiedStudent?.name || ''} tercatat resmi sebesar ${curScore?.score ?? 0} (${curScore?.isPassed ? 'Tuntas KKTP' : 'Remedial'}). Data nilai ini diinput oleh guru pengampu melalui rekapitulasi nilai rapor murni sekolah tanpa formulir lembar soal per butir. Silakan cek rincian nilai di Tab Rapor.`;
+                            }
+
+                            return `Lembar butir soal digital untuk ${activePackage?.title || 'Asesmen Sumatif'} mata pelajaran ${curSubj?.name || 'ini'} belum disinkronkan atau belum dipublikasikan oleh guru pengampu. Jika Anda sudah mengerjakan melalui Google Form, mohon menunggu proses sinkronisasi respon oleh guru mata pelajaran terkait.`;
                           })()
                         ) : activeTryout?.isExternal
                           ? `Paket '${activeTryout.title}' diolah langsung dari rekapitulasi nilai kolektif multi-mapel sekolah tanpa formulir lembar soal per butir. Silakan cek rincian nilai tiap mapel pada tab Rapor & Skor TO atau Grafik & Rekap Mapel.`

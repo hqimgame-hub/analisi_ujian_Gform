@@ -2890,18 +2890,6 @@ export class DatabaseService {
 
   // STUDENTS CRUD
   public getStudents(): Student[] { return this.state.students; }
-  public getStudentByNisn(nisn: string): Student | undefined {
-    return this.state.students.find(s => s.nisn.trim() === nisn.trim());
-  }
-  public getStudentByBirthDateAndNisn(birthDate: string, nisn: string): Student | undefined {
-    const cleanDate = birthDate.trim();
-    const cleanNisn = nisn.trim();
-    return this.state.students.find(s => {
-      const matchNisn = s.nisn.trim() === cleanNisn;
-      const matchDate = s.birthDate ? s.birthDate.trim() === cleanDate : true;
-      return matchNisn && matchDate;
-    });
-  }
   public getStudentByBirthDateAndNis(birthDate: string, nis: string): Student | undefined {
     const cleanDate = birthDate.trim();
     const cleanNis = nis.trim();
@@ -2909,6 +2897,41 @@ export class DatabaseService {
       const matchNis = (s.nis ? s.nis.trim() === cleanNis : false) || s.nisn.trim() === cleanNis;
       const matchDate = s.birthDate ? s.birthDate.trim() === cleanDate : true;
       return matchNis && matchDate;
+    });
+  }
+
+  public getStudentByNisn(nisn: string): Student | undefined {
+    const clean = nisn.trim();
+    if (!clean) return undefined;
+    const cleanDigits = clean.replace(/\D/g, '');
+    return this.state.students.find(s => {
+      if (s.nisn.trim() === clean) return true;
+      const dbDigits = s.nisn.replace(/\D/g, '');
+      if (dbDigits && cleanDigits) {
+        if (dbDigits === cleanDigits) return true;
+        if (dbDigits.padStart(10, '0') === cleanDigits.padStart(10, '0')) return true;
+        if (dbDigits.replace(/^0+/, '') === cleanDigits.replace(/^0+/, '')) return true;
+      }
+      return false;
+    });
+  }
+
+  public getStudentByBirthDateAndNisn(birthDate: string, nisn: string): Student | undefined {
+    const cleanDate = birthDate.trim();
+    const cleanNisn = nisn.trim();
+    const cleanDigits = cleanNisn.replace(/\D/g, '');
+
+    return this.state.students.find(s => {
+      const dbDigits = s.nisn.replace(/\D/g, '');
+      const matchNisn = s.nisn.trim() === cleanNisn ||
+        (Boolean(dbDigits) && Boolean(cleanDigits) && (
+          dbDigits === cleanDigits ||
+          dbDigits.padStart(10, '0') === cleanDigits.padStart(10, '0') ||
+          dbDigits.replace(/^0+/, '') === cleanDigits.replace(/^0+/, '')
+        ));
+
+      const matchDate = s.birthDate ? s.birthDate.trim() === cleanDate : true;
+      return matchNisn && matchDate;
     });
   }
   public addStudent(student: Omit<Student, 'id'>, currentUser: any): Student {
