@@ -102,9 +102,63 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
     }
   }, [payload.subjects, payload.activeSubject, selectedSubjectId]);
 
-  // Filtered & Sorted Student Rows
-  const filteredStudents = useMemo(() => {
+  // Scope Filtering by Grade & Class (Determines KPI Summary context)
+  const selectedClassObj = useMemo(() => {
+    if (selectedClassId === 'ALL') return null;
+    return payload.classes.find(c => c.id === selectedClassId) || null;
+  }, [payload.classes, selectedClassId]);
+
+  const isScoped = selectedClassId !== 'ALL' || selectedGrade !== 'ALL';
+
+  const scopeLabel = useMemo(() => {
+    if (selectedClassObj) return `Kelas ${selectedClassObj.name}`;
+    if (selectedGrade !== 'ALL') return `Jenjang Kelas ${selectedGrade}`;
+    return 'Semua Rombel';
+  }, [selectedClassObj, selectedGrade]);
+
+  // Students in selected Class & Grade scope (before search & status filters)
+  const scopedStudents = useMemo(() => {
     let list = payload.students || [];
+    if (selectedGrade !== 'ALL') {
+      list = list.filter(s => s.gradeLevel === selectedGrade);
+    }
+    if (selectedClassId !== 'ALL') {
+      list = list.filter(s => s.classId === selectedClassId);
+    }
+    return list;
+  }, [payload.students, selectedGrade, selectedClassId]);
+
+  // Scoped metrics summary (Dynamically changes with Grade/Class filter)
+  const scopedSummary = useMemo(() => {
+    const totalStudents = scopedStudents.length;
+    const submittedRows = scopedStudents.filter(s => s.isSubmitted);
+    const submittedCount = submittedRows.length;
+    const unsubmittedCount = totalStudents - submittedCount;
+    const completionPercentage = totalStudents > 0
+      ? Math.round((submittedCount / totalStudents) * 100)
+      : 0;
+
+    const scoresArray = submittedRows
+      .map(s => s.score)
+      .filter((sc): sc is number => typeof sc === 'number' && !isNaN(sc));
+
+    const totalScoresSum = scoresArray.reduce((acc, curr) => acc + curr, 0);
+    const averageScore = scoresArray.length > 0
+      ? Math.round((totalScoresSum / scoresArray.length) * 10) / 10
+      : 0;
+
+    return {
+      totalStudents,
+      submittedCount,
+      unsubmittedCount,
+      completionPercentage,
+      averageScore
+    };
+  }, [scopedStudents]);
+
+  // Filtered & Sorted Student Rows for Table & Cards
+  const filteredStudents = useMemo(() => {
+    let list = scopedStudents;
 
     // Filter Search
     if (searchQuery.trim()) {
@@ -114,16 +168,6 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
         s.nisn.toLowerCase().includes(q) ||
         s.className.toLowerCase().includes(q)
       );
-    }
-
-    // Filter Grade
-    if (selectedGrade !== 'ALL') {
-      list = list.filter(s => s.gradeLevel === selectedGrade);
-    }
-
-    // Filter Class
-    if (selectedClassId !== 'ALL') {
-      list = list.filter(s => s.classId === selectedClassId);
     }
 
     // Filter Status
@@ -159,7 +203,7 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
       }
       return 0;
     });
-  }, [payload.students, searchQuery, selectedGrade, selectedClassId, statusFilter, sortBy]);
+  }, [scopedStudents, searchQuery, statusFilter, sortBy]);
 
   // If portal is disabled by admin
   if (!payload.config.isEnabled) {
@@ -190,10 +234,9 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
     );
   }
 
-  const { summary } = payload;
-  const completionPercentage = summary.totalStudents > 0
-    ? Math.round((summary.submittedCount / summary.totalStudents) * 100)
-    : 0;
+  // Effective summary for KPI cards (dynamically scoped to selected class/grade if filtered)
+  const currentSummary = scopedSummary;
+  const currentCompletionPercentage = scopedSummary.completionPercentage;
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 py-6 px-3 sm:px-6 transition-colors">
@@ -270,17 +313,53 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
         </div>
 
         {/* ========================================================= */}
+        {/* ACTIVE SCOPE BANNER (IF FILTERED BY CLASS OR GRADE) */}
+        {/* ========================================================= */}
+        {isScoped && (
+          <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-gradient-to-r from-indigo-500/10 via-blue-500/10 to-indigo-500/10 border border-indigo-200 dark:border-indigo-800 rounded-2xl text-xs shadow-2xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 dark:bg-indigo-400 animate-pulse shrink-0" />
+              <p className="text-slate-800 dark:text-slate-200 truncate text-xs">
+                Menampilkan metrik &amp; data khusus: <strong className="text-indigo-600 dark:text-indigo-400 font-extrabold">{scopeLabel}</strong> ({currentSummary.submittedCount}/{currentSummary.totalStudents} selesai • {currentCompletionPercentage}%)
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedGrade('ALL');
+                setSelectedClassId('ALL');
+              }}
+              className="shrink-0 px-3 py-1 text-xs font-bold text-indigo-600 dark:text-indigo-300 hover:text-white hover:bg-indigo-600 dark:hover:bg-indigo-500 bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 rounded-xl shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+              title="Tampilkan kembali seluruh peserta dari semua rombel"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Semua Rombel</span>
+            </button>
+          </div>
+        )}
+
+        {/* ========================================================= */}
         {/* KPI SUMMARY CARDS */}
         {/* ========================================================= */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Card 1: Total Siswa */}
           <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Peserta Terdaftar
-              </p>
+            <div className="min-w-0 pr-2">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Peserta Terdaftar
+                </p>
+                {isScoped && (
+                  <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 truncate max-w-[120px]" title={scopeLabel}>
+                    {scopeLabel}
+                  </span>
+                )}
+              </div>
               <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">
-                {summary.totalStudents} <span className="text-xs font-medium text-slate-400">siswa</span>
+                {currentSummary.totalStudents} <span className="text-xs font-medium text-slate-400">siswa</span>
+              </p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+                {isScoped ? `dari ${payload.summary.totalStudents} total sekolah` : `${payload.classes.length} Rombel aktif`}
               </p>
             </div>
             <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
@@ -293,17 +372,20 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
             onClick={() => setStatusFilter(statusFilter === 'SUBMITTED' ? 'ALL' : 'SUBMITTED')}
             className={`p-4 rounded-2xl border shadow-xs flex items-center justify-between cursor-pointer transition-all ${statusFilter === 'SUBMITTED' ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 ring-2 ring-emerald-500/20' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300'}`}
           >
-            <div>
-              <div className="flex items-center gap-1.5">
+            <div className="min-w-0 pr-2">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
                   Sudah Selesai
                 </p>
                 <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300">
-                  {completionPercentage}%
+                  {currentCompletionPercentage}%
                 </span>
               </div>
               <p className="text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-1">
-                {summary.submittedCount} <span className="text-xs font-medium text-slate-400">siswa</span>
+                {currentSummary.submittedCount} <span className="text-xs font-medium text-slate-400">siswa</span>
+              </p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+                {isScoped ? `di ${scopeLabel}` : `dari ${payload.summary.totalStudents} siswa`}
               </p>
             </div>
             <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
@@ -316,12 +398,15 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
             onClick={() => setStatusFilter(statusFilter === 'UNSUBMITTED' ? 'ALL' : 'UNSUBMITTED')}
             className={`p-4 rounded-2xl border shadow-xs flex items-center justify-between cursor-pointer transition-all ${statusFilter === 'UNSUBMITTED' ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-500 ring-2 ring-rose-500/20' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300'}`}
           >
-            <div>
+            <div className="min-w-0 pr-2">
               <p className="text-[11px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">
                 Belum Selesai
               </p>
               <p className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">
-                {summary.unsubmittedCount} <span className="text-xs font-medium text-slate-400">siswa</span>
+                {currentSummary.unsubmittedCount} <span className="text-xs font-medium text-slate-400">siswa</span>
+              </p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+                {isScoped ? `perlu dipantau di ${scopeLabel}` : `dari ${payload.summary.totalStudents} siswa`}
               </p>
             </div>
             <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
@@ -345,12 +430,15 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
                 </p>
               </div>
             ) : (
-              <div>
+              <div className="min-w-0 pr-2">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
                   Rata-rata Skor
                 </p>
                 <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">
-                  {summary.averageScore} <span className="text-xs font-medium text-slate-400">/ 100</span>
+                  {currentSummary.averageScore} <span className="text-xs font-medium text-slate-400">/ 100</span>
+                </p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+                  {isScoped ? `Rerata ${scopeLabel} (Sekolah: ${payload.summary.averageScore})` : 'Rerata seluruh peserta'}
                 </p>
               </div>
             )}
@@ -534,7 +622,7 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
                     : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
-                Semua ({payload.students.length})
+                Semua ({scopedSummary.totalStudents})
               </button>
               <button
                 onClick={() => setStatusFilter('SUBMITTED')}
@@ -545,7 +633,7 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
                 }`}
               >
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Sudah ({summary.submittedCount})</span>
+                <span>Sudah ({scopedSummary.submittedCount})</span>
               </button>
               <button
                 onClick={() => setStatusFilter('UNSUBMITTED')}
@@ -556,13 +644,13 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
                 }`}
               >
                 <Clock className="w-3.5 h-3.5 text-rose-500" />
-                <span>Belum ({summary.unsubmittedCount})</span>
+                <span>Belum ({scopedSummary.unsubmittedCount})</span>
               </button>
             </div>
 
             <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
               <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                <strong>{filteredStudents.length}</strong> / {payload.students.length} siswa
+                <strong>{filteredStudents.length}</strong> / {scopedSummary.totalStudents} siswa
               </div>
 
               {/* View Switcher: Tabel vs Kartu HP */}
