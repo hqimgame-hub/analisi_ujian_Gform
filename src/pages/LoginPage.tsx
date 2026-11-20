@@ -228,9 +228,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     </p>
                     <p className="text-[10px] text-slate-500 dark:text-slate-400">
                       {monitoringConfig.targetType === 'EXAM_PACKAGE'
-                        ? (monitoringConfig.targetPackageIds && monitoringConfig.targetPackageIds.length > 1
-                            ? 'SAT Terpadu (Kelas 7, 8, 9) · Cek kehadiran & progres real-time'
-                            : 'Cek kehadiran & progres siswa real-time')
+                        ? (monitoringConfig.targetId === 'ALL_SAT' || (monitoringConfig.targetPackageIds && monitoringConfig.targetPackageIds.length > 1)
+                            ? 'SAT Terpadu (Serentak Kelas 7, 8, 9) · Cek progres real-time'
+                            : (monitoringConfig.targetId === 'ALL_SAS' ? 'SAS Terpadu · Cek progres real-time' : 'Paket Ujian SAT · Cek kehadiran & progres siswa real-time'))
                         : `Siklus ${monitoringConfig.targetId} · Cek kehadiran & progres siswa`}
                     </p>
                   </div>

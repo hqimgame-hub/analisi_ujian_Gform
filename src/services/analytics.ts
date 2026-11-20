@@ -725,7 +725,7 @@ export class AnalyticsService {
           let resolvedKey = resolveToOptionKey(effectiveAns);
 
           if (!resolvedKey && isAnsCorrect) {
-            resolvedKey = resolvedCorrectKey;
+            resolvedKey = resolveToOptionKey(resolvedCorrectKey);
           }
 
           // Hitung persebaran opsi secara murni dan presisi sesuai respon nyata siswa

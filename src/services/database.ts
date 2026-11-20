@@ -1864,7 +1864,8 @@ export class DatabaseService {
 
   public applySchoolProfile(cloudProfile: SchoolProfile): boolean {
     const current = this.state?.schoolProfile || this.loadCachedSchoolProfile() || this.getSchoolProfile();
-    const hasDiff =
+    const configDiff = JSON.stringify(current.liveMonitoringConfig || null) !== JSON.stringify(cloudProfile.liveMonitoringConfig || null);
+    let hasDiff =
       current.name !== cloudProfile.name ||
       current.subHeader !== cloudProfile.subHeader ||
       current.address !== cloudProfile.address ||
@@ -1872,11 +1873,18 @@ export class DatabaseService {
       current.principalNip !== cloudProfile.principalNip ||
       current.academicYear !== cloudProfile.academicYear ||
       current.logoUrl !== cloudProfile.logoUrl ||
-      JSON.stringify(current.liveMonitoringConfig || null) !== JSON.stringify(cloudProfile.liveMonitoringConfig || null);
+      configDiff;
 
     if (cloudProfile.liveMonitoringConfig) {
-      this.state.liveMonitoringConfig = cloudProfile.liveMonitoringConfig;
+      const prevConfigStr = JSON.stringify(this.state?.liveMonitoringConfig || null);
+      const newConfigStr = JSON.stringify(cloudProfile.liveMonitoringConfig || null);
+      if (this.state) {
+        this.state.liveMonitoringConfig = cloudProfile.liveMonitoringConfig;
+      }
       this.saveCachedLiveMonitoringConfig(cloudProfile.liveMonitoringConfig);
+      if (prevConfigStr !== newConfigStr) {
+        hasDiff = true;
+      }
     }
 
     if (hasDiff) {
@@ -1894,6 +1902,7 @@ export class DatabaseService {
 
   private loadFromStorage(): DatabaseState {
     const cachedProfile = this.loadCachedSchoolProfile();
+    const cachedMonitoring = this.loadCachedLiveMonitoringConfig();
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
@@ -1904,6 +1913,21 @@ export class DatabaseService {
           parsed.schoolProfile = { ...cachedProfile, ...(parsed.schoolProfile || {}) };
         } else if (parsed.schoolProfile) {
           this.saveCachedSchoolProfile(parsed.schoolProfile);
+        }
+
+        // Sinkronisasi live monitoring config dari cache tercepat agar tidak pernah jump/flicker ke default Tryout
+        const effectiveMonitoring =
+          cachedMonitoring ||
+          parsed.schoolProfile?.liveMonitoringConfig ||
+          cachedProfile?.liveMonitoringConfig ||
+          parsed.liveMonitoringConfig;
+
+        if (effectiveMonitoring) {
+          parsed.liveMonitoringConfig = effectiveMonitoring;
+          this.saveCachedLiveMonitoringConfig(effectiveMonitoring);
+          if (parsed.schoolProfile) {
+            parsed.schoolProfile.liveMonitoringConfig = effectiveMonitoring;
+          }
         }
 
         // Ensure initial users/teachers exist without overwriting updated roles
@@ -2043,6 +2067,7 @@ export class DatabaseService {
       reports: [],
       auditLogs: [],
       schoolProfile: cachedProfile,
+      liveMonitoringConfig: cachedMonitoring || cachedProfile?.liveMonitoringConfig,
     };
     return defaultState;
   }
@@ -2121,19 +2146,29 @@ export class DatabaseService {
   }
 
   public getLiveMonitoringConfig(): LiveMonitoringConfig {
-    if (this.state.liveMonitoringConfig) {
+    if (this.state.liveMonitoringConfig && this.state.liveMonitoringConfig.targetType) {
       return this.state.liveMonitoringConfig;
     }
     const cached = this.loadCachedLiveMonitoringConfig();
-    if (cached) {
+    if (cached && cached.targetType) {
       this.state.liveMonitoringConfig = cached;
       return cached;
     }
-    const defaultPackage = this.state.examPackages?.[0];
+    const profileConfig = this.state.schoolProfile?.liveMonitoringConfig || this.loadCachedSchoolProfile()?.liveMonitoringConfig;
+    if (profileConfig && profileConfig.targetType) {
+      this.state.liveMonitoringConfig = profileConfig;
+      this.saveCachedLiveMonitoringConfig(profileConfig);
+      return profileConfig;
+    }
+    const allPkgs = this.state.examPackages || [];
+    const satPkg = allPkgs.find(p => p.assessmentType === 'SAT');
+    const sasPkg = allPkgs.find(p => p.assessmentType === 'SAS');
+    const defaultPackage = satPkg || sasPkg || allPkgs[0];
     const defaultConfig: LiveMonitoringConfig = {
       isEnabled: false,
       targetType: defaultPackage ? 'EXAM_PACKAGE' : 'TRYOUT_STAGE',
-      targetId: defaultPackage ? defaultPackage.id : 'TO 1',
+      targetId: defaultPackage ? (satPkg ? 'ALL_SAT' : defaultPackage.id) : 'TO 1',
+      targetPackageIds: satPkg ? [satPkg.id] : (defaultPackage ? [defaultPackage.id] : undefined),
       hideScores: true,
       lastUpdated: new Date().toISOString()
     };
@@ -2190,9 +2225,16 @@ export class DatabaseService {
     const allScores = this.state.scores || [];
     const allResponses = this.state.responses || [];
 
-    let title = 'Live Monitoring Asesmen';
-    let subTitle = `Tahun Ajaran ${this.getSchoolProfile().academicYear}`;
-    let assessmentType = 'TRYOUT';
+    const isPackagesLoading = allPackages.length === 0 && config.targetType === 'EXAM_PACKAGE';
+    const targetAssessmentName = config.targetId?.includes('SAS') ? 'SAS' : 'SAT';
+
+    let title = config.targetType === 'EXAM_PACKAGE'
+      ? (config.targetId === 'ALL_SAT' ? 'SAT Terpadu' : (config.targetId === 'ALL_SAS' ? 'SAS Terpadu' : `Paket Ujian ${targetAssessmentName}`))
+      : 'Live Monitoring Asesmen';
+    let subTitle = config.targetType === 'EXAM_PACKAGE'
+      ? `Asesmen ${targetAssessmentName} · TP ${this.getSchoolProfile().academicYear}`
+      : `Tahun Ajaran ${this.getSchoolProfile().academicYear}`;
+    let assessmentType = config.targetType === 'EXAM_PACKAGE' ? targetAssessmentName : 'TRYOUT';
     let targetClassIds: string[] = [];
     let targetGrades: string[] = [];
 
@@ -2205,35 +2247,53 @@ export class DatabaseService {
     if (config.targetType === 'EXAM_PACKAGE') {
       let selectedPackages: ExamPackage[] = [];
       if (config.targetPackageIds && config.targetPackageIds.length > 0) {
-        selectedPackages = allPackages.filter(p => config.targetPackageIds!.includes(p.id));
-      } else if (config.targetId === 'ALL_SAT') {
-        selectedPackages = allPackages.filter(p => p.assessmentType === 'SAT' && p.status === 'ACTIVE');
-        if (selectedPackages.length === 0) selectedPackages = allPackages.filter(p => p.assessmentType === 'SAT');
-      } else if (config.targetId === 'ALL_SAS') {
-        selectedPackages = allPackages.filter(p => p.assessmentType === 'SAS' && p.status === 'ACTIVE');
-        if (selectedPackages.length === 0) selectedPackages = allPackages.filter(p => p.assessmentType === 'SAS');
-      } else if (config.targetId && config.targetId.includes(',')) {
-        const ids = config.targetId.split(',').map(s => s.trim());
-        selectedPackages = allPackages.filter(p => ids.includes(p.id));
-      } else if (config.targetId) {
-        const single = allPackages.find(p => p.id === config.targetId);
-        if (single) selectedPackages = [single];
+        const targetIds = config.targetPackageIds.map(id => (id || '').toLowerCase().trim());
+        selectedPackages = allPackages.filter(p =>
+          targetIds.includes((p.id || '').toLowerCase().trim()) ||
+          (p.code && targetIds.includes(p.code.toLowerCase().trim()))
+        );
+      }
+      
+      if (selectedPackages.length === 0) {
+        if (config.targetId === 'ALL_SAT') {
+          selectedPackages = allPackages.filter(p => p.assessmentType === 'SAT' && p.status === 'ACTIVE');
+          if (selectedPackages.length === 0) selectedPackages = allPackages.filter(p => p.assessmentType === 'SAT');
+        } else if (config.targetId === 'ALL_SAS') {
+          selectedPackages = allPackages.filter(p => p.assessmentType === 'SAS' && p.status === 'ACTIVE');
+          if (selectedPackages.length === 0) selectedPackages = allPackages.filter(p => p.assessmentType === 'SAS');
+        } else if (config.targetId && config.targetId.includes(',')) {
+          const ids = config.targetId.split(',').map(s => s.toLowerCase().trim());
+          selectedPackages = allPackages.filter(p =>
+            ids.includes((p.id || '').toLowerCase().trim()) ||
+            (p.code && ids.includes(p.code.toLowerCase().trim()))
+          );
+        } else if (config.targetId) {
+          const single = allPackages.find(p =>
+            (p.id && p.id.toLowerCase().trim() === config.targetId.toLowerCase().trim()) ||
+            (p.code && p.code.toLowerCase().trim() === config.targetId.toLowerCase().trim())
+          );
+          if (single) selectedPackages = [single];
+        }
       }
 
       if (selectedPackages.length === 0 && allPackages.length > 0) {
         const satPkgs = allPackages.filter(p => p.assessmentType === 'SAT');
-        selectedPackages = satPkgs.length > 0 ? satPkgs : [allPackages[0]];
+        if (satPkgs.length > 0) {
+          selectedPackages = satPkgs;
+        } else {
+          const sasPkgs = allPackages.filter(p => p.assessmentType === 'SAS');
+          selectedPackages = sasPkgs.length > 0 ? sasPkgs : [allPackages[0]];
+        }
       }
 
       if (selectedPackages.length > 0) {
+        assessmentType = selectedPackages[0].assessmentType || targetAssessmentName;
         if (selectedPackages.length === 1) {
           title = selectedPackages[0].title;
-          assessmentType = selectedPackages[0].assessmentType || 'TRYOUT';
           subTitle = `Paket ${assessmentType} · TP ${this.getSchoolProfile().academicYear}`;
         } else {
           // Multi-package: gabungan jenjang (misal Kelas 7, 8, dan 9 serentak)
           const allGrades = Array.from(new Set(selectedPackages.flatMap(p => p.targetGrades || []))).filter(Boolean).sort();
-          assessmentType = selectedPackages[0].assessmentType || 'SAT';
           const gradeLabel = allGrades.length > 0 ? `Kelas ${allGrades.join(', ')}` : 'Lintas Jenjang';
           title = `${assessmentType} Terpadu (${gradeLabel})`;
           subTitle = `Asesmen Serentak (${selectedPackages.length} Paket Ujian) · TP ${this.getSchoolProfile().academicYear}`;
@@ -2277,6 +2337,14 @@ export class DatabaseService {
             }
           });
         });
+      } else {
+        // Ketika paket belum selesai diunduh dari cloud (misal saat boot / refresh),
+        // pastikan judul dan tipe tetap konsisten dengan target yang diatur Admin (SAT/SAS)
+        title = config.targetId === 'ALL_SAT'
+          ? 'SAT Terpadu'
+          : (config.targetId === 'ALL_SAS' ? 'SAS Terpadu' : `Paket Ujian ${targetAssessmentName}`);
+        subTitle = `Menghubungkan data asesmen ${targetAssessmentName}... TP ${this.getSchoolProfile().academicYear}`;
+        assessmentType = targetAssessmentName;
       }
     } else {
       const stageLabel = config.targetId || 'TO 1';
@@ -2309,7 +2377,7 @@ export class DatabaseService {
       });
     }
 
-    if (subjectItemsMap.size === 0 && this.state.subjects.length > 0) {
+    if (config.targetType === 'TRYOUT_STAGE' && subjectItemsMap.size === 0 && this.state.subjects.length > 0) {
       this.state.subjects.slice(0, 4).forEach(sub => {
         subjectItemsMap.set(sub.id, {
           subject: sub,
@@ -2444,7 +2512,8 @@ export class DatabaseService {
         highestScore,
         lowestScore
       },
-      lastSyncedAt: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      lastSyncedAt: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      isLoading: isPackagesLoading && subjectList.length === 0
     };
   }
 

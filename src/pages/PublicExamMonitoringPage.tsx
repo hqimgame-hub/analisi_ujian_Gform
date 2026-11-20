@@ -18,8 +18,16 @@ type SortByType = 'NAME_ASC' | 'CLASS_ASC' | 'SCORE_DESC' | 'SCORE_ASC' | 'TIME_
 
 export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> = ({ onNavigate }) => {
   const [schoolProfile, setSchoolProfile] = useState(() => dbService.getSchoolProfile());
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
-  const [payload, setPayload] = useState<LiveMonitoringPayload>(() => dbService.getLiveMonitoringData());
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('live_monitoring_selected_subject_id') || '';
+    }
+    return '';
+  });
+  const [payload, setPayload] = useState<LiveMonitoringPayload>(() => {
+    const cachedSubId = typeof window !== 'undefined' ? (sessionStorage.getItem('live_monitoring_selected_subject_id') || undefined) : undefined;
+    return dbService.getLiveMonitoringData(cachedSubId);
+  });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // View Mode: TABLE (Desktop/Standard) or CARDS (Responsive Mobile)
@@ -71,18 +79,28 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
     }, 400);
   };
 
-  // Change Subject Tab
+  // Change Subject Tab & persist to sessionStorage so refresh won't jump
   const handleSelectSubject = (subjectId: string) => {
     setSelectedSubjectId(subjectId);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('live_monitoring_selected_subject_id', subjectId);
+    }
     setPayload(dbService.getLiveMonitoringData(subjectId));
   };
 
-  // If initial activeSubject exists and selectedSubjectId is empty, set it
+  // Reconcile selectedSubjectId when payload or activeSubject loads/changes
   useEffect(() => {
-    if (payload.activeSubject && !selectedSubjectId) {
-      setSelectedSubjectId(payload.activeSubject.id);
+    if (payload.subjects && payload.subjects.length > 0) {
+      const subjectExists = payload.subjects.some(sub => sub.id === selectedSubjectId);
+      if (!subjectExists) {
+        const nextId = payload.activeSubject?.id || payload.subjects[0].id;
+        setSelectedSubjectId(nextId);
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('live_monitoring_selected_subject_id', nextId);
+        }
+      }
     }
-  }, [payload.activeSubject, selectedSubjectId]);
+  }, [payload.subjects, payload.activeSubject, selectedSubjectId]);
 
   // Filtered & Sorted Student Rows
   const filteredStudents = useMemo(() => {
@@ -203,7 +221,7 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60">
                   <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                  Live Monitoring
+                  {payload.assessmentType === 'SAT' ? 'Live SAT Monitoring' : (payload.assessmentType === 'SAS' ? 'Live SAS Monitoring' : 'Live Monitoring')}
                 </span>
                 <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 hidden sm:inline">
                   • Real-Time Assessment
@@ -375,9 +393,16 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
           {/* Desktop & Scrollable Tabs */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
             {payload.subjects.length === 0 ? (
-              <span className="text-xs text-slate-400 p-2">
-                Belum ada mata pelajaran terdaftar pada asesmen ini.
-              </span>
+              <div className="flex items-center gap-2 p-2 text-xs text-slate-500 dark:text-slate-400">
+                {payload.isLoading ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 text-indigo-500 animate-spin" />
+                    <span>Menyinkronkan mata pelajaran {payload.assessmentType}...</span>
+                  </>
+                ) : (
+                  <span>Belum ada mata pelajaran terdaftar pada asesmen ini.</span>
+                )}
+              </div>
             ) : (
               payload.subjects.map(sub => {
                 const isActive = sub.id === (payload.activeSubject?.id || selectedSubjectId);

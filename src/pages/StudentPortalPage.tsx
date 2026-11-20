@@ -9,7 +9,7 @@ import {
 import { ResourceCard } from '../components/ResourceCard';
 import { dbService } from '../services/database';
 import { ExportService } from '../services/export';
-import { Score, Student, Tryout, Explanation, Question, Subject, ClassRoom } from '../types/database';
+import { Score, Student, Tryout, Explanation, Question, Subject, ClassRoom, Answer } from '../types/database';
 import { StudentVerificationGate } from '../components/student/StudentVerificationGate';
 import { StudentQuestionSheet } from '../components/student/StudentQuestionSheet';
 import { SubjectRecapSection, SubjectRecapRow } from '../components/student/SubjectRecapSection';

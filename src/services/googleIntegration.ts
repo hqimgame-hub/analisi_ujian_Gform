@@ -1670,7 +1670,8 @@ export class GoogleIntegrationService {
       const cleanRowNisn = GoogleIntegrationService.normalizeNisn(rawNisn);
       detectedKeyStudent = (rawNisn || cleanRowNisn)
         ? (students.find(s => s.nisn === rawNisn || String(s.nisn).trim() === rawNisn || (cleanRowNisn && GoogleIntegrationService.normalizeNisn(s.nisn) === cleanRowNisn))
-           || allDbStudents.find(s => s.nisn === rawNisn || String(s.nisn).trim() === rawNisn || (cleanRowNisn && GoogleIntegrationService.normalizeNisn(s.nisn) === cleanRowNisn)))
+           || allDbStudents.find(s => s.nisn === rawNisn || String(s.nisn).trim() === rawNisn || (cleanRowNisn && GoogleIntegrationService.normalizeNisn(s.nisn) === cleanRowNisn))
+           || null)
         : null;
 
       if (!detectedKeyStudent) {

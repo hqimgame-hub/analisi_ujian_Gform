@@ -517,6 +517,7 @@ export interface LiveMonitoringPayload {
     lowestScore: number;
   };
   lastSyncedAt: string;
+  isLoading?: boolean;
 }
 
 
