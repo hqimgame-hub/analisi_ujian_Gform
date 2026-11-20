@@ -18,15 +18,22 @@ type SortByType = 'NAME_ASC' | 'CLASS_ASC' | 'SCORE_DESC' | 'SCORE_ASC' | 'TIME_
 
 export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> = ({ onNavigate }) => {
   const [schoolProfile, setSchoolProfile] = useState(() => dbService.getSchoolProfile());
+  const [payload, setPayload] = useState<LiveMonitoringPayload>(() => {
+    const cachedSubId = typeof window !== 'undefined'
+      ? (sessionStorage.getItem('live_monitoring_selected_subject_id') || undefined)
+      : undefined;
+    return dbService.getLiveMonitoringData(cachedSubId);
+  });
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(() => {
     if (typeof window !== 'undefined') {
-      return sessionStorage.getItem('live_monitoring_selected_subject_id') || '';
+      const saved = sessionStorage.getItem('live_monitoring_selected_subject_id');
+      if (saved && payload.subjects.some(s => s.id === saved)) return saved;
     }
-    return '';
-  });
-  const [payload, setPayload] = useState<LiveMonitoringPayload>(() => {
-    const cachedSubId = typeof window !== 'undefined' ? (sessionStorage.getItem('live_monitoring_selected_subject_id') || undefined) : undefined;
-    return dbService.getLiveMonitoringData(cachedSubId);
+    const fallbackId = payload.activeSubject?.id || payload.subjects[0]?.id || '';
+    if (typeof window !== 'undefined' && fallbackId) {
+      sessionStorage.setItem('live_monitoring_selected_subject_id', fallbackId);
+    }
+    return fallbackId;
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -237,6 +244,7 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
   // Effective summary for KPI cards (dynamically scoped to selected class/grade if filtered)
   const currentSummary = scopedSummary;
   const currentCompletionPercentage = scopedSummary.completionPercentage;
+  const isInitialLoading = (payload.isLoading || payload.subjects.length === 0) && payload.students.length === 0;
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 py-6 px-3 sm:px-6 transition-colors">
@@ -288,14 +296,14 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
           <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
             <button
               onClick={handleManualRefresh}
-              disabled={isRefreshing}
+              disabled={isRefreshing || isInitialLoading}
               className="flex-1 sm:flex-none justify-center px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               title="Perbarui data terbaru"
             >
-              <RefreshCw className={`w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>Segarkan</span>
+              <RefreshCw className={`w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 ${isRefreshing || isInitialLoading ? 'animate-spin' : ''}`} />
+              <span>{isInitialLoading ? 'Menghubungkan...' : 'Segarkan'}</span>
               <span className="text-[10px] font-normal text-slate-400 dark:text-slate-500 hidden sm:inline">
-                ({payload.lastSyncedAt})
+                ({isInitialLoading ? 'Sinkron Cloud' : payload.lastSyncedAt})
               </span>
             </button>
 
@@ -355,12 +363,21 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
                   </span>
                 )}
               </div>
-              <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">
-                {currentSummary.totalStudents} <span className="text-xs font-medium text-slate-400">siswa</span>
-              </p>
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
-                {isScoped ? `dari ${payload.summary.totalStudents} total sekolah` : `${payload.classes.length} Rombel aktif`}
-              </p>
+              {isInitialLoading ? (
+                <div className="space-y-1.5 mt-2">
+                  <div className="h-7 w-20 bg-slate-200 dark:bg-slate-800 rounded-lg animate-pulse" />
+                  <div className="h-3 w-28 bg-slate-100 dark:bg-slate-800/60 rounded animate-pulse" />
+                </div>
+              ) : (
+                <>
+                  <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                    {currentSummary.totalStudents} <span className="text-xs font-medium text-slate-400">siswa</span>
+                  </p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+                    {isScoped ? `dari ${payload.summary.totalStudents} total sekolah` : `${payload.classes.length} Rombel aktif`}
+                  </p>
+                </>
+              )}
             </div>
             <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
               <Users className="w-5 h-5" />
@@ -381,12 +398,21 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
                   {currentCompletionPercentage}%
                 </span>
               </div>
-              <p className="text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-1">
-                {currentSummary.submittedCount} <span className="text-xs font-medium text-slate-400">siswa</span>
-              </p>
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
-                {isScoped ? `di ${scopeLabel}` : `dari ${payload.summary.totalStudents} siswa`}
-              </p>
+              {isInitialLoading ? (
+                <div className="space-y-1.5 mt-2">
+                  <div className="h-7 w-20 bg-slate-200 dark:bg-slate-800 rounded-lg animate-pulse" />
+                  <div className="h-3 w-28 bg-slate-100 dark:bg-slate-800/60 rounded animate-pulse" />
+                </div>
+              ) : (
+                <>
+                  <p className="text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-1">
+                    {currentSummary.submittedCount} <span className="text-xs font-medium text-slate-400">siswa</span>
+                  </p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+                    {isScoped ? `di ${scopeLabel}` : `dari ${payload.summary.totalStudents} siswa`}
+                  </p>
+                </>
+              )}
             </div>
             <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
               <CheckCircle2 className="w-5 h-5" />
@@ -402,12 +428,21 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
               <p className="text-[11px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">
                 Belum Selesai
               </p>
-              <p className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">
-                {currentSummary.unsubmittedCount} <span className="text-xs font-medium text-slate-400">siswa</span>
-              </p>
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
-                {isScoped ? `perlu dipantau di ${scopeLabel}` : `dari ${payload.summary.totalStudents} siswa`}
-              </p>
+              {isInitialLoading ? (
+                <div className="space-y-1.5 mt-2">
+                  <div className="h-7 w-20 bg-slate-200 dark:bg-slate-800 rounded-lg animate-pulse" />
+                  <div className="h-3 w-28 bg-slate-100 dark:bg-slate-800/60 rounded animate-pulse" />
+                </div>
+              ) : (
+                <>
+                  <p className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">
+                    {currentSummary.unsubmittedCount} <span className="text-xs font-medium text-slate-400">siswa</span>
+                  </p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+                    {isScoped ? `perlu dipantau di ${scopeLabel}` : `dari ${payload.summary.totalStudents} siswa`}
+                  </p>
+                </>
+              )}
             </div>
             <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
               <Clock className="w-5 h-5" />
@@ -416,7 +451,17 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
 
           {/* Card 4: Mode Nilai (Rata-rata atau Sensor) */}
           <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between">
-            {payload.config.hideScores ? (
+            {isInitialLoading ? (
+              <div className="min-w-0 pr-2">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
+                  Rata-rata Skor
+                </p>
+                <div className="space-y-1.5 mt-2">
+                  <div className="h-7 w-20 bg-slate-200 dark:bg-slate-800 rounded-lg animate-pulse" />
+                  <div className="h-3 w-28 bg-slate-100 dark:bg-slate-800/60 rounded animate-pulse" />
+                </div>
+              </div>
+            ) : payload.config.hideScores ? (
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
                   Mode Privasi Nilai
@@ -464,23 +509,33 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
 
             {/* Mobile Subject Dropdown Shortcut */}
             <div className="sm:hidden w-full">
-              <select
-                value={selectedSubjectId}
-                onChange={e => handleSelectSubject(e.target.value)}
-                className="w-full text-xs font-semibold py-2 px-3 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                {payload.subjects.map(sub => (
-                  <option key={sub.id} value={sub.id}>
-                    {sub.name} ({sub.submittedCount}/{sub.totalStudents} Selesai)
-                  </option>
-                ))}
-              </select>
+              {isInitialLoading ? (
+                <div className="h-9 w-full bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
+              ) : (
+                <select
+                  value={selectedSubjectId}
+                  onChange={e => handleSelectSubject(e.target.value)}
+                  className="w-full text-xs font-semibold py-2 px-3 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  {payload.subjects.map(sub => (
+                    <option key={sub.id} value={sub.id}>
+                      {sub.name} ({sub.submittedCount}/{sub.totalStudents} Selesai)
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
 
           {/* Desktop & Scrollable Tabs */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
-            {payload.subjects.length === 0 ? (
+            {isInitialLoading ? (
+              <div className="flex items-center gap-2 py-1">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="h-8 w-28 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
+                ))}
+              </div>
+            ) : payload.subjects.length === 0 ? (
               <div className="flex items-center gap-2 p-2 text-xs text-slate-500 dark:text-slate-400">
                 {payload.isLoading ? (
                   <>
@@ -714,7 +769,19 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
 
                 {/* Table Body */}
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
-                  {filteredStudents.length === 0 ? (
+                  {isInitialLoading ? (
+                    [...Array(6)].map((_, i) => (
+                      <tr key={i} className="animate-pulse">
+                        <td className="py-3.5 px-3 text-center"><div className="h-3.5 w-5 bg-slate-200 dark:bg-slate-800 rounded mx-auto" /></td>
+                        <td className="py-3.5 px-3"><div className="h-3.5 w-20 bg-slate-200 dark:bg-slate-800 rounded" /></td>
+                        <td className="py-3.5 px-4"><div className="h-3.5 w-40 bg-slate-200 dark:bg-slate-800 rounded" /></td>
+                        <td className="py-3.5 px-3 text-center"><div className="h-3.5 w-8 bg-slate-200 dark:bg-slate-800 rounded mx-auto" /></td>
+                        <td className="py-3.5 px-3 text-center"><div className="h-3.5 w-12 bg-slate-200 dark:bg-slate-800 rounded mx-auto" /></td>
+                        <td className="py-3.5 px-4"><div className="h-5 w-24 bg-slate-200 dark:bg-slate-800 rounded-full" /></td>
+                        <td className="py-3.5 px-4 text-right"><div className="h-4 w-12 bg-slate-200 dark:bg-slate-800 rounded ml-auto" /></td>
+                      </tr>
+                    ))
+                  ) : filteredStudents.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="py-12 text-center text-slate-400 space-y-2">
                         <AlertCircle className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
@@ -853,7 +920,23 @@ export const PublicExamMonitoringPage: React.FC<PublicExamMonitoringPageProps> =
             /* MODE 2: KARTU HP (Responsive Touch Card Grid)           */
             /* ======================================================= */
             <div className="p-3 sm:p-4 max-h-[650px] overflow-y-auto scrollbar-thin">
-              {filteredStudents.length === 0 ? (
+              {isInitialLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3 animate-pulse">
+                      <div className="flex items-center justify-between">
+                        <div className="h-4 w-20 bg-slate-200 dark:bg-slate-800 rounded" />
+                        <div className="h-4 w-16 bg-slate-200 dark:bg-slate-800 rounded-full" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="h-4 w-36 bg-slate-200 dark:bg-slate-800 rounded" />
+                        <div className="h-3 w-24 bg-slate-100 dark:bg-slate-800/60 rounded" />
+                      </div>
+                      <div className="h-6 w-full bg-slate-100 dark:bg-slate-800/40 rounded-xl" />
+                    </div>
+                  ))}
+                </div>
+              ) : filteredStudents.length === 0 ? (
                 <div className="py-12 text-center text-slate-400 space-y-2">
                   <AlertCircle className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
                   <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">

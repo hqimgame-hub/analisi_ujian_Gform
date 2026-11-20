@@ -41,6 +41,7 @@ const DELETED_PACKAGES_KEY = 'school_exam_packages_deleted_ids_v1';
 const DELETED_SUBJECTS_KEY = 'school_tryout_deleted_subjects_v1';
 const DELETED_EXPLANATIONS_KEY = 'school_tryout_deleted_explanations_v1';
 const LIVE_MONITORING_CACHE_KEY = 'wikan_live_monitoring_cache_v1';
+const LIVE_MONITORING_PAYLOAD_CACHE_KEY = 'wikan_live_monitoring_payload_cache_v1';
 
 export interface DatabaseState {
   users: User[];
@@ -1862,6 +1863,45 @@ export class DatabaseService {
     }
   }
 
+  public saveCachedLiveMonitoringPayload(payload: LiveMonitoringPayload): void {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+      if (
+        payload &&
+        Array.isArray(payload.subjects) &&
+        payload.subjects.length > 0 &&
+        Array.isArray(payload.students) &&
+        payload.students.length > 0
+      ) {
+        localStorage.setItem(LIVE_MONITORING_PAYLOAD_CACHE_KEY, JSON.stringify(payload));
+      }
+    } catch (e) {
+      console.warn('[DB] Failed to save live monitoring payload cache:', e);
+    }
+  }
+
+  public getCachedLiveMonitoringPayload(targetSubjectId?: string): LiveMonitoringPayload | undefined {
+    if (typeof window === 'undefined' || !window.localStorage) return undefined;
+    try {
+      const raw = localStorage.getItem(LIVE_MONITORING_PAYLOAD_CACHE_KEY);
+      if (raw) {
+        const parsed: LiveMonitoringPayload = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.subjects) && parsed.subjects.length > 0 && Array.isArray(parsed.students)) {
+          if (targetSubjectId && parsed.activeSubject?.id !== targetSubjectId) {
+            const matchedSub = parsed.subjects.find(s => s.id === targetSubjectId);
+            if (matchedSub) {
+              parsed.activeSubject = matchedSub;
+            }
+          }
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('[DB] Failed to load cached live monitoring payload:', e);
+    }
+    return undefined;
+  }
+
   public applySchoolProfile(cloudProfile: SchoolProfile): boolean {
     const current = this.state?.schoolProfile || this.loadCachedSchoolProfile() || this.getSchoolProfile();
     const configDiff = JSON.stringify(current.liveMonitoringConfig || null) !== JSON.stringify(cloudProfile.liveMonitoringConfig || null);
@@ -2226,6 +2266,18 @@ export class DatabaseService {
     const allResponses = this.state.responses || [];
 
     const isPackagesLoading = allPackages.length === 0 && config.targetType === 'EXAM_PACKAGE';
+
+    // FAST-PATH: Jika paket atau siswa belum selesai dimuat dari cloud/storage, sajikan langsung dari snapshot cache
+    if ((allPackages.length === 0 && config.targetType === 'EXAM_PACKAGE') || allStudents.length === 0) {
+      const cachedSnapshot = this.getCachedLiveMonitoringPayload(selectedSubjectId);
+      if (cachedSnapshot && cachedSnapshot.subjects && cachedSnapshot.subjects.length > 0) {
+        return {
+          ...cachedSnapshot,
+          config,
+          isLoading: false
+        };
+      }
+    }
     const targetAssessmentName = config.targetId?.includes('SAS') ? 'SAS' : 'SAT';
 
     let title = config.targetType === 'EXAM_PACKAGE'
@@ -2493,7 +2545,7 @@ export class DatabaseService {
 
     const gradeLevels = Array.from(new Set(filteredClasses.map(c => c.gradeLevel))).filter(Boolean).sort();
 
-    return {
+    const resultPayload: LiveMonitoringPayload = {
       config,
       title,
       subTitle,
@@ -2515,6 +2567,12 @@ export class DatabaseService {
       lastSyncedAt: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
       isLoading: isPackagesLoading && subjectList.length === 0
     };
+
+    if (resultPayload.subjects.length > 0 && resultPayload.students.length > 0) {
+      this.saveCachedLiveMonitoringPayload(resultPayload);
+    }
+
+    return resultPayload;
   }
 
   // SECURITY: Require Admin Authorization Helper
