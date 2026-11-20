@@ -917,11 +917,28 @@ export class AnalyticsService {
     let unansweredCount = 0;
 
     const answerMap = new Map<string, Answer>();
-    studentAnswers.forEach(a => answerMap.set(a.questionId, a));
+    studentAnswers.forEach(a => {
+      if (a.questionId) {
+        answerMap.set(a.questionId, a);
+        answerMap.set(a.questionId.toLowerCase().trim(), a);
+      }
+    });
+
+    const getAnswerForQuestion = (q: Question): Answer | undefined => {
+      if (answerMap.has(q.id)) return answerMap.get(q.id);
+      if (q.id && answerMap.has(q.id.toLowerCase().trim())) return answerMap.get(q.id.toLowerCase().trim());
+      if (q.uniqueCode && answerMap.has(q.uniqueCode)) return answerMap.get(q.uniqueCode);
+      if (q.uniqueCode && answerMap.has(q.uniqueCode.toLowerCase().trim())) return answerMap.get(q.uniqueCode.toLowerCase().trim());
+      return studentAnswers.find(a =>
+        a.questionId === q.id ||
+        (q.uniqueCode && a.questionId === q.uniqueCode) ||
+        (a.questionId && q.uniqueCode && a.questionId.toLowerCase().trim() === q.uniqueCode.toLowerCase().trim())
+      );
+    };
 
     if (totalQuestions > 0) {
       questions.forEach(q => {
-        const ans = answerMap.get(q.id);
+        const ans = getAnswerForQuestion(q);
         if (!ans || !ans.studentAnswer || ans.studentAnswer === 'KOSONG' || ans.studentAnswer === 'Kosong') {
           unansweredCount++;
         } else if (ans.isCorrect) {
@@ -953,7 +970,7 @@ export class AnalyticsService {
       }
       const st = materialStatsMap.get(q.materialId)!;
       st.total++;
-      const ans = answerMap.get(q.id);
+      const ans = getAnswerForQuestion(q);
       if (ans && ans.isCorrect) st.correct++;
     });
 
@@ -980,7 +997,7 @@ export class AnalyticsService {
       }
       const st = compMap.get(q.competencyId)!;
       st.total++;
-      const ans = answerMap.get(q.id);
+      const ans = getAnswerForQuestion(q);
       if (ans && ans.isCorrect) st.correct++;
     });
 
@@ -1008,7 +1025,7 @@ export class AnalyticsService {
 
     // Question Performance Details
     const questionPerformance: QuestionPerformanceDetail[] = questions.map(q => {
-      const ans = answerMap.get(q.id);
+      const ans = getAnswerForQuestion(q);
       const mat = materials.find(m => m.id === q.materialId);
       const comp = competencies.find(c => c.id === q.competencyId);
       const isCorrect = ans ? ans.isCorrect : false;

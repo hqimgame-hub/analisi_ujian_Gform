@@ -4,7 +4,7 @@ import {
   AlertTriangle, BookOpen, ExternalLink, Youtube, Sparkles, Lock, ShieldCheck,
   TrendingUp, ArrowRight, ShieldAlert, CheckCircle2, RotateCcw, Eye, ChevronDown, ChevronUp,
   Filter, Layers, ArrowUpRight, ArrowDownRight, BarChart3, Play, Video, Copy, Check, Share2,
-  LayoutGrid, LogOut, UserCheck, Trophy, Medal, Package, ClipboardList, ArrowLeftRight
+  LayoutGrid, LogOut, UserCheck, Trophy, Medal, Package, ClipboardList, ArrowLeftRight, Clock, RefreshCw
 } from 'lucide-react';
 import { ResourceCard } from '../components/ResourceCard';
 import { dbService } from '../services/database';
@@ -160,7 +160,11 @@ export const StudentPortalPage: React.FC = () => {
         if (studentClass && pkg.targetGrades && pkg.targetGrades.length > 0) {
           return pkg.targetGrades.includes(studentClass.gradeLevel);
         }
-        return false;
+        // Jika paket tidak memiliki batasan eksplisit, cek pembatasan langsung pada tryout
+        if (t.targetClassIds && t.targetClassIds.length > 0) {
+          return t.targetClassIds.includes(verifiedStudent.classId);
+        }
+        return true;
       }
 
       // 3. Direct targetClassIds on tryout
@@ -460,44 +464,37 @@ export const StudentPortalPage: React.FC = () => {
     const targetSubCode = (targetSubObj?.code || '').toLowerCase().trim();
     const targetSubName = (targetSubObj?.name || '').toLowerCase().trim();
 
-    // 1. Prioritas utama: cari tryout di dalam wadah yang subjectId persis sama
-    const exactSubMatch = tryouts.find(t => {
+    // Saring kandidat tryout dari allTryouts yang berada dalam wadah ini (bukan hanya tryouts lokal yang difilter kelas)
+    const candidateTryouts = allTryouts.filter(t => {
       const tPkg = (t.packageId || '').toLowerCase().trim();
       const tCode = (t.code || '').toLowerCase().trim();
-      const tSub = (t.subjectId || '').toLowerCase().trim();
-      const isPkg = tPkg === pkgId || (pkgCode && tCode.startsWith(pkgCode)) || t.id.toLowerCase() === pkgId;
-      return isPkg && tSub === subId;
+      return tPkg === pkgId || (pkgCode && tCode.startsWith(pkgCode)) || t.id.toLowerCase() === pkgId;
     });
+
+    // 1. Prioritas utama: cari tryout di dalam wadah yang subjectId persis sama
+    const exactSubMatch = candidateTryouts.find(t => (t.subjectId || '').toLowerCase().trim() === subId);
     if (exactSubMatch) return exactSubMatch;
 
     // 2. Prioritas kedua: cari tryout di dalam wadah yang title/code memuat nama/kode mapel
-    const nameCodeMatch = tryouts.find(t => {
-      const tPkg = (t.packageId || '').toLowerCase().trim();
+    const nameCodeMatch = candidateTryouts.find(t => {
       const tCode = (t.code || '').toLowerCase().trim();
       const tTitle = (t.title || '').toLowerCase().trim();
-      const isPkg = tPkg === pkgId || (pkgCode && tCode.startsWith(pkgCode)) || t.id.toLowerCase() === pkgId;
-      if (!isPkg) return false;
       return (targetSubCode && (tCode.includes(targetSubCode) || tTitle.includes(targetSubCode))) ||
              (targetSubName && tTitle.includes(targetSubName));
     });
     if (nameCodeMatch) return nameCodeMatch;
 
     // 3. Prioritas ketiga: cari tryout khusus wadah SAT/SAS ini yang memiliki data jawaban/skor untuk siswa ini
-    const pkgTryouts = tryouts.filter(t => {
-      const tPkg = (t.packageId || '').toLowerCase().trim();
-      const tCode = (t.code || '').toLowerCase().trim();
-      return tPkg === pkgId || (pkgCode && tCode.startsWith(pkgCode)) || t.id.toLowerCase() === pkgId;
-    });
-
     if (verifiedStudent) {
-      const toWithAnswers = pkgTryouts.find(t =>
-        allScores.some(s => s.studentId === verifiedStudent.id && s.tryoutId === t.id)
+      const toWithAnswers = candidateTryouts.find(t =>
+        allScores.some(s => s.studentId === verifiedStudent.id && s.tryoutId === t.id) ||
+        allAnswersCache.some(a => a.studentId === verifiedStudent.id && a.tryoutId === t.id)
       );
       if (toWithAnswers) return toWithAnswers;
     }
 
-    return pkgTryouts[0] || null;
-  }, [isSumatifPackage, activePackage, selectedSumatifSubjectId, tryouts, allSubjects, verifiedStudent, allScores]);
+    return candidateTryouts[0] || null;
+  }, [isSumatifPackage, activePackage, selectedSumatifSubjectId, allTryouts, allSubjects, verifiedStudent, allScores, allAnswersCache]);
 
   // Target Tryout ID untuk tab lembar butir soal
   // PERHATIKAN: Pada wadah SAT/SAS, HARUS KEDAP / ISOLATED. JANGAN PERNAH fallback ke selectedTryoutId jika tryout bukan bagian dari wadah SAT!
@@ -507,6 +504,18 @@ export const StudentPortalPage: React.FC = () => {
     }
     return selectedTryoutId;
   }, [isSumatifPackage, activeSumatifTryout, selectedTryoutId]);
+
+  // Status apakah siswa sudah memiliki data rekaman jawaban atau skor pada tryout target
+  const studentHasAnswersForEffectiveTryout = useMemo(() => {
+    if (!verifiedStudent || !effectiveQuestionSheetTryoutId) return false;
+    const hasAnswers = allAnswersCache.some(
+      a => a.studentId === verifiedStudent.id && a.tryoutId === effectiveQuestionSheetTryoutId
+    );
+    const hasScore = allScores.some(
+      s => s.studentId === verifiedStudent.id && s.tryoutId === effectiveQuestionSheetTryoutId
+    );
+    return hasAnswers || hasScore;
+  }, [verifiedStudent, effectiveQuestionSheetTryoutId, allAnswersCache, allScores]);
 
   // Real Database Student Analytics (menggunakan effectiveQuestionSheetTryoutId dan reaktif)
   const studentAnalytics = useMemo(() => {
@@ -2109,25 +2118,59 @@ export const StudentPortalPage: React.FC = () => {
                 )}
 
                 {studentAnalytics && studentAnalytics.questionPerformance.length > 0 ? (
-                  <StudentQuestionSheet
-                    questions={allQuestions}
-                    questionPerformance={studentAnalytics.questionPerformance}
-                    subjects={allSubjects}
-                    explanations={publishedExplanations}
-                    onWatchVideo={(url, title) => {
-                      setSelectedVideoUrl(url);
-                      setSelectedVideoTitle(title);
-                    }}
-                    activeTryoutCode={
-                      isSumatifPackage
-                        ? `${activePackage?.title || 'Asesmen Sumatif'} — ${allSubjects.find(s => s.id === selectedSumatifSubjectId)?.name || 'Mata Pelajaran'}`
-                        : (activeTryout ? `${getFriendlyTryoutStageLabel(activeTryout, displayTryouts)} (${activeTryout.title})` : 'Try Out')
-                    }
-                    tryouts={displayTryouts}
-                    selectedTryoutId={selectedTryoutId}
-                    onSelectTryout={id => setSelectedTryoutId(id)}
-                    hideSubjectFilter={isSumatifPackage}
-                  />
+                  !studentHasAnswersForEffectiveTryout ? (
+                    <div className="bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/60 rounded-3xl p-8 sm:p-12 text-center space-y-4 animate-fade-in shadow-xs">
+                      <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+                        <Clock className="w-8 h-8" />
+                      </div>
+                      <div className="max-w-md mx-auto space-y-2">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300">
+                          {studentAnalytics.questionPerformance.length} Butir Soal Terdeteksi
+                        </span>
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+                          Jawaban Google Form Sedang Menunggu Sinkronisasi
+                        </h3>
+                        <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                          Sistem telah menyiapkan {studentAnalytics.questionPerformance.length} butir soal untuk mata pelajaran{' '}
+                          <strong>{allSubjects.find(s => s.id === selectedSumatifSubjectId)?.name || 'ini'}</strong>. Namun, rekaman jawaban dari formulir Google Form atas nama <strong>{verifiedStudent?.name}</strong> (NISN: {verifiedStudent?.nisn}) belum ditarik/disinkronkan oleh guru pengampu ke database sekolah.
+                        </p>
+                        <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                          Jika Anda baru saja menyelesaikan ujian, silakan tunggu guru mata pelajaran menekan tombol <em>&quot;Tarik Respons&quot;</em> pada akun guru, atau gunakan tombol di bawah untuk memeriksa pembaruan data cloud.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={handleManualSync}
+                          disabled={isCloudSyncing}
+                          className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold transition-all flex items-center gap-2 shadow-xs cursor-pointer"
+                        >
+                          <RefreshCw className={`w-4 h-4 ${isCloudSyncing ? 'animate-spin' : ''}`} />
+                          {isCloudSyncing ? 'Memeriksa Cloud...' : 'Cek Pembaruan Cloud Sekarang'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <StudentQuestionSheet
+                      questions={allQuestions}
+                      questionPerformance={studentAnalytics.questionPerformance}
+                      subjects={allSubjects}
+                      explanations={publishedExplanations}
+                      onWatchVideo={(url, title) => {
+                        setSelectedVideoUrl(url);
+                        setSelectedVideoTitle(title);
+                      }}
+                      activeTryoutCode={
+                        isSumatifPackage
+                          ? `${activePackage?.title || 'Asesmen Sumatif'} — ${allSubjects.find(s => s.id === selectedSumatifSubjectId)?.name || 'Mata Pelajaran'}`
+                          : (activeTryout ? `${getFriendlyTryoutStageLabel(activeTryout, displayTryouts)} (${activeTryout.title})` : 'Try Out')
+                      }
+                      tryouts={displayTryouts}
+                      selectedTryoutId={selectedTryoutId}
+                      onSelectTryout={id => setSelectedTryoutId(id)}
+                      hideSubjectFilter={isSumatifPackage}
+                    />
+                  )
                 ) : (
                   <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 sm:p-12 text-center space-y-4 animate-fade-in shadow-xs">
                     <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto">
