@@ -138,6 +138,30 @@ export const StudentPortalPage: React.FC = () => {
     }
   };
 
+
+  // Cache jawaban seluruh siswa dan Hash Map O(1) untuk optimasi performa klik
+  const allAnswersCache = useMemo(() => dbService.getAnswers(), [dbVersion, allScores]);
+
+  const scoresByStudentAndTryout = useMemo(() => {
+    const map = new Map<string, Score>();
+    allScores.forEach(s => map.set(`${s.studentId}_${s.tryoutId}`, s));
+    return map;
+  }, [allScores]);
+
+  const answersByStudentAndTryout = useMemo(() => {
+    const map = new Map<string, Answer[]>();
+    allAnswersCache.forEach(a => {
+      const key = `${a.studentId}_${a.tryoutId}`;
+      let list = map.get(key);
+      if (!list) {
+        list = [];
+        map.set(key, list);
+      }
+      list.push(a);
+    });
+    return map;
+  }, [allAnswersCache]);
+
   // Filter Tryouts strictly scoped to verified student's class or existing scores
   const tryouts = useMemo(() => {
     if (!verifiedStudent) return allTryouts;
@@ -227,6 +251,36 @@ export const StudentPortalPage: React.FC = () => {
     }
   }, [selectedTryoutId, allStudents, allScores, verifiedStudent]);
 
+  const handleVerificationFailure = (message: string) => {
+    setVerifiedStudent(null);
+    setActiveScore(null);
+    sessionStorage.removeItem('verified_student_id');
+    setErrorMessage(message);
+    setLoading(false);
+
+    const newAttempts = failedAttempts + 1;
+    setFailedAttempts(newAttempts);
+
+    dbService.logAudit(
+      { id: 'anonymous', name: 'Anonim', role: 'SISWA' },
+      'STUDENT_VERIFICATION_FAILED',
+      'SECURITY',
+      `Percobaan verifikasi siswa gagal (${newAttempts}x): ${message}`
+    );
+
+    // Rate Limiting Trigger: Max 5 failed attempts -> 30s lockout
+    if (newAttempts >= 5) {
+      setIsLockedOut(true);
+      setLockoutTimer(30);
+      dbService.logAudit(
+        { id: 'anonymous', name: 'Anonim', role: 'SECURITY' },
+        'RATE_LIMIT_TRIGGERED',
+        'SECURITY',
+        `Rate limiting aktif: 5 kali percobaan verifikasi gagal berturut-turut. Akses dikunci 30 detik.`
+      );
+    }
+  };
+
   // Verification Handler (Tanggal Lahir + NISN Siswa)
   const handleVerify = (e?: React.FormEvent, overrideBirthDate?: string, overrideNisn?: string) => {
     if (e) e.preventDefault();
@@ -298,36 +352,6 @@ export const StudentPortalPage: React.FC = () => {
 
       setLoading(false);
     }, 250);
-  };
-
-  const handleVerificationFailure = (message: string) => {
-    setVerifiedStudent(null);
-    setActiveScore(null);
-    sessionStorage.removeItem('verified_student_id');
-    setErrorMessage(message);
-    setLoading(false);
-
-    const newAttempts = failedAttempts + 1;
-    setFailedAttempts(newAttempts);
-
-    dbService.logAudit(
-      { id: 'anonymous', name: 'Anonim', role: 'SISWA' },
-      'STUDENT_VERIFICATION_FAILED',
-      'SECURITY',
-      `Percobaan verifikasi siswa gagal (${newAttempts}x): ${message}`
-    );
-
-    // Rate Limiting Trigger: Max 5 failed attempts -> 30s lockout
-    if (newAttempts >= 5) {
-      setIsLockedOut(true);
-      setLockoutTimer(30);
-      dbService.logAudit(
-        { id: 'anonymous', name: 'Anonim', role: 'SECURITY' },
-        'RATE_LIMIT_TRIGGERED',
-        'SECURITY',
-        `Rate limiting aktif: 5 kali percobaan verifikasi gagal berturut-turut. Akses dikunci 30 detik.`
-      );
-    }
   };
 
   const handleLogoutStudent = () => {
@@ -545,28 +569,6 @@ export const StudentPortalPage: React.FC = () => {
     return analytics;
   }, [verifiedStudent, effectiveQuestionSheetTryoutId, dbVersion, isSumatifPackage, selectedSumatifSubjectId, allQuestions]);
 
-  // Cache jawaban seluruh siswa dan Hash Map O(1) untuk optimasi performa klik
-  const allAnswersCache = useMemo(() => dbService.getAnswers(), [dbVersion, allScores]);
-
-  const scoresByStudentAndTryout = useMemo(() => {
-    const map = new Map<string, Score>();
-    allScores.forEach(s => map.set(`${s.studentId}_${s.tryoutId}`, s));
-    return map;
-  }, [allScores]);
-
-  const answersByStudentAndTryout = useMemo(() => {
-    const map = new Map<string, Answer[]>();
-    allAnswersCache.forEach(a => {
-      const key = `${a.studentId}_${a.tryoutId}`;
-      let list = map.get(key);
-      if (!list) {
-        list = [];
-        map.set(key, list);
-      }
-      list.push(a);
-    });
-    return map;
-  }, [allAnswersCache]);
 
   // Kumpulkan semua ID tryout yang berada dalam satu stage/siklus yang sama (misal semua tryout "TO 2")
   const stageSiblingTryoutIds = useMemo(() => {
