@@ -3,7 +3,7 @@ import {
   FolderKanban, Plus, Search, Filter, CheckCircle2, AlertCircle,
   Calendar, School, BookOpen, Link as LinkIcon, ExternalLink,
   Edit2, Trash2, Check, X, ChevronRight, ChevronDown, Sparkles,
-  Clock, FileSpreadsheet, Layers, ShieldCheck, UserCheck, Copy, LogIn
+  Clock, FileSpreadsheet, Layers, ShieldCheck, UserCheck, Copy, LogIn, Users
 } from 'lucide-react';
 import {
   ExamPackage, ExamPackageSubject, ClassRoom, Subject,
@@ -12,6 +12,7 @@ import {
 import { DatabaseService } from '../../services/database';
 import { authService } from '../../services/auth';
 import { generateUuid } from '../../utils/idUtils';
+import { SubjectEnrollmentModal } from './SubjectEnrollmentModal';
 
 interface ExamPackagesSectionProps {
   dbService: DatabaseService;
@@ -67,6 +68,14 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
     subjectName: string;
     sheetUrl: string;
     formUrl: string;
+  } | null>(null);
+
+  // Sub-Modal: Setting Peserta Mapel Spesifik (Agama/Peminatan)
+  const [enrollmentTargetSubj, setEnrollmentTargetSubj] = useState<{
+    package: ExamPackage;
+    subjectItem: ExamPackageSubject;
+    subjectName: string;
+    subjectCode: string;
   } | null>(null);
 
   const handleImpersonateTeacherForSubj = (teacher: Teacher) => {
@@ -933,6 +942,7 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
                     <thead>
                       <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase text-[10px]">
                         <th className="py-2.5 px-3">Mata Pelajaran</th>
+                        <th className="py-2.5 px-3">Peserta Ujian</th>
                         <th className="py-2.5 px-3">Status Link</th>
                         <th className="py-2.5 px-3">Terakhir Diperbarui</th>
                         <th className="py-2.5 px-3">Google Spreadsheet</th>
@@ -942,7 +952,7 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                       {displayedSubjects.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="py-6 text-center text-xs text-slate-400 italic">
+                          <td colSpan={6} className="py-6 text-center text-xs text-slate-400 italic">
                             Tidak ada mata pelajaran dengan filter ini.
                           </td>
                         </tr>
@@ -950,6 +960,8 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
                         displayedSubjects.map(item => {
                           const subj = subjects.find(s => s.id === item.subjectId);
                           const hasSheet = Boolean(item.googleSheetUrl?.trim());
+                          const isCustomEnrolled = Boolean(item.enrolledStudentIds && item.enrolledStudentIds.length > 0);
+                          const enrolledCount = isCustomEnrolled ? item.enrolledStudentIds!.length : 0;
                           const allTeachers = dbService.getTeachers() || [];
                           const teacherForSubj = allTeachers.find(t => (t.subjectPermissions || []).includes(item.subjectId));
                           const extToForSubj = pkgTryouts.find(t =>
@@ -969,6 +981,32 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
                                 <span className="text-[10px] text-slate-400 font-mono">
                                   {subj?.code || 'MAPEL'} • {subj?.category || 'WAJIB'}
                                 </span>
+                              </td>
+
+                              <td className="py-3 px-3">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setEnrollmentTargetSubj({
+                                      package: selectedPackage,
+                                      subjectItem: item,
+                                      subjectName: subj?.name || item.subjectId,
+                                      subjectCode: subj?.code || 'MAPEL',
+                                    })
+                                  }
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold cursor-pointer border transition-all ${
+                                    isCustomEnrolled
+                                      ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800 hover:bg-purple-100 shadow-2xs'
+                                      : 'bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200/70'
+                                  }`}
+                                  title="Klik untuk mengatur siswa peserta mapel ini (misal: Agama / Peminatan)"
+                                >
+                                  <Users className={`w-3.5 h-3.5 ${isCustomEnrolled ? 'text-purple-600 dark:text-purple-400' : 'text-slate-500'}`} />
+                                  <span>
+                                    {isCustomEnrolled ? `${enrolledCount} Siswa Khusus` : 'Semua Siswa'}
+                                  </span>
+                                  <Edit2 className="w-2.5 h-2.5 opacity-60 ml-0.5" />
+                                </button>
                               </td>
 
                               <td className="py-3 px-3">
@@ -1425,6 +1463,30 @@ export const ExamPackagesSection: React.FC<ExamPackagesSectionProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* MODAL 3: PENGATURAN PESERTA MAPEL (SELEKTIF / KHUSUS) */}
+      {enrollmentTargetSubj && (
+        <SubjectEnrollmentModal
+          isOpen={Boolean(enrollmentTargetSubj)}
+          onClose={() => setEnrollmentTargetSubj(null)}
+          packageName={enrollmentTargetSubj.package.title}
+          subjectName={enrollmentTargetSubj.subjectName}
+          subjectCode={enrollmentTargetSubj.subjectCode}
+          targetClasses={classes.filter(c => enrollmentTargetSubj.package.targetClassIds?.includes(c.id))}
+          allStudents={dbService.getStudents() || []}
+          initialEnrolledStudentIds={enrollmentTargetSubj.subjectItem.enrolledStudentIds}
+          onSave={enrolledIds => {
+            dbService.updateExamPackageSubject(
+              enrollmentTargetSubj.package.id,
+              enrollmentTargetSubj.subjectItem.subjectId,
+              { enrolledStudentIds: enrolledIds },
+              currentUser
+            );
+            onShowToast(`Pengaturan peserta mapel '${enrollmentTargetSubj.subjectName}' berhasil disimpan.`);
+            refreshData();
+          }}
+        />
       )}
     </div>
   );

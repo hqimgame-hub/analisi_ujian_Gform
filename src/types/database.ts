@@ -181,6 +181,8 @@ export interface ExamPackageSubject {
   syncStatus?: 'PENDING' | 'SYNCED' | 'ERROR';
   lastUpdatedBy?: string;
   updatedAt?: string;
+  /** Daftar ID siswa terpilih jika mapel hanya diikuti siswa tertentu (Agama, Peminatan, dll). Jika undefined / kosong = semua siswa ikut */
+  enrolledStudentIds?: string[];
 }
 
 export interface ExamPackage {

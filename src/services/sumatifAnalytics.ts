@@ -90,8 +90,8 @@ export interface LegerStudentRow {
   studentId: string;
   studentName: string;
   nisn: string;
-  scoresBySubjectId: Record<string, number>;
-  scoresBySubjectCode: Record<string, number>;
+  scoresBySubjectId: Record<string, number | null>;
+  scoresBySubjectCode: Record<string, number | null>;
   totalScore: number;
   averageScore: number;
   rank: number;
@@ -193,6 +193,11 @@ export class SumatifAnalyticsService {
     let gradedCount = 0;
 
     pkgSubjects.forEach(pkgSub => {
+      // Jika mapel ini diset khusus untuk siswa tertentu dan siswa ini BUKAN peserta, lewati (tidak ditampilkan di profil & rapor mandiri)
+      if (pkgSub.enrolledStudentIds && pkgSub.enrolledStudentIds.length > 0 && !pkgSub.enrolledStudentIds.includes(student.id)) {
+        return;
+      }
+
       const subInfo = effectiveSubjects.find(s => s.id === pkgSub.subjectId);
       const subCode = subInfo?.code || 'MAPEL';
       const subName = subInfo?.name || 'Mata Pelajaran';
@@ -354,9 +359,16 @@ export class SumatifAnalyticsService {
       return false;
     });
     const targetClassIds = new Set(targetClasses.map(c => c.id));
-    const targetStudents = effectiveStudents.filter(s =>
-      (targetClassIds.size === 0 || targetClassIds.has(s.classId)) && !s.isAnswerKeyAccount
-    );
+    const pkgSubForEnrollment = (pkg.subjects || []).find(ps => ps.subjectId.toLowerCase().trim() === subjectId.toLowerCase().trim());
+    const hasCustomEnrollment = Boolean(pkgSubForEnrollment?.enrolledStudentIds && pkgSubForEnrollment.enrolledStudentIds.length > 0);
+    const enrolledSet = hasCustomEnrollment ? new Set(pkgSubForEnrollment!.enrolledStudentIds) : null;
+
+    const targetStudents = effectiveStudents.filter(s => {
+      const matchClass = (targetClassIds.size === 0 || targetClassIds.has(s.classId)) && !s.isAnswerKeyAccount;
+      if (!matchClass) return false;
+      if (enrolledSet) return enrolledSet.has(s.id);
+      return true;
+    });
     const targetStudentIdSet = new Set(targetStudents.map(s => s.id));
 
     // 3. Ambil skor yang BENAR-BENAR milik tryout paket ini dan siswa kelas target
@@ -367,6 +379,9 @@ export class SumatifAnalyticsService {
       // Abaikan akun kunci jawaban
       const st = effectiveStudents.find(std => std.id === s.studentId);
       if (st?.isAnswerKeyAccount) return;
+
+      // Jika mapel diset khusus untuk siswa tertentu, abaikan siswa yang bukan peserta
+      if (enrolledSet && !enrolledSet.has(s.studentId)) return;
 
       // Jika ada target siswa dan siswa ini bukan target siswa DAN bukan peserta tryout wadah ini, lewati
       if (targetStudentIdSet.size > 0 && !targetStudentIdSet.has(s.studentId) && !matchingTryoutIds.has(s.tryoutId)) {
@@ -602,13 +617,24 @@ export class SumatifAnalyticsService {
     });
 
     const rows: LegerStudentRow[] = classStudents.map(student => {
-      const scoresBySubjectId: Record<string, number> = {};
-      const scoresBySubjectCode: Record<string, number> = {};
+      const scoresBySubjectId: Record<string, number | null> = {};
+      const scoresBySubjectCode: Record<string, number | null> = {};
       const remedialSubjectCodes: string[] = [];
       let totalScore = 0;
       let gradedSubjectsCount = 0;
 
       subjects.forEach(sub => {
+        const pkgSub = pkg.subjects?.find(ps => ps.subjectId.toLowerCase().trim() === sub.id.toLowerCase().trim());
+        const hasCustomEnrollment = Boolean(pkgSub?.enrolledStudentIds && pkgSub.enrolledStudentIds.length > 0);
+        const isEnrolled = !hasCustomEnrollment || (pkgSub?.enrolledStudentIds && pkgSub.enrolledStudentIds.includes(student.id));
+
+        if (!isEnrolled) {
+          // KASUS 1: SISWA BUKAN PESERTA (Beda agama / tidak mengambil mapel ini)
+          scoresBySubjectId[sub.id] = null;
+          scoresBySubjectCode[sub.code] = null;
+          return; // JANGAN tambah gradedSubjectsCount, JANGAN masukkan ke remedial
+        }
+
         const validTryoutIds = subjectTryoutMap.get(sub.id);
         const studentScoreRecords = allScores.filter(s =>
           s.studentId === student.id && validTryoutIds && validTryoutIds.has(s.tryoutId)
@@ -636,9 +662,11 @@ export class SumatifAnalyticsService {
             remedialSubjectCodes.push(sub.code);
           }
         } else {
-          // Belum ada nilai untuk mapel ini di wadah ini
+          // KASUS 2: SISWA PESERTA TAPI BELUM MENEMPUH UJIAN (Absen / Sakit / Izin)
           scoresBySubjectId[sub.id] = 0;
           scoresBySubjectCode[sub.code] = 0;
+          gradedSubjectsCount += 1;
+          remedialSubjectCodes.push(sub.code);
         }
       });
 
@@ -675,10 +703,17 @@ export class SumatifAnalyticsService {
     let totalGradedEntries = 0;
 
     subjects.forEach(sub => {
+      const pkgSub = pkg.subjects?.find(ps => ps.subjectId.toLowerCase().trim() === sub.id.toLowerCase().trim());
+      const hasCustomEnrollment = Boolean(pkgSub?.enrolledStudentIds && pkgSub.enrolledStudentIds.length > 0);
       const validTryoutIds = subjectTryoutMap.get(sub.id);
       const scoresForSub: number[] = [];
 
       classStudents.forEach(st => {
+        // Abaikan siswa yang bukan peserta mapel ini agar tidak merusak rata-rata kelas
+        if (hasCustomEnrollment && !pkgSub!.enrolledStudentIds!.includes(st.id)) {
+          return;
+        }
+
         const studentScoreRecords = allScores.filter(s =>
           s.studentId === st.id && validTryoutIds && validTryoutIds.has(s.tryoutId)
         );

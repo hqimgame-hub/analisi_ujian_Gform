@@ -209,7 +209,22 @@ export const WaliKelasLegerSection: React.FC<WaliKelasLegerSectionProps> = ({ le
 
                   {/* Nilai per Mata Pelajaran */}
                   {leger.subjects.map(sub => {
-                    const score = row.scoresBySubjectId[sub.id] || 0;
+                    const rawScore = row.scoresBySubjectId[sub.id];
+                    const isNotEnrolled = rawScore === null;
+
+                    if (isNotEnrolled) {
+                      return (
+                        <td
+                          key={sub.id}
+                          className="py-2.5 px-2 text-center font-mono font-medium text-slate-300 dark:text-slate-600 bg-slate-50/30 dark:bg-slate-800/20"
+                          title="Bukan peserta mata pelajaran ini"
+                        >
+                          -
+                        </td>
+                      );
+                    }
+
+                    const score = rawScore ?? 0;
                     const isBelowKKTP = score < sub.passingGrade;
                     return (
                       <td
@@ -219,6 +234,7 @@ export const WaliKelasLegerSection: React.FC<WaliKelasLegerSectionProps> = ({ le
                             ? 'text-rose-600 dark:text-rose-400 bg-rose-50/50 dark:bg-rose-950/20'
                             : 'text-slate-700 dark:text-slate-200'
                         }`}
+                        title={score === 0 ? 'Belum mengikuti ujian / tidak masuk' : undefined}
                       >
                         {score}
                       </td>

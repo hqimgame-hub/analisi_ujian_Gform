@@ -277,12 +277,14 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
       const avg = sumatifLeger.subjectAverages[sub.id] || 0;
       const scores = sumatifLeger.rows
         .map(r => r.scoresBySubjectId[sub.id])
-        .filter((s): s is number => s !== undefined && s > 0);
+        .filter((s): s is number => s !== null && s !== undefined && s > 0);
       const highest = scores.length > 0 ? Math.max(...scores) : 0;
       const lowest = scores.length > 0 ? Math.min(...scores) : 0;
-      const passed = sumatifLeger.rows.filter(r => (r.scoresBySubjectId[sub.id] || 0) >= sub.passingGrade).length;
-      const remedial = sumatifLeger.rows.length - passed;
-      const passRate = sumatifLeger.rows.length > 0 ? Math.round((passed / sumatifLeger.rows.length) * 100) : 0;
+      // Hanya hitung passed dari siswa yang terdaftar (scoresBySubjectId bukan null)
+      const enrolledRows = sumatifLeger.rows.filter(r => r.scoresBySubjectId[sub.id] !== null);
+      const passed = enrolledRows.filter(r => (r.scoresBySubjectId[sub.id] ?? 0) >= sub.passingGrade).length;
+      const remedial = enrolledRows.length - passed;
+      const passRate = enrolledRows.length > 0 ? Math.round((passed / enrolledRows.length) * 100) : 0;
       return {
         id: sub.id,
         name: sub.name,
@@ -1406,7 +1408,7 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
                                             ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300'
                                             : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
                                         }`}>
-                                          {diffPassPct > 0 ? `▲ +${diffPassPct}%` : diffPassPct < 0 ? `▼ ${diffPassPct}%` : '● 0%'}
+                                          {diffPassPct > 0 ? `▲ +${diffPassPct}%` : diffPassPct < 0 ? `▼ ${diffPassPct}%` : '● 0%'}
                                         </span>
                                       )}
                                     </div>
@@ -2553,7 +2555,7 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
                       </div>
                     </div>
 
-                    {/* ── 2 GRAFIK INFORMATIF EVALUASI SAT/SAS KELAS BINAAN ── */}
+                    {/* â”€â”€ 2 GRAFIK INFORMATIF EVALUASI SAT/SAS KELAS BINAAN â”€â”€ */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       {/* GRAFIK 1: RATA-RATA NILAI PER MATA PELAJARAN VS BATAS KKTP */}
                       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-4 flex flex-col justify-between">
@@ -3076,7 +3078,25 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
                                   </thead>
                                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                                     {sumatifLeger.subjects.map(sub => {
-                                      const score = activeSumatifStudentRow.scoresBySubjectId[sub.id] ?? 0;
+                                      const rawScore = activeSumatifStudentRow.scoresBySubjectId[sub.id];
+                                      const isNotEnrolled = rawScore === null;
+                                      if (isNotEnrolled) {
+                                        return (
+                                          <tr key={sub.id} className="opacity-50">
+                                            <td className="px-4 py-2.5 font-bold text-slate-400 dark:text-slate-500">
+                                              <div>{sub.name}</div>
+                                              <span className="text-[10px] font-mono text-slate-300 dark:text-slate-600">{sub.code}</span>
+                                            </td>
+                                            <td className="px-3 py-2.5 text-center font-mono text-slate-300 dark:text-slate-600">{sub.passingGrade}</td>
+                                            <td className="px-3 py-2.5 text-center font-mono text-slate-300 dark:text-slate-600">-</td>
+                                            <td className="px-3 py-2.5 text-center">
+                                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">Bukan Peserta</span>
+                                            </td>
+                                            <td className="px-4 py-2.5" />
+                                          </tr>
+                                        );
+                                      }
+                                      const score = rawScore ?? 0;
                                       const isPassed = score >= sub.passingGrade;
                                       return (
                                         <tr key={sub.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
@@ -3284,3 +3304,5 @@ export const WaliKelasAppPage: React.FC<WaliKelasAppPageProps> = ({
     </div>
   );
 };
+
+

@@ -1059,6 +1059,7 @@ class SupabaseDbService {
           syncStatus: row.sync_status || 'SYNCED',
           lastUpdatedBy: row.last_updated_by ? String(row.last_updated_by) : undefined,
           updatedAt: row.updated_at ? String(row.updated_at) : undefined,
+          enrolledStudentIds: Array.isArray(row.enrolled_student_ids) ? row.enrolled_student_ids : undefined,
         });
         subjectsByPkg.set(pkgId, list);
       });
@@ -1421,8 +1422,14 @@ class SupabaseDbService {
             passing_grade: sub.passingGrade || 75,
             sync_status: sub.syncStatus || 'SYNCED',
             last_updated_by: sub.lastUpdatedBy || null,
+            ...(Array.isArray(sub.enrolledStudentIds) ? { enrolled_student_ids: sub.enrolledStudentIds } : {}),
           };
-          await supabase.from('exam_package_subjects').upsert(subPayload, { onConflict: 'package_id,subject_id' });
+          const { error: upsertErr } = await supabase.from('exam_package_subjects').upsert(subPayload, { onConflict: 'package_id,subject_id' });
+          if (upsertErr && upsertErr.message && upsertErr.message.includes('enrolled_student_ids')) {
+            // Jika kolom enrolled_student_ids belum ada di remote Supabase, fallback tanpa kolom tersebut
+            const { enrolled_student_ids, ...fallbackPayload } = subPayload as any;
+            await supabase.from('exam_package_subjects').upsert(fallbackPayload, { onConflict: 'package_id,subject_id' });
+          }
         }
       }
     } catch (err: unknown) {
