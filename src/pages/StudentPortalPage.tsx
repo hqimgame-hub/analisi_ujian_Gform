@@ -2359,10 +2359,10 @@ export const StudentPortalPage: React.FC = () => {
                             ? `${activePackage?.title || 'Asesmen Sumatif'} — ${allSubjects.find(s => s.id === selectedSumatifSubjectId)?.name || 'Mata Pelajaran'}`
                             : (activeTryout ? `${getFriendlyTryoutStageLabel(activeTryout, displayTryouts)} (${activeTryout.title})` : 'Try Out')
                         }
-                        tryouts={displayTryouts}
-                        selectedTryoutId={selectedTryoutId}
-                        onSelectTryout={id => setSelectedTryoutId(id)}
-                        hideSubjectFilter={isSumatifPackage}
+                        tryouts={isSumatifPackage ? undefined : displayTryouts}
+                        selectedTryoutId={isSumatifPackage ? undefined : selectedTryoutId}
+                        onSelectTryout={isSumatifPackage ? undefined : (id => setSelectedTryoutId(id))}
+                        hideSubjectFilter={true}
                         onSyncMyAnswers={effectiveSheetUrl ? () => handleResolveMyAnswers(true) : undefined}
                         isSyncingMyAnswers={isResolvingSheetAnswers}
                       />

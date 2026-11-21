@@ -111,18 +111,42 @@ export const StudentSumatifView: React.FC<StudentSumatifViewProps> = ({ profile 
           <div className="h-[280px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={profile.radarData} outerRadius="75%">
-                <PolarGrid stroke="#e2e8f0" strokeDasharray="3 3" />
+                <defs>
+                  {/* Gradien arsir poligon radar ala Excel spider chart */}
+                  <radialGradient id="spiderRadialGrad" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stopColor="#818cf8" stopOpacity="0.8" />
+                    <stop offset="50%" stopColor="#6366f1" stopOpacity="0.55" />
+                    <stop offset="100%" stopColor="#4338ca" stopOpacity="0.35" />
+                  </radialGradient>
+                </defs>
+                <PolarGrid stroke="#cbd5e1" strokeDasharray="3 3" />
                 <PolarAngleAxis
                   dataKey="subject"
-                  tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }}
+                  tick={{ fill: '#475569', fontSize: 11, fontWeight: 700 }}
                 />
                 <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fontSize: 10 }} />
+                
+                {/* Spider Boundary KKTP: Garis rujukan batas tuntas minimal sekolah */}
+                <Radar
+                  name="Standar KKTP"
+                  dataKey="kktp"
+                  stroke="#f59e0b"
+                  strokeWidth={1.5}
+                  strokeDasharray="4 4"
+                  fill="#fef3c7"
+                  fillOpacity={0.12}
+                />
+
+                {/* Radar Capaian Siswa: Area Bidang Terarsir & Titik Simpul (Spider Polygon Area) */}
                 <Radar
                   name="Nilai Siswa"
                   dataKey="score"
-                  stroke="#4f46e5"
-                  fill="#6366f1"
-                  fillOpacity={0.45}
+                  stroke="#4338ca"
+                  strokeWidth={2.5}
+                  fill="url(#spiderRadialGrad)"
+                  fillOpacity={0.65}
+                  dot={{ r: 4.5, fill: '#4338ca', stroke: '#ffffff', strokeWidth: 2 }}
+                  activeDot={{ r: 7, fill: '#312e81', stroke: '#ffffff', strokeWidth: 2 }}
                 />
                 <Tooltip
                   formatter={(value: any, name: any, props: any) => [
@@ -177,9 +201,15 @@ export const StudentSumatifView: React.FC<StudentSumatifViewProps> = ({ profile 
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-slate-500 dark:text-slate-400 px-1 pt-1 border-t border-slate-100 dark:border-slate-800/80">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block" />
-                <span>Area Ungu: Capaian Nilai Siswa</span>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 inline-block" />
+                  <span>Area Terarsir: Capaian Nilai Siswa</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-0.5 border-t border-dashed border-amber-500 inline-block" />
+                  <span>Garis Kuning: Ambang KKTP (75)</span>
+                </div>
               </div>
               <div className="flex items-center gap-1.5 font-medium">
                 <Compass className="w-3.5 h-3.5 text-indigo-500" />

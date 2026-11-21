@@ -2331,7 +2331,8 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                   </header>
 
                   {/* High-Contrast Summary Metric Cards with Vivid Typography */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    {/* Kartu 1: Try Out Terjadwal */}
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-slate-600 dark:text-slate-400 font-semibold">Try Out Terjadwal</span>
@@ -2340,13 +2341,46 @@ export const GuruAppPage: React.FC<GuruAppPageProps> = ({ currentUser: initialUs
                         </div>
                       </div>
                       <div className="text-3xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                        {tryouts.length} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">Paket</span>
+                        {tryouts.filter(t => !t.packageId || (!examPackages.find(p => p.id === t.packageId && (p.assessmentType === 'SAT' || p.assessmentType === 'SAS')))).length} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">Paket</span>
                       </div>
                       <div className="text-[11px] text-indigo-700 dark:text-indigo-300 font-medium flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                         <span>Terhubung ke Google Form Ujian</span>
                       </div>
                     </div>
+
+                    {/* Kartu 2: Wadah SAT/SAS (dinamis) */}
+                    {(() => {
+                      const satPkgs = examPackages.filter(p => p.assessmentType === 'SAT');
+                      const sasPkgs = examPackages.filter(p => p.assessmentType === 'SAS');
+                      const totalWadah = examPackages.filter(p => p.assessmentType === 'SAT' || p.assessmentType === 'SAS').length;
+                      return (
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-slate-600 dark:text-slate-400 font-semibold">Wadah Asesmen</span>
+                            <div className="w-9 h-9 rounded-xl bg-violet-50 dark:bg-violet-950/70 text-violet-600 dark:text-violet-400 flex items-center justify-center font-bold">
+                              <FolderKanban className="w-4 h-4" />
+                            </div>
+                          </div>
+                          <div className="text-3xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+                            {totalWadah} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">Wadah</span>
+                          </div>
+                          <div className="text-[11px] text-violet-700 dark:text-violet-300 font-medium flex items-center gap-2 flex-wrap">
+                            {satPkgs.length > 0 && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-950/60 font-mono border border-violet-200 dark:border-violet-800">
+                                SAT ×{satPkgs.length}
+                              </span>
+                            )}
+                            {sasPkgs.length > 0 && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-fuchsia-100 dark:bg-fuchsia-950/60 font-mono border border-fuchsia-200 dark:border-fuchsia-800 text-fuchsia-700 dark:text-fuchsia-300">
+                                SAS ×{sasPkgs.length}
+                              </span>
+                            )}
+                            {totalWadah === 0 && <span className="text-slate-400">Belum ada wadah</span>}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all space-y-2">
                       <div className="flex items-center justify-between">

@@ -574,10 +574,15 @@ export class GoogleIntegrationService {
     if (/^\d+(?:,\d+)?(?:\s*[a-zA-Z%°]+)?$/.test(trimmed)) {
       return [trimmed];
     }
-    // Pisahkan berdasarkan:
-    // 1. Tanda titik diikuti koma: (?<=\.)\s*,\s*
-    // 2. Tanda koma yang diikuti spasi dan huruf kapital: ,\s+(?=[A-Z])
-    const parts = trimmed.split(/(?<=\.)\s*,\s*|,\s+(?=[A-Z])/).map(p => p.trim()).filter(Boolean);
+    // Strategi 1: Format eksplisit opsi "X. Teks, Y. Teks" dari Google Form checkbox (PGK)
+    // Pecah di koma yang diikuti huruf opsi A-E dengan pemisah (titik/kurung/dll)
+    // Contoh: "A. Bergerak, B. Mendatangi, D. Menjauh" -> ["A. Bergerak", "B. Mendatangi", "D. Menjauh"]
+    const explicitOptionSplit = trimmed.split(/,\s*(?=[A-Ea-e][.):\-\/]\s)/);
+    if (explicitOptionSplit.length > 1) {
+      return explicitOptionSplit.map((p: string) => p.trim()).filter(Boolean);
+    }
+    // Strategi 2: Koma setelah titik atau koma sebelum huruf kapital (kalimat)
+    const parts = trimmed.split(/(?<=\.)\s*,\s*|,\s+(?=[A-Z])/).map((p: string) => p.trim()).filter(Boolean);
     return parts.length > 0 ? parts : [trimmed];
   }
 
