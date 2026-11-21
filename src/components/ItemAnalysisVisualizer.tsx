@@ -1113,11 +1113,30 @@ export const ItemAnalysisVisualizer: React.FC<ItemAnalysisVisualizerProps> = ({
 
                               const cleanKeyStr = (item.correctAnswer || '').replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim().toUpperCase();
                               const isExplicitKeyE = cleanKeyStr === 'E' || /^[E][\.\)\:\-\s]/.test(cleanKeyStr) || cleanKeyStr.split(',').map((s: string) => s.trim()).includes('E');
+                              // Opsi E hanya tampil jika:
+                              // 1. Kunci jawaban memang E, ATAU
+                              // 2. Opsi E di DB punya teks non-placeholder, DAN minimal 2 siswa menjawab E
+                              const optionEInDb = Array.isArray(item.options) ? item.options.find((o: any) => (o.key || '').toUpperCase() === 'E') : undefined;
+                              const optionEHasRealText = optionEInDb &&
+                                optionEInDb.text &&
+                                !optionEInDb.text.trim().toUpperCase().startsWith('PILIHAN') &&
+                                !optionEInDb.text.trim().toUpperCase().startsWith('OPSI') &&
+                                optionEInDb.text.trim().toUpperCase() !== 'E';
+                              const eAnswerCount = item.distractorStats?.['E']?.count || item.distractorCounts?.['E'] || 0;
                               const hasEvidenceOfOptionE =
                                 isExplicitKeyE ||
-                                ((item.distractorStats?.['E']?.count || item.distractorCounts?.['E'] || 0) > 0 && validKeys.includes('E') && (Array.isArray(item.options) && item.options.some((o: any) => o.key.toUpperCase() === 'E' && o.text && !o.text.toLowerCase().startsWith('pilihan') && !['CAMPURAN', 'DIAFAN', 'MODERN', '6 CM', 'IBU', 'PAGI HARI'].includes(o.text.trim().toUpperCase()))));
+                                (validKeys.includes('E') && !!optionEHasRealText && eAnswerCount >= 2);
 
-                              renderKeys = hasEvidenceOfOptionE ? ['A', 'B', 'C', 'D', 'E'] : ['A', 'B', 'C', 'D'];
+                              // Jika item.options sudah mengandung tepat 3 atau 2 opsi dari analytics (Menjodohkan/B-S),
+                              // prioritaskan jumlah opsi dari analytics result daripada validKeys
+                              const analyticsOptionCount = Array.isArray(item.options) ? item.options.length : 0;
+                              if (!hasEvidenceOfOptionE && analyticsOptionCount === 3) {
+                                renderKeys = ['A', 'B', 'C'];
+                              } else if (!hasEvidenceOfOptionE && analyticsOptionCount === 2) {
+                                renderKeys = ['A', 'B'];
+                              } else {
+                                renderKeys = hasEvidenceOfOptionE ? ['A', 'B', 'C', 'D', 'E'] : ['A', 'B', 'C', 'D'];
+                              }
                             }
 
                             const colsClass = renderKeys.length === 2

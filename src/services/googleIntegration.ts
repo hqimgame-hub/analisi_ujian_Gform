@@ -1,4 +1,4 @@
-import {
+﻿import {
   Student, Question, Tryout, Subject, SheetImportPreviewItem,
   ColumnMappingConfig, SheetImportSummary, Response, Answer, Score, User, DuplicateSubmissionInfo
 } from '../types/database';
@@ -71,13 +71,20 @@ export class GoogleIntegrationService {
 
   /**
    * Sanitasi & normalisasi NISN:
-   * Menangani pembuangan angka nol di depan oleh Google Sheets/Excel (misal '61234567' -> '0061234567'),
-   * konversi notasi ilmiah (misal '6.12E+08'),
-   * dan pembersihan karakter non-angka atau whitespace tak kasat mata.
+   * Menangani berbagai format NISN yang umum ditemui di Google Sheets / Excel CSV:
+   * - Format teks dengan nol di depan: "0136166380" (tipe cell Text di Google Sheets) -> tetap dipertahankan
+   * - Format formula Excel: ="0136166380" -> strip tanda = dan kutip
+   * - Notasi ilmiah: "6.12E+08" atau "6.06123E+09" dari Excel -> dikonversi ke integer
+   * - Angka numerik dengan nol hilang: "136166380" (9 digit) -> dipad ke 10 digit "0136166380"
+   * - Whitespace tersembunyi, karakter non-angka -> dibersihkan
    */
   public static normalizeNisn(rawNisn: string | number | null | undefined): string {
     if (rawNisn === null || rawNisn === undefined) return '';
     let str = String(rawNisn).trim();
+
+    // Tangani format formula Excel: ="0136166380" atau ='0136166380'
+    // Juga handle prefix apostrophe tersembunyi dari CSV teks GSheets
+    str = str.replace(/^=["'](.+)["']$/, '$1').replace(/^["'`=\s]+/, '').replace(/["'`\s]+$/, '');
     if (!str) return '';
 
     // Tangani kemungkinan notasi ilmiah (misal "6.06123E+09" dari Excel)
@@ -88,11 +95,20 @@ export class GoogleIntegrationService {
       }
     }
 
-    // Buang semua karakter selain digit angka
+    // Jika string sudah murni digit (termasuk yang dimulai dengan nol),
+    // pertahankan nol di depan -- hanya pad jika 7-9 digit (nol terpotong Excel)
+    if (/^\d+$/.test(str)) {
+      if (str.length >= 7 && str.length < 10) {
+        return str.padStart(10, '0');
+      }
+      return str;
+    }
+
+    // Buang semua karakter selain digit angka (kasus campuran huruf/angka)
     const digitsOnly = str.replace(/\D/g, '');
     if (!digitsOnly) return '';
 
-    // Jika panjang digit antara 7 hingga 9 (karena 1-3 nol terpotong oleh Excel/GSheets), pad dengan '0' di depan hingga 10 digit
+    // Jika panjang digit antara 7 hingga 9, pad dengan '0' di depan hingga 10 digit
     if (digitsOnly.length >= 7 && digitsOnly.length < 10) {
       return digitsOnly.padStart(10, '0');
     }
@@ -728,21 +744,26 @@ export class GoogleIntegrationService {
       return up && !['-', 'KOSONG', 'NULL', 'N/A', 'TIDAK DIJAWAB', 'BELUM DIJAWAB'].includes(up);
     });
 
-    const valuesArePureBS = nonBlankRawValues.length > 0 && nonBlankRawValues.every(v => {
+    const isBsValue = (v: string): boolean => {
       const up = v.trim().toUpperCase();
-      return ['BENAR', 'SALAH', 'TRUE', 'FALSE', 'YA', 'TIDAK', 'SETUJU', 'TIDAK SETUJU', 'A', 'B', 'S'].includes(up);
-    });
+      if (['BENAR', 'SALAH', 'TRUE', 'FALSE', 'YA', 'TIDAK', 'SETUJU', 'TIDAK SETUJU', 'A', 'B', 'S'].includes(up)) return true;
+      const exp = this.extractExplicitOptionPrefix(v);
+      if (exp && ['BENAR', 'SALAH', 'TRUE', 'FALSE', 'YA', 'TIDAK', 'SETUJU', 'TIDAK SETUJU'].includes((exp.text || '').trim().toUpperCase())) return true;
+      return false;
+    };
 
-    const rawKeyIsBS = Boolean(rawKeyCell && ['BENAR', 'SALAH', 'TRUE', 'FALSE', 'YA', 'TIDAK', 'SETUJU', 'TIDAK SETUJU'].includes(rawKeyCell.trim().toUpperCase()));
-
+    const valuesArePureBS = nonBlankRawValues.length > 0 && nonBlankRawValues.every(isBsValue);
+    const rawKeyIsBS = Boolean(rawKeyCell && isBsValue(rawKeyCell));
     const isTrueFalseQuestion = headerIsBS || valuesArePureBS || rawKeyIsBS;
 
     if (isTrueFalseQuestion) {
       // Untuk soal Benar / Salah: HANYA ada 2 opsi A: Benar dan B: Salah!
       // Dilarang keras memunculkan opsi C, D, atau E!
       let bsCorrect = 'A';
-      const candidateKey = (rawKeyCell || existingCorrectAnswer || '').trim().toUpperCase();
-      if (['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU', 'S', 'B'].includes(candidateKey)) {
+      const keyVal = rawKeyCell || existingCorrectAnswer || '';
+      const expKey = this.extractExplicitOptionPrefix(keyVal);
+      const keyText = (expKey?.text || keyVal).trim().toUpperCase();
+      if (['SALAH', 'FALSE', 'TIDAK', 'TIDAK SETUJU', 'S', 'B'].includes(keyText) || expKey?.letter === 'B') {
         bsCorrect = 'B';
       } else {
         bsCorrect = 'A';
@@ -804,50 +825,81 @@ export class GoogleIntegrationService {
     const isPgkQuestion = pgkMultiCount >= 2 || (rawKeyCell && this.splitPgkSentenceTokens(rawKeyCell).length > 1);
 
     if (isPgkQuestion) {
-      // Kumpulkan pernyataan-pernyataan atomik dari seluruh respons
-      const statementCounts = new Map<string, number>();
-      const statementOrder: string[] = [];
+      // 1. Periksa apakah opsi PGK memiliki prefix huruf eksplisit (misal "A. ...", "B. ...", dst.)
+      const explicitPgkOptions = new Map<'A' | 'B' | 'C' | 'D' | 'E', string>();
+      const rawPgkTokens: string[] = [];
 
-      const registerStatement = (stmt: string) => {
-        const clean = stmt.replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim();
-        if (!clean || clean.length < 3) return;
-        const upper = clean.toUpperCase();
-        if (['-', 'KOSONG', 'NULL', 'N/A', 'TIDAK DIJAWAB', 'BELUM DIJAWAB'].includes(upper)) return;
-        statementCounts.set(clean, (statementCounts.get(clean) || 0) + 1);
-        if (!statementOrder.some(s => s.toUpperCase() === upper)) {
-          statementOrder.push(clean);
-        }
-      };
-
-      // 1. Prioritaskan pernyataan dari baris kunci jawaban resmi jika ada
       if (rawKeyCell) {
-        this.splitPgkSentenceTokens(rawKeyCell).forEach(registerStatement);
+        this.splitPgkSentenceTokens(rawKeyCell).forEach(t => rawPgkTokens.push(t));
       }
-
-      // 2. Kumpulkan dari seluruh respons siswa
       rawCandidates.forEach(val => {
-        this.splitPgkSentenceTokens(val).forEach(registerStatement);
+        this.splitPgkSentenceTokens(val).forEach(t => rawPgkTokens.push(t));
       });
 
-      // Filter pernyataan yang valid (muncul di baris kunci atau dipilih >= 2 siswa)
-      const validStatements = statementOrder.filter(stmt => {
-        const cnt = statementCounts.get(stmt) || 0;
-        const isFromKey = rawKeyCell && rawKeyCell.toUpperCase().includes(stmt.toUpperCase());
-        return isFromKey || cnt >= 2;
+      rawPgkTokens.forEach(t => {
+        const clean = t.replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim();
+        if (!clean || clean.length < 2) return;
+        const exp = this.extractExplicitOptionPrefix(clean);
+        if (exp && optionKeys.includes(exp.letter)) {
+          if (!explicitPgkOptions.has(exp.letter)) {
+            explicitPgkOptions.set(exp.letter, exp.text || clean);
+          }
+        }
       });
 
-      // Standar SMP: 4 opsi (A, B, C, D). Opsi E hanya jika kunci resmi memuat 5 opsi
-      const activeCount = validStatements.length >= 5 && rawKeyCell && rawKeyCell.toUpperCase().includes(validStatements[4].toUpperCase()) ? 5 : 4;
-      const finalStatements = validStatements.slice(0, activeCount);
+      let pgkOptions: Array<{ key: 'A' | 'B' | 'C' | 'D' | 'E'; text: string }> = [];
 
-      const pgkOptions = finalStatements.map((stmt, idx) => ({
-        key: optionKeys[idx] || 'A',
-        text: stmt,
-      }));
+      if (explicitPgkOptions.size >= 2) {
+        // Gunakan pemetaan huruf eksplisit secara presisi (A, B, C, D)
+        const activeKeys: Array<'A' | 'B' | 'C' | 'D' | 'E'> = explicitPgkOptions.has('E')
+          ? ['A', 'B', 'C', 'D', 'E']
+          : ['A', 'B', 'C', 'D'];
 
-      while (pgkOptions.length < 4) {
-        const k = optionKeys[pgkOptions.length];
-        pgkOptions.push({ key: k, text: `Pilihan ${k}` });
+        pgkOptions = activeKeys.map(k => ({
+          key: k,
+          text: explicitPgkOptions.get(k) || `Pilihan ${k}`,
+        }));
+      } else {
+        // Fallback untuk PGK tanpa prefix huruf eksplisit
+        const statementCounts = new Map<string, number>();
+        const statementOrder: string[] = [];
+
+        const registerStatement = (stmt: string) => {
+          const clean = stmt.replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim();
+          if (!clean || clean.length < 3) return;
+          const upper = clean.toUpperCase();
+          if (['-', 'KOSONG', 'NULL', 'N/A', 'TIDAK DIJAWAB', 'BELUM DIJAWAB'].includes(upper)) return;
+          statementCounts.set(clean, (statementCounts.get(clean) || 0) + 1);
+          if (!statementOrder.some(s => s.toUpperCase() === upper)) {
+            statementOrder.push(clean);
+          }
+        };
+
+        if (rawKeyCell) {
+          this.splitPgkSentenceTokens(rawKeyCell).forEach(registerStatement);
+        }
+        rawCandidates.forEach(val => {
+          this.splitPgkSentenceTokens(val).forEach(registerStatement);
+        });
+
+        const validStatements = statementOrder.filter(stmt => {
+          const cnt = statementCounts.get(stmt) || 0;
+          const isFromKey = rawKeyCell && rawKeyCell.toUpperCase().includes(stmt.toUpperCase());
+          return isFromKey || cnt >= 2;
+        });
+
+        const activeCount = validStatements.length >= 5 && rawKeyCell && rawKeyCell.toUpperCase().includes(validStatements[4].toUpperCase()) ? 5 : 4;
+        const finalStatements = validStatements.slice(0, activeCount);
+
+        pgkOptions = finalStatements.map((stmt, idx) => ({
+          key: optionKeys[idx] || 'A',
+          text: stmt,
+        }));
+
+        while (pgkOptions.length < 4) {
+          const k = optionKeys[pgkOptions.length];
+          pgkOptions.push({ key: k, text: `Pilihan ${k}` });
+        }
       }
 
       // Tentukan kunci jawaban huruf resmi (misal "A, C" atau "A, B, C")
@@ -857,6 +909,15 @@ export class GoogleIntegrationService {
         const keyParts = this.splitPgkSentenceTokens(keySource);
         const matchedKeys: string[] = [];
         keyParts.forEach(kp => {
+          // 1. Coba cocokkan prefix huruf eksplisit
+          const exp = this.extractExplicitOptionPrefix(kp);
+          if (exp && optionKeys.includes(exp.letter)) {
+            if (!matchedKeys.includes(exp.letter)) {
+              matchedKeys.push(exp.letter);
+            }
+            return;
+          }
+          // 2. Cocokkan teks pernyataan
           const kpUpper = kp.toUpperCase();
           const found = pgkOptions.find(o => {
             const optUpper = o.text.toUpperCase();
@@ -998,15 +1059,29 @@ export class GoogleIntegrationService {
 
     // 3. Tentukan jumlah opsi aktif secara dinamis:
     // Standar SMP adalah 4 opsi (A, B, C, D).
-    // Opsi E HANYA AKTIF jika ada bukti sah eksplisit (prefix 'E' atau kunci memuat huruf 'E'):
+    // Opsi E HANYA AKTIF jika ada bukti sah eksplisit dari lembar saat ini (bukan dari bank soal lama):
     const hasEvidenceOfOptionE =
       explicitPrefixMatches.has('E') ||
       isExplicitLetterE(rawKeyCell) ||
-      isExplicitLetterE(existingCorrectAnswer);
+      rawCandidates.some(v => this.extractExplicitOptionPrefix(v)?.letter === 'E');
 
-    const activeOptionKeys: Array<'A' | 'B' | 'C' | 'D' | 'E'> = hasEvidenceOfOptionE
-      ? ['A', 'B', 'C', 'D', 'E']
-      : ['A', 'B', 'C', 'D'];
+    const hasEvidenceOfOptionD =
+      explicitPrefixMatches.has('D') ||
+      (this.extractExplicitOptionPrefix(rawKeyCell || '')?.letter === 'D') ||
+      rawCandidates.some(v => this.extractExplicitOptionPrefix(v)?.letter === 'D') ||
+      unprefixedSpreadsheetTexts.length >= 4;
+
+    let activeOptionKeys: Array<'A' | 'B' | 'C' | 'D' | 'E'>;
+    if (hasEvidenceOfOptionE) {
+      activeOptionKeys = ['A', 'B', 'C', 'D', 'E'];
+    } else if (hasEvidenceOfOptionD || explicitPrefixMatches.size === 0) {
+      activeOptionKeys = ['A', 'B', 'C', 'D'];
+    } else if (explicitPrefixMatches.size === 3) {
+      // Soal Menjodohkan / 3 opsi murni (A, B, C)
+      activeOptionKeys = ['A', 'B', 'C'];
+    } else {
+      activeOptionKeys = ['A', 'B', 'C', 'D'];
+    }
 
     const finalOptions = activeOptionKeys.map(k => {
       // Prioritaskan teks dari keyToText, fallback ke existingOptions, lalu placeholder
@@ -1045,13 +1120,13 @@ export class GoogleIntegrationService {
             });
             if (matchedOpt) {
               finalCorrect = matchedOpt.key;
-            } else if (optionKeys.includes(cleanExistingKey as any)) {
+            } else if (activeOptionKeys.includes(cleanExistingKey as any)) {
               finalCorrect = cleanExistingKey;
             }
           }
         }
       }
-    } else if (cleanExistingKey) {
+    } else if (cleanExistingKey && activeOptionKeys.includes(cleanExistingKey as any)) {
       // Prioritas 2: Kunci yang sudah ada jika tidak ada baris kunci di spreadsheet
       finalCorrect = cleanExistingKey;
     }
@@ -1260,12 +1335,13 @@ export class GoogleIntegrationService {
       const codePrefix = tryout?.code ? tryout.code.replace(/[^a-zA-Z0-9_-]/g, '') : (subject.code || 'SOAL');
       const expectedCodePrefix = `${codePrefix}-Q`;
 
-      // Jika soal terikat pada paket lain atau memiliki kode paket berbeda, putuskan keterkaitan agar tidak merusak paket lain
+      // Jika soal terikat pada paket lain atau memiliki kode paket berbeda atau beda mapel, putuskan keterkaitan agar tidak merusak paket lain
       if (existing && tryout?.id) {
         const isLinkedToOtherTryout = (dbService.getState().tryoutQuestions || [])
           .filter((tq: any) => tq.questionId === existing!.id && tq.tryoutId !== tryout.id).length > 0;
         const codeMismatch = existing.uniqueCode && !existing.uniqueCode.startsWith(expectedCodePrefix);
-        if (isLinkedToOtherTryout && codeMismatch) {
+        const subjectMismatch = existing.subjectId && existing.subjectId !== subject.id;
+        if (isLinkedToOtherTryout || codeMismatch || subjectMismatch) {
           existing = undefined;
         }
       }
@@ -1628,29 +1704,119 @@ export class GoogleIntegrationService {
 
     // Helper untuk mengekstrak NISN & Nama dari baris (mendukung Google Form bercabang per kelas yang memiliki lebih dari 1 kolom NISN/Nama)
     const extractRowNisn = (row: Record<string, string>): string => {
-      const primary = (row[mappingConfig.nisnColumn] || '').trim();
-      if (primary) return primary;
+      const primary = (mappingConfig.nisnColumn ? row[mappingConfig.nisnColumn] : '')?.trim() || '';
+      if (primary && /\d/.test(primary)) return primary;
+
+      // 1. Cek kolom lain yang memuat keyword NISN
       for (const [k, v] of Object.entries(row)) {
         if (!v || !v.trim()) continue;
         const lk = k.toLowerCase();
         if (lk === 'nisn' || lk.includes('nisn') || lk.includes('nomor induk') || lk.includes('no induk') || lk.includes('no. peserta')) {
-          return v.trim();
+          if (/\d/.test(v)) return v.trim();
         }
       }
-      return '';
+
+      // 2. Deteksi jika siswa keliru mengisi NISN di kolom lain (misal kolom Nama):
+      for (const [k, v] of Object.entries(row)) {
+        if (!v || !v.trim()) continue;
+        const cleanVal = v.trim().replace(/^['"`=\s]+|['"`\s]+$/g, '');
+        const digits = cleanVal.replace(/\D/g, '');
+        if (digits.length >= 8 && digits.length <= 12 && /^\d+$/.test(cleanVal)) {
+          return cleanVal;
+        }
+      }
+      return primary;
     };
 
     const extractRowName = (row: Record<string, string>): string => {
       const primary = (mappingConfig.nameColumn ? row[mappingConfig.nameColumn] : '')?.trim() || '';
-      if (primary) return primary;
+      const isDigitsOnly = /^\d+$/.test(primary.replace(/^['"`=\s]+|['"`\s]+$/g, ''));
+      if (primary && !isDigitsOnly) return primary;
+
       for (const [k, v] of Object.entries(row)) {
         if (!v || !v.trim()) continue;
         const lk = k.toLowerCase();
         if ((lk === 'nama' || lk.includes('nama lengkap') || lk.includes('nama siswa') || lk.includes('nama peserta')) && !lk.includes('sekolah')) {
-          return v.trim();
+          const clean = v.trim();
+          if (!/^\d+$/.test(clean.replace(/^['"`=\s]+|['"`\s]+$/g, ''))) {
+            return clean;
+          }
         }
       }
-      return '';
+      return isDigitsOnly ? '' : primary;
+    };
+
+    const findMatchedStudent = (
+      rNisn: string,
+      cNisn: string,
+      rName: string,
+      rowObj: Record<string, string>,
+      rClass?: string
+    ): Student | undefined => {
+      // 1. Cocokkan berdasarkan NISN
+      let match = students.find(s => GoogleIntegrationService.isNisnMatching(rNisn, s.nisn)) ||
+        allDbStudents.find(s => GoogleIntegrationService.isNisnMatching(rNisn, s.nisn));
+
+      if (!match && cNisn) {
+        match = students.find(s => GoogleIntegrationService.isNisnMatching(cNisn, s.nisn)) ||
+          allDbStudents.find(s => GoogleIntegrationService.isNisnMatching(cNisn, s.nisn));
+      }
+
+      if (!match && rNisn) {
+        match = students.find(s => s.nis && (s.nis.trim() === rNisn || GoogleIntegrationService.isNisnMatching(rNisn, s.nis))) ||
+          allDbStudents.find(s => s.nis && (s.nis.trim() === rNisn || GoogleIntegrationService.isNisnMatching(rNisn, s.nis)));
+      }
+
+      // 2. Cocokkan berdasarkan Alamat Email
+      const emailVal = (rowObj['Email Address'] || rowObj['email'] || rowObj['Email'] || '').trim().toLowerCase();
+      if (!match && emailVal) {
+        match = students.find(s => (s.email && s.email.trim().toLowerCase() === emailVal) || (s.nisn && emailVal.includes(s.nisn))) ||
+          allDbStudents.find(s => (s.email && s.email.trim().toLowerCase() === emailVal) || (s.nisn && emailVal.includes(s.nisn)));
+
+        if (!match) {
+          const emailPrefix = emailVal.split('@')[0].replace(/[^a-z0-9]/g, '');
+          if (emailPrefix.length >= 4) {
+            match = students.find(s => {
+              const sNorm = s.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+              return sNorm.includes(emailPrefix) || emailPrefix.includes(sNorm);
+            }) || allDbStudents.find(s => {
+              const sNorm = s.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+              return sNorm.includes(emailPrefix) || emailPrefix.includes(sNorm);
+            });
+          }
+        }
+      }
+
+      // 3. Cocokkan berdasarkan Nama Lengkap / Panggilan
+      if (!match && rName && rName.length >= 3) {
+        const normName = rName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const nameMatches = allDbStudents.filter(s => {
+          const sn = s.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return sn === normName || (sn.length > 5 && (sn.includes(normName) || normName.includes(sn)));
+        });
+        if (nameMatches.length === 1) {
+          match = nameMatches[0];
+        } else if (nameMatches.length > 1 && rClass) {
+          const classMatch = nameMatches.find(s => s.classId && s.classId.toLowerCase().includes(rClass.toLowerCase()));
+          if (classMatch) match = classMatch;
+        }
+      }
+
+      // 4. Cocokkan berdasarkan Kelas dan Nomor Absen
+      if (!match && rClass) {
+        const absenVal = (rowObj['No. Absen :'] || rowObj['No. Absen'] || rowObj['Absen'] || '').trim();
+        const absenNum = parseInt(absenVal, 10);
+        if (!isNaN(absenNum) && absenNum > 0) {
+          const classStudents = allDbStudents
+            .filter(s => s.classId && s.classId.toLowerCase().includes(rClass.toLowerCase()))
+            .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+          if (classStudents[absenNum - 1]) {
+            match = classStudents[absenNum - 1];
+          }
+        }
+      }
+
+      return match;
     };
 
     // 0. Pre-scan for Official Answer Key row (menggunakan detektor terpadu detectAnswerKeyRow)
@@ -1773,38 +1939,18 @@ export class GoogleIntegrationService {
     const studentTrackers = new Map<string, StudentSubmissionTracker>();
 
     studentRows.forEach((row, index) => {
-      const rawNisn = extractRowNisn(row);
-      const rawName = extractRowName(row);
+      let rawNisn = extractRowNisn(row);
+      let rawName = extractRowName(row);
       const rawClass = mappingConfig.classColumn && row[mappingConfig.classColumn]
         ? String(row[mappingConfig.classColumn]).trim()
         : undefined;
-      const cleanNisn = GoogleIntegrationService.normalizeNisn(rawNisn);
+      let cleanNisn = GoogleIntegrationService.normalizeNisn(rawNisn);
 
-      let matchedStudent: Student | undefined =
-        students.find(s => GoogleIntegrationService.isNisnMatching(rawNisn, s.nisn)) ||
-        allDbStudents.find(s => GoogleIntegrationService.isNisnMatching(rawNisn, s.nisn));
-
-      if (!matchedStudent && cleanNisn) {
-        matchedStudent =
-          students.find(s => GoogleIntegrationService.isNisnMatching(cleanNisn, s.nisn)) ||
-          allDbStudents.find(s => GoogleIntegrationService.isNisnMatching(cleanNisn, s.nisn));
-      }
-
-      if (!matchedStudent && rawNisn) {
-        matchedStudent =
-          students.find(s => s.nis && (s.nis.trim() === rawNisn || GoogleIntegrationService.isNisnMatching(rawNisn, s.nis))) ||
-          allDbStudents.find(s => s.nis && (s.nis.trim() === rawNisn || GoogleIntegrationService.isNisnMatching(rawNisn, s.nis)));
-      }
-
-      if (!matchedStudent && rawName && rawName.length >= 3) {
-        const normName = rawName.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const nameMatches = allDbStudents.filter(s => {
-          const sn = s.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-          return sn === normName || (sn.length > 5 && (sn.includes(normName) || normName.includes(sn)));
-        });
-        if (nameMatches.length === 1) {
-          matchedStudent = nameMatches[0];
-        }
+      let matchedStudent = findMatchedStudent(rawNisn, cleanNisn, rawName, row, rawClass);
+      if (matchedStudent) {
+        if (!rawNisn) rawNisn = matchedStudent.nisn;
+        if (!cleanNisn) cleanNisn = matchedStudent.nisn;
+        if (!rawName) rawName = matchedStudent.name;
       }
 
       const dedupKey = matchedStudent
@@ -1867,9 +2013,12 @@ export class GoogleIntegrationService {
 
     const previewItems: SheetImportPreviewItem[] = studentRows.map((row, index) => {
       const rowNumber = index + 1;
-      const rawNisn = extractRowNisn(row);
-      const rawName = extractRowName(row);
-      const cleanNisn = GoogleIntegrationService.normalizeNisn(rawNisn);
+      let rawNisn = extractRowNisn(row);
+      let rawName = extractRowName(row);
+      const rawClass = mappingConfig.classColumn && row[mappingConfig.classColumn]
+        ? String(row[mappingConfig.classColumn]).trim()
+        : undefined;
+      let cleanNisn = GoogleIntegrationService.normalizeNisn(rawNisn);
 
       // Cek apakah baris ini merupakan submisi terdahulu yang digantikan oleh submisi terakhir siswa
       const isEarlierDuplicateRow = earlierDuplicateRowIndices.has(index);
@@ -1897,31 +2046,11 @@ export class GoogleIntegrationService {
       }
 
       // Multi-tier student lookup:
-      let matchedStudent: Student | undefined =
-        students.find(s => GoogleIntegrationService.isNisnMatching(rawNisn, s.nisn)) ||
-        allDbStudents.find(s => GoogleIntegrationService.isNisnMatching(rawNisn, s.nisn));
-
-      if (!matchedStudent && cleanNisn) {
-        matchedStudent =
-          students.find(s => GoogleIntegrationService.isNisnMatching(cleanNisn, s.nisn)) ||
-          allDbStudents.find(s => GoogleIntegrationService.isNisnMatching(cleanNisn, s.nisn));
-      }
-
-      if (!matchedStudent && rawNisn) {
-        matchedStudent =
-          students.find(s => s.nis && (s.nis.trim() === rawNisn || GoogleIntegrationService.isNisnMatching(rawNisn, s.nis))) ||
-          allDbStudents.find(s => s.nis && (s.nis.trim() === rawNisn || GoogleIntegrationService.isNisnMatching(rawNisn, s.nis)));
-      }
-
-      if (!matchedStudent && rawName && rawName.length >= 3) {
-        const normName = rawName.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const nameMatches = allDbStudents.filter(s => {
-          const sn = s.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-          return sn === normName || (sn.length > 5 && (sn.includes(normName) || normName.includes(sn)));
-        });
-        if (nameMatches.length === 1) {
-          matchedStudent = nameMatches[0];
-        }
+      let matchedStudent = findMatchedStudent(rawNisn, cleanNisn, rawName, row, rawClass);
+      if (matchedStudent) {
+        if (!rawNisn) rawNisn = matchedStudent.nisn;
+        if (!cleanNisn) cleanNisn = matchedStudent.nisn;
+        if (!rawName) rawName = matchedStudent.name;
       }
 
       const isValidStudent = !!matchedStudent;
@@ -1983,9 +2112,9 @@ export class GoogleIntegrationService {
         failedCount++;
         duplicateCount++;
         errorDetails.push(`Baris ${rowNumber}: Submisi ganda NISN '${earlierDupMeta.nisn}' digantikan oleh baris ${earlierDupMeta.lastRowNumber}`);
-      } else if (!rawNisn) {
+      } else if (!rawNisn && !matchedStudent) {
         status = 'ERROR_MALFORMED_DATA';
-        validationError = 'Baris data cacat: Kolom NISN kosong.';
+        validationError = 'Baris data cacat: Kolom NISN kosong dan identitas siswa tidak dapat dikenali.';
         failedCount++;
         errorDetails.push(`Baris ${rowNumber}: Kolom NISN kosong`);
       } else if (!isFormatValid) {

@@ -371,14 +371,27 @@ export class AnalyticsService {
           return parts.includes('E');
         };
 
+        // Opsi E hanya aktif jika:
+        // 1. q.options benar-benar memiliki opsi E dengan teks non-placeholder (bukan "Pilihan E" / "Opsi E")
+        // 2. DAN kunci jawaban adalah E, ATAU minimal 2 siswa menjawab E (mencegah anomali 1 siswa)
+        const optionEInDb = Array.isArray(q.options) ? q.options.find(o => (o.key || '').trim().toUpperCase() === 'E') : undefined;
+        const optionEHasRealText = optionEInDb &&
+          optionEInDb.text &&
+          !optionEInDb.text.trim().toUpperCase().startsWith('PILIHAN ') &&
+          !optionEInDb.text.trim().toUpperCase().startsWith('OPSI ') &&
+          optionEInDb.text.trim().toUpperCase() !== 'E';
+
+        const eAnswerCount = qAnswers.filter(a => {
+          const raw = (a.studentAnswer || '').trim().toUpperCase();
+          return raw === 'E' || raw.startsWith('E.') || raw.startsWith('E)') || raw.startsWith('E -') || raw.startsWith('OPSI E') || raw.startsWith('PILIHAN E') || raw.startsWith('OPTION E');
+        }).length;
+
         const hasOptionE =
           validOptionKeys.includes('E') &&
+          !!optionEHasRealText &&
           (
             isExplicitKeyE(q.correctAnswer) ||
-            qAnswers.some(a => {
-              const raw = (a.studentAnswer || '').trim().toUpperCase();
-              return raw === 'E' || raw.startsWith('E.') || raw.startsWith('E)') || raw.startsWith('E -') || raw.startsWith('OPSI E') || raw.startsWith('PILIHAN E') || raw.startsWith('OPTION E');
-            })
+            eAnswerCount >= 2
           );
 
         if (hasOptionE) {
@@ -1030,12 +1043,26 @@ export class AnalyticsService {
       const comp = competencies.find(c => c.id === q.competencyId);
       const isCorrect = ans ? ans.isCorrect : false;
 
+      // Saring opsi E: hanya tampilkan jika teks non-placeholder dan kunci memang E
+      const cleanCorrectKey = (q.correctAnswer || '').replace(/^["'""'']+|["'""'']+$/g, '').trim().toUpperCase();
+      const isKeyE = cleanCorrectKey === 'E' || /^E[.\)\:\-\s]/.test(cleanCorrectKey) || cleanCorrectKey.split(',').map(s => s.trim()).includes('E');
+      const filteredOptions = Array.isArray(q.options)
+        ? q.options.filter(opt => {
+            const k = (opt.key || '').trim().toUpperCase();
+            if (k !== 'E') return true;
+            // Opsi E hanya tampil jika kunci adalah E, atau teksnya bukan placeholder
+            if (isKeyE) return true;
+            const txt = (opt.text || '').trim().toUpperCase();
+            return txt && !txt.startsWith('PILIHAN ') && !txt.startsWith('OPSI ') && txt !== 'E';
+          })
+        : q.options;
+
       return {
         questionId: q.id,
         uniqueCode: q.uniqueCode,
         questionNumber: q.questionNumber,
         questionText: q.questionText,
-        options: q.options,
+        options: filteredOptions,
         studentAnswer: ans?.studentAnswer || 'KOSONG',
         correctAnswer: q.correctAnswer,
         isCorrect,

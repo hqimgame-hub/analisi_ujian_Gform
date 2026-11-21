@@ -4090,6 +4090,11 @@ export class DatabaseService {
       q => linkedQIds.has(q.id) || answerQIds.has(q.id)
     );
 
+    // KETAT: Jika targetSubjectId dispesifikasikan (atau tryout memiliki subjectId), jangan campurkan butir soal dari mapel lain!
+    if (targetSubjectId && result.length > 0) {
+      result = result.filter(q => q.subjectId === targetSubjectId);
+    }
+
     // Jika belum ditemukan dari linkedQIds atau answers, coba cari berdasarkan prefix tryout.code
     if (result.length === 0 && tryout?.code) {
       const codePrefix = `${tryout.code.toLowerCase().trim()}-`;
