@@ -2384,6 +2384,294 @@ export class GoogleIntegrationService {
   }
 
   /**
+   * JIT (Just-In-Time) Resolver Jawaban Siswa dari Google Sheet Berdasarkan NISN
+   * 
+   * Digunakan di Halaman Siswa (khususnya wadah SAT/SAS & Try Out):
+   * Jika rekap butir soal sudah muncul tetapi jawaban siswa masih terbaca kosong (belum tersinkron ke DB),
+   * fungsi ini secara langsung membaca baris respon siswa di Google Sheet berdasarkan NISN siswa,
+   * mengekstrak jawaban per butir soal, menormalisasi opsi A..E,
+   * mengecek kesesuaian dengan kunci jawaban resmi, dan menyimpan entitas Answer & Response
+   * ke database lokal dan Supabase secara idempotent.
+   */
+  public static async resolveAndPersistStudentAnswers(
+    student: Student,
+    tryout: Tryout,
+    subject: Subject,
+    sheetUrl: string,
+    questions: Question[]
+  ): Promise<{
+    success: boolean;
+    found: boolean;
+    answerCount: number;
+    mappedAnswers: Answer[];
+    message: string;
+  }> {
+    if (!sheetUrl) {
+      return { success: false, found: false, answerCount: 0, mappedAnswers: [], message: 'Tautan Google Sheet tidak tersedia.' };
+    }
+    if (!student || !student.nisn) {
+      return { success: false, found: false, answerCount: 0, mappedAnswers: [], message: 'NISN siswa tidak valid.' };
+    }
+
+    try {
+      const csvText = await this.fetchSheetCsv(sheetUrl);
+      const { headers, rows } = this.parseRawSheetText(csvText);
+      if (rows.length === 0) {
+        return { success: false, found: false, answerCount: 0, mappedAnswers: [], message: 'Sheet respon masih kosong.' };
+      }
+
+      // Deteksi baris akun kunci jawaban jika ada
+      const allDbStudents = dbService.getStudents();
+      const { keyRow: detectedKeyRow } = this.detectAnswerKeyRow(headers, rows, allDbStudents);
+
+      // Pastikan kolom pertanyaan dan opsi soal tersinkronisasi
+      const effectiveColumns = this.reconcileSelectedColumns(tryout.selectedQuestionColumns, headers, rows);
+      const enrichedQuestions = this.ensureQuestionsExist(
+        subject,
+        headers,
+        detectedKeyRow,
+        null,
+        effectiveColumns,
+        rows,
+        tryout
+      );
+      const targetQuestions = (enrichedQuestions && enrichedQuestions.length > 0)
+        ? enrichedQuestions
+        : (questions && questions.length > 0 ? questions : dbService.getQuestionsForTryout(tryout.id, subject.id));
+
+      if (targetQuestions.length === 0) {
+        return { success: false, found: false, answerCount: 0, mappedAnswers: [], message: 'Tidak ada butir soal yang dapat dipetakan.' };
+      }
+
+      // Deteksi kolom penting
+      const nisnCol = this.autoDetectNisnColumn(headers, rows, allDbStudents);
+      const nameCol = this.autoDetectNameColumn(headers);
+      const scoreCol = this.autoDetectScoreColumn(headers);
+
+      // Normalisasi target NISN siswa
+      const targetNisnRaw = String(student.nisn).trim();
+      const targetClean = this.normalizeNisn(targetNisnRaw);
+      const targetDigits = targetNisnRaw.replace(/\D/g, '');
+      const targetNoZero = targetDigits.replace(/^0+/, '');
+      const targetStudentName = (student.name || '').toLowerCase().trim();
+
+      // Cari baris siswa dari yang paling baru (submisi terakhir)
+      let matchedRow: Record<string, string> | null = null;
+
+      for (let i = rows.length - 1; i >= 0; i--) {
+        const row = rows[i];
+        let rowNisn = (nisnCol ? row[nisnCol] : '') || '';
+        if (!rowNisn || !/\d/.test(rowNisn)) {
+          for (const [k, v] of Object.entries(row)) {
+            if (!v) continue;
+            const lk = k.toLowerCase();
+            if (lk.includes('nisn') || lk.includes('no. peserta') || lk.includes('nomor induk')) {
+              if (/\d/.test(v)) {
+                rowNisn = v;
+                break;
+              }
+            }
+          }
+        }
+
+        const rowClean = this.normalizeNisn(rowNisn);
+        const rowDigits = String(rowNisn).replace(/\D/g, '');
+        const rowNoZero = rowDigits.replace(/^0+/, '');
+
+        // 1. Cocokkan NISN
+        const isNisnMatch = Boolean(
+          (rowNisn && rowNisn === targetNisnRaw) ||
+          (rowClean && targetClean && rowClean === targetClean) ||
+          (rowDigits && targetDigits && rowDigits === targetDigits) ||
+          (rowNoZero && targetNoZero && rowNoZero === targetNoZero) ||
+          (rowDigits && targetDigits && rowDigits.padStart(10, '0') === targetDigits.padStart(10, '0'))
+        );
+
+        if (isNisnMatch) {
+          matchedRow = row;
+          break;
+        }
+
+        // 2. Fallback pencocokan nama lengkap jika NISN di sheet tidak diisi dengan benar
+        if (!matchedRow && targetStudentName) {
+          const rowName = (nameCol ? row[nameCol] : '') || '';
+          if (rowName) {
+            const cleanRowName = rowName.toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
+            const cleanTargetName = targetStudentName.replace(/[^a-z0-9]/g, ' ').trim();
+            if (cleanRowName === cleanTargetName || (cleanRowName.length > 5 && cleanTargetName.includes(cleanRowName))) {
+              matchedRow = row;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!matchedRow) {
+        return {
+          success: false,
+          found: false,
+          answerCount: 0,
+          mappedAnswers: [],
+          message: `Respon pengerjaan Google Form untuk NISN ${student.nisn} (${student.name}) belum ditemukan di spreadsheet.`
+        };
+      }
+
+      // Deteksi konfigurasi pemetaan kolom soal
+      const mappingConfig = this.detectColumnMappings(
+        headers,
+        targetQuestions,
+        { nisnColumn: nisnCol, scoreColumn: scoreCol, nameColumn: nameCol },
+        effectiveColumns
+      );
+
+      // Siapkan Response ID & Answer IDs
+      const existingResponse = dbService.getResponses().find(
+        r => r.studentId === student.id && r.tryoutId === tryout.id
+      );
+      const responseId = (existingResponse?.id && isValidUuid(existingResponse.id))
+        ? existingResponse.id
+        : generateUuid();
+
+      const existingAnswers = dbService.getAnswers().filter(
+        a => a.studentId === student.id && a.tryoutId === tryout.id
+      );
+      const existingAnswerMap = new Map<string, Answer>();
+      existingAnswers.forEach(a => existingAnswerMap.set(a.questionId, a));
+
+      // Ekstrak skor mentah jika ada di kolom skor
+      let rawGFormScoreNum: number | undefined = undefined;
+      if (scoreCol && matchedRow[scoreCol]) {
+        const rawScoreStr = matchedRow[scoreCol].trim();
+        if (rawScoreStr.includes('/')) {
+          const parts = rawScoreStr.split('/');
+          const num = parseFloat(parts[0].trim().replace(',', '.'));
+          const denom = parseFloat(parts[1].trim().replace(',', '.'));
+          if (!isNaN(num) && !isNaN(denom) && denom > 0) {
+            const maxScore = tryout.scoringConfig?.maxScore || 100;
+            rawGFormScoreNum = Math.round(((num / denom) * maxScore) * 100) / 100;
+          } else {
+            rawGFormScoreNum = isNaN(num) ? undefined : num;
+          }
+        } else {
+          const normalizedStr = rawScoreStr.replace(',', '.');
+          const parsed = parseFloat(normalizedStr);
+          rawGFormScoreNum = isNaN(parsed) ? undefined : parsed;
+        }
+      }
+
+      const now = new Date().toISOString();
+      const mappedAnswers: Answer[] = [];
+
+      targetQuestions.forEach((q, idx) => {
+        let rawVal = '';
+        const mappedCol = mappingConfig.questionMappings?.[q.uniqueCode] || (mappingConfig as any).questionColumns?.[q.uniqueCode];
+        if (mappedCol && matchedRow![mappedCol] !== undefined) {
+          rawVal = matchedRow![mappedCol];
+        } else if (effectiveColumns && effectiveColumns[idx] && matchedRow![effectiveColumns[idx]] !== undefined) {
+          rawVal = matchedRow![effectiveColumns[idx]];
+        }
+
+        const studentAns = this.normalizeAnswerToOptionKey(rawVal, q);
+        const isCorrect = ScoringService.isAnswerMatching(studentAns, q.correctAnswer);
+        const qWeight = tryout.scoringConfig?.scoringType === 'CUSTOM_WEIGHT' ? (q.weight || 1) : 1;
+
+        let ansScore = 0;
+        if (!studentAns) {
+          ansScore = (tryout.scoringConfig?.unansweredScore ?? 0) * qWeight;
+        } else if (isCorrect) {
+          ansScore = (tryout.scoringConfig?.correctScore ?? 1) * qWeight;
+        } else {
+          ansScore = (tryout.scoringConfig?.allowNegativeMarking ? (tryout.scoringConfig?.wrongScore ?? 0) : 0) * qWeight;
+        }
+
+        const existingAns = existingAnswerMap.get(q.id);
+        mappedAnswers.push({
+          id: existingAns?.id || generateUuid(),
+          responseId,
+          studentId: student.id,
+          tryoutId: tryout.id,
+          questionId: q.id,
+          studentAnswer: studentAns,
+          correctAnswer: q.correctAnswer,
+          isCorrect,
+          score: Math.round(ansScore * 100) / 100,
+          submittedAt: now,
+        });
+      });
+
+      // 1. Bentuk Response record
+      const respRecord: Response = {
+        id: responseId,
+        tryoutId: tryout.id,
+        studentId: student.id,
+        nisnInput: student.nisn,
+        rawScoreGForm: rawGFormScoreNum ?? (existingResponse?.rawScoreGForm ?? 0),
+        submittedAt: now,
+        syncBatchId: generateUuid(),
+      };
+
+      // 2. Siapkan / pertahankan Score record
+      const existingScore = dbService.getScores().find(
+        s => s.studentId === student.id && s.tryoutId === tryout.id
+      );
+
+      const totalCorrect = mappedAnswers.filter(a => a.isCorrect).length;
+      const totalUnanswered = mappedAnswers.filter(a => !a.studentAnswer || a.studentAnswer === 'KOSONG').length;
+      const totalIncorrect = mappedAnswers.length - totalCorrect - totalUnanswered;
+
+      const calcScore = targetQuestions.length > 0
+        ? Math.round((totalCorrect / targetQuestions.length) * (tryout.scoringConfig?.maxScore || 100) * 10) / 10
+        : 0;
+
+      const finalScoreVal = rawGFormScoreNum !== undefined
+        ? rawGFormScoreNum
+        : (existingScore?.googleFormScore ?? existingScore?.calculatedScore ?? calcScore);
+
+      const scoreRecord: Score = {
+        id: existingScore?.id || generateUuid(),
+        responseId,
+        studentId: student.id,
+        tryoutId: tryout.id,
+        subjectScores: { [subject.id]: finalScoreVal },
+        googleFormScore: rawGFormScoreNum ?? existingScore?.googleFormScore,
+        calculatedScore: finalScoreVal,
+        scoreDifference: 0,
+        scoringStatus: 'MATCH',
+        totalCorrect,
+        totalIncorrect,
+        totalUnanswered,
+        createdAt: existingScore?.createdAt || now,
+      };
+
+      // 3. Simpan jawaban, response, dan score secara idempotent ke dbService
+      dbService.saveImportedResponsesAndScores(
+        tryout.id,
+        [respRecord],
+        mappedAnswers,
+        [scoreRecord],
+        null
+      );
+
+      return {
+        success: true,
+        found: true,
+        answerCount: mappedAnswers.length,
+        mappedAnswers,
+        message: `Berhasil memetakan ${mappedAnswers.length} butir jawaban untuk ${student.name} (NISN: ${student.nisn}).`
+      };
+    } catch (err: any) {
+      console.error('[GoogleIntegration] resolveAndPersistStudentAnswers error:', err);
+      return {
+        success: false,
+        found: false,
+        answerCount: 0,
+        mappedAnswers: [],
+        message: `Gagal memetakan jawaban: ${err.message || String(err)}`
+      };
+    }
+  }
+
+  /**
    * 5. AUTOMATED TEST SUITE: Full coverage of all Phase 7 requirements
    * Tests:
    * 1. Valid import

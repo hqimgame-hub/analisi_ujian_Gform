@@ -15,6 +15,7 @@ import { StudentQuestionSheet } from '../components/student/StudentQuestionSheet
 import { SubjectRecapSection, SubjectRecapRow } from '../components/student/SubjectRecapSection';
 import { StudentSumatifView } from '../components/student/StudentSumatifView';
 import { SumatifAnalyticsService } from '../services/sumatifAnalytics';
+import { GoogleIntegrationService } from '../services/googleIntegration';
 import {
   buildTryoutStageGroups,
   getStudentStageCompositeScore,
@@ -64,6 +65,11 @@ export const StudentPortalPage: React.FC = () => {
   const [explanationQuestionNumberFilter, setExplanationQuestionNumberFilter] = useState<number | 'ALL'>('ALL');
   const [resourceViewMode, setResourceViewMode] = useState<'CARDS' | 'MODULES'>('CARDS');
   const [mediaTypeFilter, setMediaTypeFilter] = useState<'ALL' | 'YOUTUBE' | 'PDF'>('ALL');
+
+  // JIT Google Sheet NISN Resolver State for Student Portal
+  const [isResolvingSheetAnswers, setIsResolvingSheetAnswers] = useState<boolean>(false);
+  const [sheetResolveMessage, setSheetResolveMessage] = useState<string>('');
+  const [autoResolvedAttempts, setAutoResolvedAttempts] = useState<Record<string, boolean>>({});
 
   // Security & Rate Limiting State
   const [failedAttempts, setFailedAttempts] = useState(0);
@@ -520,14 +526,79 @@ export const StudentPortalPage: React.FC = () => {
     return candidateTryouts[0] || null;
   }, [isSumatifPackage, activePackage, selectedSumatifSubjectId, allTryouts, allSubjects, verifiedStudent, allScores, allAnswersCache]);
 
+  // Konfigurasi mapel sumatif aktif dari wadah paket
+  const activeSumatifSubjectConfig = useMemo(() => {
+    if (!isSumatifPackage || !activePackage || !selectedSumatifSubjectId) return null;
+    return activePackage.subjects?.find(s => s.subjectId === selectedSumatifSubjectId) || null;
+  }, [isSumatifPackage, activePackage, selectedSumatifSubjectId]);
+
+  const activeSumatifSubjectObj = useMemo(() => {
+    if (!selectedSumatifSubjectId) return null;
+    return allSubjects.find(s => s.id === selectedSumatifSubjectId) || null;
+  }, [selectedSumatifSubjectId, allSubjects]);
+
+  // Pastikan Tryout wadah mapel sumatif selalu tersedia/disintesis jika belum terdaftar eksplisit di allTryouts
+  const ensuredSumatifTryout = useMemo<Tryout | null>(() => {
+    if (!isSumatifPackage || !activePackage || !selectedSumatifSubjectId) return null;
+    if (activeSumatifTryout) return activeSumatifTryout;
+    const fullSub = activeSumatifSubjectObj;
+    const targetClassIds = activePackage.targetClassIds || [];
+    const synthesizedTo: Tryout = {
+      id: `to-sum-${activePackage.id}-${selectedSumatifSubjectId}`,
+      code: `${activePackage.code || 'SAT'}-${selectedSumatifSubjectId.slice(-4).toUpperCase()}`,
+      title: `${activePackage.title} - ${fullSub?.name || 'Mata Pelajaran'}`,
+      academicYearId: activePackage.academicYearId,
+      packageId: activePackage.id,
+      assessmentType: activePackage.assessmentType,
+      subjectId: selectedSumatifSubjectId,
+      targetClassIds: targetClassIds.length > 0 ? targetClassIds : undefined,
+      startDate: activePackage.startDate,
+      endDate: activePackage.endDate,
+      status: 'ACTIVE',
+      googleSheetUrl: activeSumatifSubjectConfig?.googleSheetUrl || undefined,
+      googleFormUrl: activeSumatifSubjectConfig?.googleFormUrl || undefined,
+      scoringConfig: {
+        scoringType: 'EQUAL_WEIGHT',
+        scoreSource: 'GOOGLE_FORM',
+        maxScore: 100,
+        correctScore: 1,
+        wrongScore: 0,
+        unansweredScore: 0,
+        allowNegativeMarking: false,
+        passingGrade: fullSub?.passingGrade || 75,
+      },
+    };
+    return synthesizedTo;
+  }, [isSumatifPackage, activePackage, selectedSumatifSubjectId, activeSumatifTryout, activeSumatifSubjectObj, activeSumatifSubjectConfig]);
+
   // Target Tryout ID untuk tab lembar butir soal
   // PERHATIKAN: Pada wadah SAT/SAS, HARUS KEDAP / ISOLATED. JANGAN PERNAH fallback ke selectedTryoutId jika tryout bukan bagian dari wadah SAT!
   const effectiveQuestionSheetTryoutId = useMemo(() => {
     if (isSumatifPackage) {
-      return activeSumatifTryout?.id || '';
+      return activeSumatifTryout?.id || ensuredSumatifTryout?.id || '';
     }
     return selectedTryoutId;
-  }, [isSumatifPackage, activeSumatifTryout, selectedTryoutId]);
+  }, [isSumatifPackage, activeSumatifTryout, ensuredSumatifTryout, selectedTryoutId]);
+
+  // Tautan Google Sheet aktif untuk tryout / mapel yang sedang dibuka
+  const effectiveSheetUrl = useMemo(() => {
+    if (isSumatifPackage) {
+      return activeSumatifSubjectConfig?.googleSheetUrl || activeSumatifTryout?.googleSheetUrl || ensuredSumatifTryout?.googleSheetUrl || '';
+    }
+    return activeTryout?.googleSheetUrl || '';
+  }, [isSumatifPackage, activeSumatifSubjectConfig, activeSumatifTryout, ensuredSumatifTryout, activeTryout]);
+
+  // Deteksi apakah siswa SUDAH MEMILIKI rekaman jawaban nyata (bukan kosong/unanswered)
+  const studentHasRealAnswers = useMemo(() => {
+    if (!verifiedStudent || !effectiveQuestionSheetTryoutId) return false;
+    return allAnswersCache.some(
+      a => a.studentId === verifiedStudent.id &&
+           (a.tryoutId === effectiveQuestionSheetTryoutId || (activePackage && a.tryoutId === activePackage.id)) &&
+           a.studentAnswer &&
+           a.studentAnswer !== 'KOSONG' &&
+           a.studentAnswer !== 'Kosong'
+    );
+  }, [verifiedStudent, effectiveQuestionSheetTryoutId, activePackage, allAnswersCache]);
 
   // Status apakah siswa sudah memiliki data rekaman jawaban atau skor pada tryout target
   const studentHasAnswersForEffectiveTryout = useMemo(() => {
@@ -536,10 +607,84 @@ export const StudentPortalPage: React.FC = () => {
       a => a.studentId === verifiedStudent.id && a.tryoutId === effectiveQuestionSheetTryoutId
     );
     const hasScore = allScores.some(
-      s => s.studentId === verifiedStudent.id && s.tryoutId === effectiveQuestionSheetTryoutId
+      s => s.studentId === verifiedStudent.id && aTryoutMatches(s.tryoutId, effectiveQuestionSheetTryoutId)
     );
-    return hasAnswers || hasScore;
-  }, [verifiedStudent, effectiveQuestionSheetTryoutId, allAnswersCache, allScores]);
+    function aTryoutMatches(sTryoutId: string, targetId: string) {
+      if (sTryoutId === targetId) return true;
+      if (isSumatifPackage && activePackage && sTryoutId === activePackage.id) return true;
+      return false;
+    }
+    return hasAnswers || hasScore || studentHasRealAnswers;
+  }, [verifiedStudent, effectiveQuestionSheetTryoutId, allAnswersCache, allScores, isSumatifPackage, activePackage, studentHasRealAnswers]);
+
+  // Handler JIT: Menarik dan memetakan jawaban siswa langsung dari Google Sheet via NISN
+  const handleResolveMyAnswers = async (showNotification = true) => {
+    if (!verifiedStudent) return;
+    if (!effectiveSheetUrl) {
+      if (showNotification) setErrorMessage('Tautan formulir Google Sheet untuk mata pelajaran ini belum tersedia.');
+      return;
+    }
+    const targetTryout = activeSumatifTryout || ensuredSumatifTryout || activeTryout;
+    const targetSubject = activeSumatifSubjectObj || (activeTryout?.subjectId ? allSubjects.find(s => s.id === activeTryout.subjectId) : null) || allSubjects[0];
+    if (!targetTryout || !targetSubject) {
+      if (showNotification) setErrorMessage('Informasi ujian atau mata pelajaran tidak lengkap.');
+      return;
+    }
+
+    setIsResolvingSheetAnswers(true);
+    setSheetResolveMessage(`Menghubungkan respon Google Form untuk NISN ${verifiedStudent.nisn}...`);
+
+    try {
+      // Pastikan tryout tersimpan di database jika merupakan tryout wadah baru
+      if (!allTryouts.some(t => t.id === targetTryout.id)) {
+        dbService.saveTryout(targetTryout);
+      }
+
+      const questionsForTryout = dbService.getQuestionsForTryout(targetTryout.id, targetSubject.id);
+      const res = await GoogleIntegrationService.resolveAndPersistStudentAnswers(
+        verifiedStudent,
+        targetTryout,
+        targetSubject,
+        effectiveSheetUrl,
+        questionsForTryout
+      );
+
+      if (res.success && res.found) {
+        setSheetResolveMessage(`Berhasil memetakan ${res.answerCount} butir jawaban.`);
+        setDbVersion(v => v + 1);
+      } else {
+        setSheetResolveMessage(res.message);
+      }
+    } catch (err: any) {
+      console.warn('[StudentPortal] handleResolveMyAnswers error:', err);
+      setSheetResolveMessage(`Gagal memetakan jawaban: ${err.message || 'Terjadi kesalahan'}`);
+    } finally {
+      setIsResolvingSheetAnswers(false);
+    }
+  };
+
+  // Auto-resolve jawaban siswa dari Google Sheet via NISN saat siswa membuka tab QUESTION_SHEET
+  // jika jawaban butir soal masih kosong/belum tersinkronkan
+  useEffect(() => {
+    if (portalTab !== 'QUESTION_SHEET') return;
+    if (!verifiedStudent || !effectiveQuestionSheetTryoutId || !effectiveSheetUrl) return;
+    if (studentHasRealAnswers) return;
+    if (isResolvingSheetAnswers) return;
+
+    const attemptKey = `${verifiedStudent.id}_${effectiveQuestionSheetTryoutId}_${effectiveSheetUrl}`;
+    if (autoResolvedAttempts[attemptKey]) return;
+
+    setAutoResolvedAttempts(prev => ({ ...prev, [attemptKey]: true }));
+    handleResolveMyAnswers(false);
+  }, [
+    portalTab,
+    verifiedStudent?.id,
+    effectiveQuestionSheetTryoutId,
+    effectiveSheetUrl,
+    studentHasRealAnswers,
+    isResolvingSheetAnswers,
+    autoResolvedAttempts
+  ]);
 
   // Real Database Student Analytics (menggunakan effectiveQuestionSheetTryoutId dan reaktif)
   const studentAnalytics = useMemo(() => {
@@ -2141,6 +2286,17 @@ export const StudentPortalPage: React.FC = () => {
                         </p>
                       </div>
                       <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                        {effectiveSheetUrl && (
+                          <button
+                            type="button"
+                            onClick={() => handleResolveMyAnswers(true)}
+                            disabled={isResolvingSheetAnswers}
+                            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition-all flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
+                          >
+                            <RefreshCw className={`w-4 h-4 ${isResolvingSheetAnswers ? 'animate-spin' : ''}`} />
+                            {isResolvingSheetAnswers ? 'Memetakan Jawaban...' : 'Tarik Jawaban Saya via NISN'}
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={handleManualSync}
@@ -2153,25 +2309,64 @@ export const StudentPortalPage: React.FC = () => {
                       </div>
                     </div>
                   ) : (
-                    <StudentQuestionSheet
-                      questions={allQuestions}
-                      questionPerformance={studentAnalytics.questionPerformance}
-                      subjects={allSubjects}
-                      explanations={publishedExplanations}
-                      onWatchVideo={(url, title) => {
-                        setSelectedVideoUrl(url);
-                        setSelectedVideoTitle(title);
-                      }}
-                      activeTryoutCode={
-                        isSumatifPackage
-                          ? `${activePackage?.title || 'Asesmen Sumatif'} — ${allSubjects.find(s => s.id === selectedSumatifSubjectId)?.name || 'Mata Pelajaran'}`
-                          : (activeTryout ? `${getFriendlyTryoutStageLabel(activeTryout, displayTryouts)} (${activeTryout.title})` : 'Try Out')
-                      }
-                      tryouts={displayTryouts}
-                      selectedTryoutId={selectedTryoutId}
-                      onSelectTryout={id => setSelectedTryoutId(id)}
-                      hideSubjectFilter={isSumatifPackage}
-                    />
+                    <div className="space-y-4">
+                      {isResolvingSheetAnswers && (
+                        <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-2xl flex items-center gap-3 text-emerald-800 dark:text-emerald-200 animate-pulse shadow-xs">
+                          <RefreshCw className="w-5 h-5 animate-spin text-emerald-600 shrink-0" />
+                          <div className="text-xs">
+                            <p className="font-bold">Menghubungkan & Memetakan Jawaban Anda dari Google Form...</p>
+                            <p className="text-emerald-700 dark:text-emerald-300">
+                              {sheetResolveMessage || `Membaca respon Google Form untuk NISN ${verifiedStudent?.nisn}...`}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      {!studentHasRealAnswers && effectiveSheetUrl && !isResolvingSheetAnswers && (
+                        <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 dark:text-amber-200 shadow-xs">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-amber-100 dark:bg-amber-900/60 rounded-xl text-amber-700 dark:text-amber-300 shrink-0">
+                              <Clock className="w-5 h-5" />
+                            </div>
+                            <div className="text-xs">
+                              <p className="font-bold">Jawaban Butir Soal Belum Terpetakan ke NISN Anda</p>
+                              <p className="text-amber-700 dark:text-amber-300">
+                                {sheetResolveMessage || `Jawaban untuk ${verifiedStudent?.name} (NISN: ${verifiedStudent?.nisn}) belum tersinkronkan. Klik tombol di samping untuk memetakan jawaban Anda.`}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleResolveMyAnswers(true)}
+                            disabled={isResolvingSheetAnswers}
+                            className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shrink-0 disabled:opacity-50"
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 ${isResolvingSheetAnswers ? 'animate-spin' : ''}`} />
+                            Petakan Jawaban Saya
+                          </button>
+                        </div>
+                      )}
+                      <StudentQuestionSheet
+                        questions={allQuestions}
+                        questionPerformance={studentAnalytics.questionPerformance}
+                        subjects={allSubjects}
+                        explanations={publishedExplanations}
+                        onWatchVideo={(url, title) => {
+                          setSelectedVideoUrl(url);
+                          setSelectedVideoTitle(title);
+                        }}
+                        activeTryoutCode={
+                          isSumatifPackage
+                            ? `${activePackage?.title || 'Asesmen Sumatif'} — ${allSubjects.find(s => s.id === selectedSumatifSubjectId)?.name || 'Mata Pelajaran'}`
+                            : (activeTryout ? `${getFriendlyTryoutStageLabel(activeTryout, displayTryouts)} (${activeTryout.title})` : 'Try Out')
+                        }
+                        tryouts={displayTryouts}
+                        selectedTryoutId={selectedTryoutId}
+                        onSelectTryout={id => setSelectedTryoutId(id)}
+                        hideSubjectFilter={isSumatifPackage}
+                        onSyncMyAnswers={effectiveSheetUrl ? () => handleResolveMyAnswers(true) : undefined}
+                        isSyncingMyAnswers={isResolvingSheetAnswers}
+                      />
+                    </div>
                   )
                 ) : (
                   <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 sm:p-12 text-center space-y-4 animate-fade-in shadow-xs">
@@ -2203,6 +2398,17 @@ export const StudentPortalPage: React.FC = () => {
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                      {effectiveSheetUrl && (
+                        <button
+                          type="button"
+                          onClick={() => handleResolveMyAnswers(true)}
+                          disabled={isResolvingSheetAnswers}
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isResolvingSheetAnswers ? 'animate-spin' : ''}`} />
+                          {isResolvingSheetAnswers ? 'Memetakan Jawaban...' : 'Tarik Soal & Jawaban via NISN'}
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => setPortalTab('REPORT')}

@@ -913,9 +913,15 @@ export class AnalyticsService {
     const tryout = tryouts.find(t => t.id === tryoutId) || tryouts[0];
     if (!tryout) return null;
 
-    const studentScore = scores.find(s => s.studentId === studentId && s.tryoutId === tryout.id);
-    const studentResponse = responses.find(r => r.studentId === studentId && r.tryoutId === tryout.id);
-    const studentAnswers = answers.filter(a => a.studentId === studentId && a.tryoutId === tryout.id);
+    const studentScore = scores.find(s => s.studentId === studentId && (s.tryoutId === tryout.id || (tryout.packageId && s.tryoutId === tryout.packageId)));
+    const studentResponse = responses.find(r => r.studentId === studentId && (r.tryoutId === tryout.id || (tryout.packageId && r.tryoutId === tryout.packageId)));
+    const pkgId = tryout.packageId ? tryout.packageId.toLowerCase().trim() : '';
+    const studentAnswers = answers.filter(a => {
+      if (a.studentId !== studentId) return false;
+      if (a.tryoutId === tryout.id) return true;
+      if (pkgId && (a.tryoutId.toLowerCase().trim() === pkgId || a.tryoutId.toLowerCase().includes(pkgId))) return true;
+      return false;
+    });
 
     const isGFormSource = tryout.scoringConfig?.scoreSource === 'GOOGLE_FORM';
     const rawScoreGForm = studentScore?.googleFormScore ?? studentResponse?.rawScoreGForm ?? 0;
@@ -942,6 +948,15 @@ export class AnalyticsService {
       if (q.id && answerMap.has(q.id.toLowerCase().trim())) return answerMap.get(q.id.toLowerCase().trim());
       if (q.uniqueCode && answerMap.has(q.uniqueCode)) return answerMap.get(q.uniqueCode);
       if (q.uniqueCode && answerMap.has(q.uniqueCode.toLowerCase().trim())) return answerMap.get(q.uniqueCode.toLowerCase().trim());
+      // Fallback matching by questionNumber
+      if (q.questionNumber) {
+        const byNum = studentAnswers.find(a => {
+          if (!a.questionId) return false;
+          const qNumMatch = a.questionId.match(/(\d+)$/);
+          return qNumMatch && parseInt(qNumMatch[1], 10) === q.questionNumber;
+        });
+        if (byNum) return byNum;
+      }
       return studentAnswers.find(a =>
         a.questionId === q.id ||
         (q.uniqueCode && a.questionId === q.uniqueCode) ||

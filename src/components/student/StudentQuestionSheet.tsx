@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   CheckCircle2, XCircle, HelpCircle, BookOpen, Play, FileText, Search,
-  Filter, Check, AlertCircle, ArrowUpRight, Sparkles, ExternalLink
+  Filter, Check, AlertCircle, ArrowUpRight, Sparkles, ExternalLink, RefreshCw
 } from 'lucide-react';
 import { Question, Subject, Explanation, Tryout } from '../../types/database';
 import { QuestionPerformanceDetail } from '../../services/analytics';
@@ -18,6 +18,8 @@ interface StudentQuestionSheetProps {
   selectedTryoutId?: string;
   onSelectTryout?: (tryoutId: string) => void;
   hideSubjectFilter?: boolean;
+  onSyncMyAnswers?: () => Promise<void>;
+  isSyncingMyAnswers?: boolean;
 }
 
 export const StudentQuestionSheet: React.FC<StudentQuestionSheetProps> = ({
@@ -31,6 +33,8 @@ export const StudentQuestionSheet: React.FC<StudentQuestionSheetProps> = ({
   selectedTryoutId,
   onSelectTryout,
   hideSubjectFilter = false,
+  onSyncMyAnswers,
+  isSyncingMyAnswers = false,
 }) => {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'CORRECT' | 'INCORRECT' | 'UNANSWERED'>('ALL');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('ALL');
@@ -147,6 +151,19 @@ export const StudentQuestionSheet: React.FC<StudentQuestionSheetProps> = ({
             <span className="text-xs font-mono font-bold bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 px-3 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800">
               Akurasi: {accuracyPct}% ({correctCount}/{totalQuestions})
             </span>
+
+            {onSyncMyAnswers && (
+              <button
+                type="button"
+                onClick={onSyncMyAnswers}
+                disabled={isSyncingMyAnswers}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors shadow-2xs cursor-pointer disabled:opacity-60"
+                title="Tarik atau perbarui respon pengerjaan Google Form Anda berdasarkan NISN"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncingMyAnswers ? 'animate-spin' : ''}`} />
+                <span>{isSyncingMyAnswers ? 'Memetakan...' : 'Sinkronkan Form'}</span>
+              </button>
+            )}
           </div>
         </div>
 
